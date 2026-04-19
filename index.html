@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DEF Web</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">DEF Web</div>
+    <div class="subtitle">Disposition – Testversion</div>
+  </header>
+
+  <main class="container">
+    <section class="card hero">
+      <h1>Willkommen</h1>
+      <p>Das ist die erste Web-Version deiner DEF-Datei.</p>
+      <div class="actions">
+        <button id="newOrderBtn">Neuer Auftrag</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Aufträge</h2>
+      <table class="orders-table">
+        <thead>
+          <tr>
+            <th>BT</th>
+            <th>Datum</th>
+            <th>Adresse</th>
+            <th>VAO</th>
+            <th>PVS</th>
+          </tr>
+        </thead>
+        <tbody id="ordersTableBody">
+          <tr>
+            <td colspan="5" class="empty-state">Noch keine Aufträge vorhanden.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <div id="orderModal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Auftrag bearbeiten</h2>
+        <button id="closeModalBtn" class="icon-btn">✕</button>
+      </div>
+
+      <div class="form-grid">
+        <label>
+          <span>BT</span>
+          <select id="btField">
+            <option value="BT1">BT1</option>
+            <option value="BT2">BT2</option>
+            <option value="BT3">BT3</option>
+            <option value="BT4">BT4</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Datum</span>
+          <input id="dateField" type="date">
+        </label>
+
+        <label class="full">
+          <span>Adresse</span>
+          <input id="addressField" type="text" placeholder="Adresse eingeben">
+        </label>
+
+        <label>
+          <span>VAO Status</span>
+          <select id="vaoField">
+            <option value="nicht gestellt">nicht gestellt</option>
+            <option value="gestellt">gestellt</option>
+            <option value="da">da</option>
+            <option value="nicht nötig">nicht nötig</option>
+          </select>
+        </label>
+
+        <label>
+          <span>PVS</span>
+          <select id="pvsField">
+            <option value="nichts">nichts</option>
+            <option value="einseitig">einseitig</option>
+            <option value="beidseitig">beidseitig</option>
+          </select>
+        </label>
+
+        <label class="full">
+          <span>Details</span>
+          <textarea id="detailsField" rows="4" placeholder="Details eingeben"></textarea>
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button id="saveOrderBtn">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
+index erstellt
