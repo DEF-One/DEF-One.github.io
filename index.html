@@ -9,20 +9,23 @@
 <body>
   <div class="app">
     <header class="topbar">
-      <div>
-        <h1>Disposition Wochenübersicht</h1>
-        <p>Alle Bautrupps einer Woche auf einer Sicht</p>
+      <div class="title-action-wrap">
+        <div>
+          <h1 id="mainTitle">Disposition Wochenübersicht</h1>
+          <p id="mainSubtitle">Alle Bautrupps einer Woche auf einer Sicht</p>
+        </div>
+
+        <button id="vaoOpenListBtn" class="vao-switch-btn" type="button" title="VAO-Offenliste öffnen">
+          🔄
+        </button>
       </div>
 
       <div class="topbar-tools">
+        <button id="exportBuilderBtn" class="tool-btn" type="button">Export</button>
+
         <div class="bt-select-wrap">
           <button id="btDropdownBtn" class="tool-btn" type="button">BT-Auswahl</button>
-          <div id="btDropdownMenu" class="dropdown-menu hidden">
-            <button type="button" class="dropdown-item" data-bt="BT1">BT1</button>
-            <button type="button" class="dropdown-item" data-bt="BT2">BT2</button>
-            <button type="button" class="dropdown-item" data-bt="BT3">BT3</button>
-            <button type="button" class="dropdown-item" data-bt="BT4">BT4</button>
-          </div>
+          <div id="btDropdownMenu" class="dropdown-menu hidden"></div>
         </div>
 
         <button id="weekAdjustBtn" class="tool-btn" type="button">Wochenanpassung</button>
@@ -31,50 +34,72 @@
 
         <div class="search-wrap">
           <input id="searchInput" class="search-input" type="text" placeholder="Suchen..." />
-          <button id="searchInfoBtn" class="info-btn" type="button" aria-label="Suchhilfe">i</button>
+          <button id="searchInfoBtn" class="info-btn" type="button">i</button>
         </div>
 
         <button id="todayBtn" class="tool-btn" type="button">Heute</button>
+        <button id="backToWeekBtn" class="tool-btn hidden" type="button">Wochenansicht</button>
 
         <div class="week-switch-box">
-          <button id="prevWeekBtn" class="arrow-btn" aria-label="Vorherige Woche" type="button">&#8592;</button>
+          <button id="prevWeekBtn" class="arrow-btn" type="button">&#8592;</button>
           <div class="week-switch-center" id="weekDisplay">KW 1 / 2026</div>
-          <button id="nextWeekBtn" class="arrow-btn" aria-label="Nächste Woche" type="button">&#8594;</button>
+          <button id="nextWeekBtn" class="arrow-btn" type="button">&#8594;</button>
         </div>
       </div>
     </header>
 
-    <main class="week-grid" id="weekGrid"></main>
+    <main id="weekView" class="main-view active-view">
+      <div class="week-grid" id="weekGrid"></div>
+    </main>
+
+    <main id="vaoOpenMainView" class="main-view vao-main-view hidden">
+      <section class="vao-main-left">
+        <div class="vao-main-header">
+          <div>
+            <h2>VAO-Offenliste</h2>
+            <p>Alle Aufträge mit „VAO nicht gestellt“</p>
+          </div>
+        </div>
+
+        <div id="vaoOpenListContainer" class="vao-open-list-container"></div>
+      </section>
+
+      <aside class="vao-todo-panel">
+        <div class="vao-todo-header">
+          <div class="vao-cart-icon">🛒</div>
+          <div>
+            <h3>To Do Liste</h3>
+            <p>Deine reservierten VAO-Aufträge</p>
+          </div>
+        </div>
+
+        <div id="vaoTodoListContainer" class="vao-todo-list-container"></div>
+      </aside>
+    </main>
   </div>
 
+  <!-- LIVE DASHBOARD -->
   <div class="modal hidden" id="liveDashboardModal">
     <div class="modal-content live-dashboard-content">
       <div class="small-modal-header">
         <h3 id="liveDashboardTitle">Live Dashboard</h3>
-        <button id="closeLiveDashboardBtn" class="close-btn" type="button">&times;</button>
+        <div class="live-header-right">
+          <span id="activeBtCount" class="active-bt-badge hidden">Aktive BTs: 4</span>
+          <button id="closeLiveDashboardBtn" class="close-btn" type="button">&times;</button>
+        </div>
       </div>
 
       <div class="live-dashboard-body">
         <section class="live-kpi-card">
           <div class="live-kpi-label">Aufträge platziert diese Woche</div>
           <div id="liveTotalOrders" class="live-kpi-number">0</div>
-
           <div class="live-kpi-divider"></div>
 
-          <div class="live-kpi-row">
-            <span>Bestätigte Aufträge</span>
-            <strong id="liveConfirmedOrders">0</strong>
-          </div>
-
-          <div class="live-kpi-row">
-            <span>Offen</span>
-            <strong id="liveOpenOrders">0</strong>
-          </div>
-
-          <div class="live-kpi-row">
-            <span>Fertiggestellt</span>
-            <strong id="liveCompletedOrders">0</strong>
-          </div>
+          <div class="live-kpi-row"><span>Bestätigte Aufträge</span><strong id="liveConfirmedOrders">0</strong></div>
+          <div class="live-kpi-row"><span>Offen</span><strong id="liveOpenOrders">0</strong></div>
+          <div class="live-kpi-row"><span>Fertiggestellt</span><strong id="liveCompletedOrders">0</strong></div>
+          <div class="live-kpi-row"><span>Davon eingeblasen</span><strong id="liveBlownInOrders">0</strong></div>
+          <div class="live-kpi-row"><span>Aufwand</span><strong id="liveEffortOrders">0</strong></div>
 
           <div class="live-progress-wrap">
             <div class="live-progress-top">
@@ -96,13 +121,13 @@
             <span>Ausfälle der aktuellen KW anzeigen</span>
           </label>
 
-          <div id="absenceHint" class="absence-hint hidden">
-            Ausfälle: 0
-          </div>
+          <label class="live-toggle-row">
+            <input id="liveUnaToggle" type="checkbox" />
+            <span>Live Una</span>
+          </label>
 
-          <div id="missingMetersHint" class="missing-meters-hint hidden">
-            0 Aufträge ohne Meterangabe
-          </div>
+          <div id="absenceHint" class="absence-hint hidden">Ausfälle: 0</div>
+          <div id="missingMetersHint" class="missing-meters-hint hidden">0 Aufträge ohne Meterangabe</div>
         </section>
 
         <section class="live-chart-card">
@@ -117,8 +142,10 @@
               <div><span class="legend-dot legend-confirmed"></span>Bestätigt</div>
               <div><span class="legend-dot legend-storno"></span>Storno</div>
               <div><span class="legend-dot legend-clarify"></span>Klärung</div>
+              <div><span class="legend-dot legend-waiting"></span>Wartegrund</div>
               <div><span class="legend-dot legend-open"></span>Offen</div>
               <div><span class="legend-dot legend-completed"></span>Fertiggestellt</div>
+              <div><span class="legend-dot legend-effort"></span>Aufwand</div>
             </div>
           </div>
 
@@ -150,7 +177,7 @@
           <div class="live-chart-header">
             <div>
               <h4>Leistungstrend</h4>
-              <p>Fertiggestellte Aufträge: aktuelle KW im Vergleich zu 3 Vorwochen</p>
+              <p>Fertiggestellt normal / eingeblasen / Aufwand: aktuelle KW im Vergleich zu 3 Vorwochen</p>
             </div>
           </div>
 
@@ -160,10 +187,11 @@
     </div>
   </div>
 
+  <!-- WOCHENANPASSUNG -->
   <div class="modal hidden" id="weekAdjustModal">
     <div class="modal-content week-adjust-content">
       <div class="modal-brand-header">
-        <img src="logo.png" alt="Telekom Tiefbau DEF 1 Logo" class="modal-brand-logo" />
+        <img src="logo.png" alt="Logo" class="modal-brand-logo" />
         <button id="closeWeekAdjustBtn" class="close-btn modal-close-absolute" type="button">&times;</button>
       </div>
 
@@ -190,20 +218,9 @@
 
       <div class="small-modal-body">
         <div class="adjust-status-box">
-          <label>
-            <input type="radio" name="teamAdjustStatus" value="krank" checked />
-            Krank
-          </label>
-
-          <label>
-            <input type="radio" name="teamAdjustStatus" value="urlaub" />
-            Urlaub
-          </label>
-
-          <label>
-            <input type="radio" name="teamAdjustStatus" value="schulung" />
-            Schulungstag
-          </label>
+          <label><input type="radio" name="teamAdjustStatus" value="krank" checked /> Krank</label>
+          <label><input type="radio" name="teamAdjustStatus" value="urlaub" /> Urlaub</label>
+          <label><input type="radio" name="teamAdjustStatus" value="schulung" /> Schulungstag</label>
         </div>
 
         <div class="field-row-2">
@@ -226,13 +243,57 @@
     </div>
   </div>
 
+    <!-- FERTIGGESTELLT -->
+  <div class="modal hidden" id="completedQuestionModal">
+    <div class="modal-content small-modal-content">
+      <div class="small-modal-header">
+        <h3>Fertiggestellt</h3>
+        <button id="closeCompletedQuestionBtn" class="close-btn" type="button">&times;</button>
+      </div>
+
+      <div class="small-modal-body">
+        <p class="question-text">Wurde schon eingeblasen?</p>
+
+        <div class="modal-actions">
+          <button type="button" id="completedNoBtn" class="secondary-btn">Nein</button>
+          <button type="button" id="completedYesBtn" class="primary-btn">Ja</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUFWANDSKONTROLLE -->
+  <div class="modal hidden" id="effortModal">
+    <div class="modal-content small-modal-content">
+      <div class="small-modal-header">
+        <h3>Aufwandskontrolle</h3>
+        <button id="closeEffortModalBtn" class="close-btn" type="button">&times;</button>
+      </div>
+
+      <div class="small-modal-body">
+        <div class="adjust-status-box">
+          <label><input type="radio" name="effortType" value="asphalt" checked /> Asphalt</label>
+          <label><input type="radio" name="effortType" value="pflaster" /> Pflaster</label>
+          <label><input type="radio" name="effortType" value="nacharbeit" /> Nacharbeit</label>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" id="clearEffortBtn" class="secondary-btn">Entfernen</button>
+          <button type="button" id="cancelEffortBtn" class="secondary-btn">Abbrechen</button>
+          <button type="button" id="saveEffortBtn" class="primary-btn">Bestätigen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUFTRAG -->
   <div class="modal hidden" id="orderModal">
     <div class="modal-content order-modal-layout">
       <div class="modal-brand-header">
-        <img src="logo.png" alt="Telekom Tiefbau DEF 1 Logo" class="modal-brand-logo" />
+        <img src="logo.png" alt="Logo" class="modal-brand-logo" />
 
         <div class="modal-header-actions">
-          <button id="deleteOrderBtn" class="delete-order-btn hidden" type="button" title="Auftrag löschen">🗑</button>
+          <button id="deleteOrderBtn" class="delete-order-btn hidden" type="button">🗑</button>
           <button id="closeModalBtn" class="close-btn" type="button">&times;</button>
         </div>
       </div>
@@ -290,10 +351,16 @@
               <input id="orderNvtArea" type="text" />
             </div>
 
-            <label class="completed-check-card">
-              <input id="orderCompleted" type="checkbox" />
-              <span>Fertiggestellt</span>
-            </label>
+            <div class="order-check-actions">
+              <label class="completed-check-card">
+                <input id="orderCompleted" type="checkbox" />
+                <span>Fertiggestellt</span>
+              </label>
+
+              <button id="openEffortBtn" class="effort-control-btn" type="button">
+                Aufwands Kontrolle
+              </button>
+            </div>
           </div>
 
           <div class="form-column">
@@ -366,33 +433,24 @@
 
             <div class="details-time-row">
               <div class="details-editor-wrap">
-                <div class="field-group details-half details-box-group">
+                <div class="field-group details-box-group">
                   <label for="orderDetails">Details</label>
                   <textarea id="orderDetails" rows="6"></textarea>
                 </div>
-                <button type="button" id="insertSeparatorBtn" class="separator-btn" title="Trennlinie einfügen">⚡</button>
+
+                <button type="button" id="insertSeparatorBtn" class="separator-btn">⚡</button>
               </div>
 
               <div class="time-box">
-                <button type="button" id="openTimeModalBtn" class="time-trigger-btn" aria-label="Termin öffnen">
-                  <span class="time-icon">🕒</span>
-                </button>
+                <button type="button" id="openTimeModalBtn" class="time-trigger-btn">🕒</button>
                 <div class="time-box-text">Termin</div>
               </div>
             </div>
 
             <div class="link-grid">
-              <button type="button" id="openGoogleEarthBtn" class="link-card link-card-wide">
-                Google Earth
-              </button>
-
-              <button type="button" id="openAppleMapsBtn" class="link-card">
-                Apple Karten
-              </button>
-
-              <button type="button" id="openGoogleMapsBtn" class="link-card">
-                Google Maps
-              </button>
+              <button type="button" id="openGoogleEarthBtn" class="link-card link-card-wide">Google Earth</button>
+              <button type="button" id="openAppleMapsBtn" class="link-card">Apple Karten</button>
+              <button type="button" id="openGoogleMapsBtn" class="link-card">Google Maps</button>
             </div>
           </div>
         </div>
@@ -405,6 +463,7 @@
     </div>
   </div>
 
+    <!-- AUFTRAG LÖSCHEN -->
   <div class="modal hidden" id="deleteOrderConfirmModal">
     <div class="modal-content small-modal-content">
       <div class="small-modal-header">
@@ -413,7 +472,9 @@
       </div>
 
       <div class="small-modal-body">
-        <p class="warning-text">Willst du diesen Auftrag wirklich unwiderruflich löschen?</p>
+        <p class="warning-text">
+          Willst du diesen Auftrag wirklich unwiderruflich löschen?
+        </p>
 
         <div class="modal-actions">
           <button type="button" id="cancelDeleteOrderBtn" class="secondary-btn">Nein</button>
@@ -423,10 +484,11 @@
     </div>
   </div>
 
+  <!-- TERMIN -->
   <div class="modal hidden" id="timeModal">
     <div class="modal-content time-modal-content">
       <div class="modal-brand-header">
-        <img src="logo.png" alt="Telekom Tiefbau DEF 1 Logo" class="modal-brand-logo" />
+        <img src="logo.png" alt="Logo" class="modal-brand-logo" />
         <button id="closeTimeModalBtn" class="close-btn modal-close-absolute" type="button">&times;</button>
       </div>
 
@@ -444,12 +506,23 @@
         </div>
 
         <div class="field-group">
-          <label for="appointmentStatus">Status</label>
+          <label for="appointmentStatus">Terminstatus</label>
+
           <select id="appointmentStatus">
-            <option value="nicht_bestaetigt" selected>Nicht bestätigt</option>
+            <option value="nicht_bestaetigt">Nicht bestätigt</option>
             <option value="bestaetigt">Bestätigt</option>
             <option value="storno">Storno</option>
             <option value="klaerung">Klärung</option>
+            <option value="wartegrund">Wartegrund</option>
+          </select>
+        </div>
+
+        <div class="field-group waiting-reason-wrap hidden" id="waitingReasonWrap">
+          <label for="waitingReasonSelect">Wartegrund</label>
+
+          <select id="waitingReasonSelect">
+            <option value="">Bitte auswählen</option>
+            <option value="#BT5">#BT5</option>
           </select>
         </div>
 
@@ -461,10 +534,11 @@
     </div>
   </div>
 
+  <!-- SUCHHILFE -->
   <div class="modal hidden" id="searchInfoModal">
     <div class="modal-content small-modal-content">
       <div class="modal-brand-header">
-        <img src="logo.png" alt="Telekom Tiefbau DEF 1 Logo" class="modal-brand-logo" />
+        <img src="logo.png" alt="Logo" class="modal-brand-logo" />
         <button id="closeSearchInfoBtn" class="close-btn modal-close-absolute" type="button">&times;</button>
       </div>
 
@@ -484,33 +558,32 @@
     </div>
   </div>
 
+  <!-- SUCHERGEBNISSE -->
   <div class="modal hidden" id="searchResultsModal">
     <div class="modal-content search-results-content">
       <div class="small-modal-header">
         <h3>Suchergebnisse</h3>
         <button id="closeSearchResultsBtn" class="close-btn" type="button">&times;</button>
       </div>
+
       <div class="small-modal-body">
         <div id="searchResultsContainer"></div>
       </div>
     </div>
   </div>
 
+  <!-- PDF -->
   <div class="modal hidden" id="pdfModal">
     <div class="modal-content small-modal-content">
       <div class="small-modal-header">
         <h3>PDF-Auszug</h3>
         <button id="closePdfModalBtn" class="close-btn" type="button">&times;</button>
       </div>
+
       <div class="small-modal-body">
         <div class="field-group">
           <label for="pdfBtSelect">Für welches BT?</label>
-          <select id="pdfBtSelect">
-            <option value="BT1">BT1</option>
-            <option value="BT2">BT2</option>
-            <option value="BT3">BT3</option>
-            <option value="BT4">BT4</option>
-          </select>
+          <select id="pdfBtSelect"></select>
         </div>
 
         <div class="field-group">
@@ -526,6 +599,7 @@
     </div>
   </div>
 
+  <!-- E-MAIL GENERATOR -->
   <div class="modal hidden" id="emailGeneratorModal">
     <div class="modal-content small-modal-content">
       <div class="small-modal-header">
@@ -549,6 +623,7 @@
     </div>
   </div>
 
+  <!-- AUFTRAG VERSCHIEBEN -->
   <div class="modal hidden" id="moveOrderModal">
     <div class="modal-content small-modal-content">
       <div class="small-modal-header">
@@ -577,6 +652,7 @@
     </div>
   </div>
 
+  <!-- VAO WARNUNG -->
   <div class="modal hidden" id="vaoMoveWarningModal">
     <div class="modal-content small-modal-content">
       <div class="small-modal-header">
@@ -595,6 +671,7 @@
     </div>
   </div>
 
+    <!-- PVS AUSWAHL -->
   <div class="modal hidden" id="pvsMoveChoiceModal">
     <div class="modal-content small-modal-content">
       <div class="small-modal-header">
@@ -621,6 +698,163 @@
             <span>PVS wird zum neuen Datum neu berechnet.</span>
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VAO RESERVIERUNG -->
+  <div id="vaoReserveConfirmModal" class="modal hidden">
+    <div class="modal-content small-modal-content">
+      <div class="small-modal-header">
+        <h3>Auftrag reservieren</h3>
+        <button id="closeVaoReserveConfirmBtn" class="close-btn" type="button">&times;</button>
+      </div>
+
+      <div class="small-modal-body">
+        <p class="warning-text">
+          Möchtest du diesen Auftrag wirklich für dich reservieren?
+        </p>
+
+        <div class="modal-actions">
+          <button id="cancelVaoReserveBtn" class="secondary-btn" type="button">Nein</button>
+          <button id="confirmVaoReserveBtn" class="primary-btn" type="button">Ja</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VAO ABSCHLIESSEN -->
+  <div id="vaoCompleteModal" class="modal hidden">
+    <div class="modal-content small-modal-content">
+      <div class="small-modal-header">
+        <h3>VAO gestellt</h3>
+        <button id="closeVaoCompleteModalBtn" class="close-btn" type="button">&times;</button>
+      </div>
+
+      <div class="small-modal-body">
+        <div class="field-row-2 compact-row">
+          <div class="field-group">
+            <label for="vaoCompleteStart">Gültig ab</label>
+            <input id="vaoCompleteStart" type="date" />
+          </div>
+
+          <div class="field-group">
+            <label for="vaoCompleteEnd">Gültig bis</label>
+            <input id="vaoCompleteEnd" type="date" />
+          </div>
+        </div>
+
+        <div class="permit-action-list">
+          <div class="check-card compact-check-card">
+            <div class="check-title">PVS nötig</div>
+
+            <div class="radio-row">
+              <label><input type="radio" name="vaoCompletePvs" value="ja" /> Ja</label>
+              <label><input type="radio" name="vaoCompletePvs" value="nein" checked /> Nein</label>
+            </div>
+          </div>
+
+          <div class="check-card compact-check-card">
+            <div class="check-title">Aufbruchgenehmigung</div>
+
+            <div class="radio-row">
+              <label><input type="radio" name="vaoCompletePermit" value="ja" /> Ja</label>
+              <label><input type="radio" name="vaoCompletePermit" value="nein" checked /> Nein</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="vaoCompleteMeters">Meter</label>
+          <input id="vaoCompleteMeters" type="number" placeholder="z. B. 12" />
+        </div>
+
+        <div class="modal-actions">
+          <button id="cancelVaoCompleteBtn" class="secondary-btn" type="button">Abbrechen</button>
+          <button id="saveVaoCompleteBtn" class="primary-btn" type="button">Übernehmen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPORT BUILDER -->
+  <div class="modal hidden" id="exportBuilderModal">
+    <div class="modal-content export-builder-content">
+      <div class="small-modal-header">
+        <div>
+          <h3>Excel Export</h3>
+          <p class="muted-text export-subtitle">
+            Baue dir deine Exportspalten per Klick oder Drag & Drop.
+          </p>
+        </div>
+
+        <button id="closeExportBuilderBtn" class="close-btn" type="button">&times;</button>
+      </div>
+
+      <div class="export-builder-body">
+        <section class="export-scope-card">
+          <div>
+            <h4>Exportbereich</h4>
+            <p>Aktuelle KW: <strong id="exportWeekLabel">KW</strong></p>
+          </div>
+
+          <div class="export-scope-options">
+            <label>
+              <input type="radio" name="exportScope" value="solus" checked />
+              Solus
+            </label>
+
+            <label>
+              <input type="radio" name="exportScope" value="una" />
+              Una
+            </label>
+          </div>
+        </section>
+
+        <div class="export-builder-grid">
+          <section class="export-blocks-card">
+            <h4>Bausteine</h4>
+            <p class="muted-text">
+              Klick = nächste freie Spalte. Ziehen = gezielt platzieren.
+            </p>
+
+            <div id="exportFieldBlocks" class="export-field-blocks"></div>
+          </section>
+
+          <section class="export-columns-card">
+            <div class="export-columns-header">
+              <div>
+                <h4>Spaltenaufbau</h4>
+                <p class="muted-text">
+                  Belegte Spalten können mit × entfernt werden.
+                </p>
+              </div>
+
+              <button id="clearExportColumnsBtn" class="secondary-btn" type="button">
+                Leeren
+              </button>
+            </div>
+
+            <div id="exportColumns" class="export-columns"></div>
+          </section>
+        </div>
+
+        <section class="export-preview-card">
+          <div class="export-preview-header">
+            <div>
+              <h4>Vorschau</h4>
+              <p class="muted-text">
+                Die ersten 5 Zeilen deines Exports.
+              </p>
+            </div>
+
+            <button id="downloadExportBtn" class="primary-btn" type="button">
+              Excel exportieren
+            </button>
+          </div>
+
+          <div id="exportPreview" class="export-preview"></div>
+        </section>
       </div>
     </div>
   </div>
