@@ -21,7 +21,11 @@
       </div>
 
       <div class="topbar-tools">
-        <button id="exportBuilderBtn" class="tool-btn" type="button">Export</button>
+        <button id="poolPlanningBtn" class="tool-btn pool-planning-btn" type="button">
+         Pool <span id="poolPlanningCount" class="pool-counter">0</span>
+        </button>
+
+<button id="exportBuilderBtn" class="tool-btn" type="button">Export</button>
 
         <div class="bt-select-wrap">
           <button id="btDropdownBtn" class="tool-btn" type="button">BT-Auswahl</button>
@@ -55,11 +59,24 @@
     <main id="vaoOpenMainView" class="main-view vao-main-view hidden">
       <section class="vao-main-left">
         <div class="vao-main-header">
-          <div>
-            <h2>VAO-Offenliste</h2>
-            <p>Alle Aufträge mit „VAO nicht gestellt“</p>
-          </div>
-        </div>
+  <div>
+    <div class="vao-view-title-row">
+      <div>
+        <h2 id="poolViewTitle">VAO-Offenliste</h2>
+        <p id="poolViewSubtitle">Alle Aufträge mit „VAO nicht gestellt“</p>
+      </div>
+
+      <button
+        id="poolViewSwitchBtn"
+        class="vao-inner-switch-btn"
+        type="button"
+        title="Zwischen VAO-Offenliste und Kontrolle Pool wechseln"
+      >
+        🔄
+      </button>
+    </div>
+  </div>
+</div>
 
         <div id="vaoOpenListContainer" class="vao-open-list-container"></div>
       </section>
@@ -68,8 +85,8 @@
         <div class="vao-todo-header">
           <div class="vao-cart-icon">🛒</div>
           <div>
-            <h3>To Do Liste</h3>
-            <p>Deine reservierten VAO-Aufträge</p>
+            <h3 id="poolTodoTitle">To Do Liste</h3>
+            <p id="poolTodoSubtitle">Deine reservierten VAO-Aufträge</p>
           </div>
         </div>
 
@@ -778,6 +795,62 @@
   </div>
 
   <!-- EXPORT BUILDER -->
+  <!-- PLANUNGSPOOL -->
+<div id="planningPoolModal" class="modal hidden">
+  <div class="modal-content planning-pool-content">
+    <div class="small-modal-header">
+      <div>
+        <h3>Pool</h3>
+        <p class="muted-text">Kontrollierte Aufträge zur Einplanung in die Daily</p>
+      </div>
+
+      <button id="closePlanningPoolBtn" class="close-btn" type="button">&times;</button>
+    </div>
+
+    <div class="planning-pool-body">
+      <div id="planningPoolList" class="planning-pool-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- POOL EINPLANEN -->
+<div id="planningPoolScheduleModal" class="modal hidden">
+  <div class="modal-content small-modal-content">
+    <div class="small-modal-header">
+      <div>
+        <h3>Auftrag einplanen</h3>
+        <p id="planningPoolScheduleSubtitle" class="muted-text">Datum und Trupp auswählen</p>
+      </div>
+
+      <button id="closePlanningPoolScheduleBtn" class="close-btn" type="button">&times;</button>
+    </div>
+
+    <div class="small-modal-body">
+      <div class="field-group">
+        <label for="planningPoolDateInput">Datum</label>
+        <input id="planningPoolDateInput" type="date" />
+      </div>
+
+      <div class="field-group">
+        <label for="planningPoolTeamSelect">Trupp</label>
+        <select id="planningPoolTeamSelect"></select>
+      </div>
+
+      <div id="planningPoolLoadPreview" class="move-load-preview"></div>
+
+      <div class="modal-actions">
+        <button id="cancelPlanningPoolScheduleBtn" class="secondary-btn" type="button">
+          Abbrechen
+        </button>
+
+        <button id="confirmPlanningPoolScheduleBtn" class="primary-btn" type="button">
+          Einplanen
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+  
   <div class="modal hidden" id="exportBuilderModal">
     <div class="modal-content export-builder-content">
       <div class="small-modal-header">
@@ -858,6 +931,112 @@
       </div>
     </div>
   </div>
+
+<!-- KONTROLLE ABSCHLIESSEN -->
+<div id="controlCompleteModal" class="modal hidden">
+  <div class="modal-content control-complete-content">
+    <div class="control-create-header">
+      <div>
+        <h2>Auftrag erstellen</h2>
+        <p id="controlCompleteSubtitle">Auftrag prüfen und kategorisieren</p>
+      </div>
+
+      <button id="closeControlCompleteBtn" class="close-btn" type="button">&times;</button>
+    </div>
+
+    <div class="control-section">
+      <h3>Produktionsreif?</h3>
+
+      <div class="control-production-grid clean">
+        <label class="control-choice-card">
+          <input type="radio" name="controlPtiSketch" value="ja" checked />
+          <span class="control-radio-dot"></span>
+          <strong>Ja</strong>
+        </label>
+
+        <label class="control-choice-card">
+          <input type="radio" name="controlPtiSketch" value="nein" />
+          <span class="control-radio-dot"></span>
+          <strong>Nein</strong>
+        </label>
+      </div>
+    </div>
+
+    <div id="controlNoArea" class="control-section hidden">
+      <h3>Fehlende Unterlagen</h3>
+
+      <div class="control-building-blocks">
+        <button type="button" class="control-block-btn" data-control-block="AKP nicht vorhanden">
+          AKP nicht vorhanden
+        </button>
+
+        <button type="button" class="control-block-btn" data-control-block="Bauakte nicht vorhanden">
+          Bauakte nicht vorhanden
+        </button>
+      </div>
+    </div>
+
+    <div id="controlYesArea">
+      <div class="control-section">
+        <div class="control-section-title">
+          <h3>Auftrag Clustering</h3>
+        </div>
+
+        <div class="control-cluster-clean">
+          <div>
+            <h4>Größe</h4>
+            <div class="control-chip-row">
+              <label><input type="radio" name="controlCategory" value="klein" /> Klein</label>
+              <label><input type="radio" name="controlCategory" value="mittel" /> Mittel</label>
+              <label><input type="radio" name="controlCategory" value="gross" /> Groß</label>
+            </div>
+          </div>
+
+          <div>
+            <h4>Lage</h4>
+            <div class="control-chip-row">
+              <label><input type="radio" name="controlSmDoku" value="gehweg" /> Gehweg</label>
+              <label><input type="radio" name="controlSmDoku" value="strasse" /> Straße</label>
+              <label><input type="radio" name="controlSmDoku" value="querung" /> Straßenquerung</label>
+            </div>
+          </div>
+
+          <div>
+            <h4>Oberfläche</h4>
+            <div class="control-surface-row clean">
+              <button type="button" class="control-surface-btn" data-surface="Unbefestigt">🟫 Unbefestigt</button>
+              <button type="button" class="control-surface-btn" data-surface="Pflaster">🧱 Pflaster</button>
+              <button type="button" class="control-surface-btn" data-surface="Naturstein">🪨 Naturstein</button>
+              <button type="button" class="control-surface-btn" data-surface="Mosaik">◼️ Mosaik</button>
+              <button type="button" class="control-surface-btn" data-surface="Asphalt">🛣️ Asphalt</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-generated-box full">
+      <div>
+        <h3>KI Text</h3>
+        <textarea id="controlGeneratedText" readonly></textarea>
+      </div>
+    </div>
+
+    <textarea id="controlDokuFeedback" class="hidden"></textarea>
+
+    <div class="control-actions">
+      <button id="cancelControlCompleteBtn" class="secondary-btn" type="button">
+        Abbrechen
+      </button>
+
+      <button id="saveControlCompleteBtn" class="control-submit-btn" type="button">
+        ✈ Absenden
+      </button>
+    </div>
+  </div>
+</div>
+  
+</div>
 
   <script src="app.js"></script>
 </body>
