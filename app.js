@@ -21,6 +21,7 @@ let currentBT = "BT1";
 let currentDate = new Date();
 let dailyViewDate = null;
 let currentMainView = "week";
+let currentPoolView = "vao";
 
 let draggedOrderId = null;
 let draggedExportFieldKey = null;
@@ -39,6 +40,8 @@ let selectedAdjustTeam = null;
 
 let pendingVaoReserveOrderId = null;
 let pendingVaoCompleteOrderId = null;
+let pendingControlCompleteOrderId = null;
+let pendingPlanningPoolOrderId = null;
 
 let exportColumnsState = [];
 
@@ -83,7 +86,52 @@ let orders = [
     effortType: "",
     vaoReservedBy: "",
     vaoReservedAt: "",
-    vaoProcessing: false
+    vaoProcessing: false,
+    sourceStage: "daily",
+    controlProcessing: false,
+    controlReservedBy: "",
+    controlReservedAt: "",
+    controlData: null
+  },
+  {
+    id: crypto.randomUUID(),
+    bt: "BT1",
+    team: "",
+    date: "",
+    address: "TEST",
+    klsId: "TEST-KLS",
+    smNumber: "",
+    aspName: "",
+    aspPhone: "",
+    email: "",
+    expansionStatus: "",
+    buildingType: "",
+    meters: "",
+    nvtArea: "",
+    vaoStatus: "nicht_gestellt",
+    vaoStart: "",
+    vaoEnd: "",
+    permit: "nein",
+    baz: "nein",
+    faz: "nein",
+    pvsRequired: "nein",
+    pvsSetupDate: "",
+    details: "",
+    appointmentStart: "",
+    appointmentEnd: "",
+    appointmentStatus: "nicht_bestaetigt",
+    waitingReason: "",
+    completed: false,
+    blownIn: false,
+    effortType: "",
+    vaoReservedBy: "",
+    vaoReservedAt: "",
+    vaoProcessing: false,
+    sourceStage: "control_pool",
+    controlProcessing: false,
+    controlReservedBy: "",
+    controlReservedAt: "",
+    controlData: null
   }
 ];
 
@@ -102,6 +150,12 @@ const vaoOpenMainView = document.getElementById("vaoOpenMainView");
 const vaoOpenListBtn = document.getElementById("vaoOpenListBtn");
 const vaoOpenListContainer = document.getElementById("vaoOpenListContainer");
 const vaoTodoListContainer = document.getElementById("vaoTodoListContainer");
+
+const poolViewTitle = document.getElementById("poolViewTitle");
+const poolViewSubtitle = document.getElementById("poolViewSubtitle");
+const poolViewSwitchBtn = document.getElementById("poolViewSwitchBtn");
+const poolTodoTitle = document.getElementById("poolTodoTitle");
+const poolTodoSubtitle = document.getElementById("poolTodoSubtitle");
 
 const prevWeekBtn = document.getElementById("prevWeekBtn");
 const nextWeekBtn = document.getElementById("nextWeekBtn");
@@ -263,6 +317,29 @@ const vaoCompleteStart = document.getElementById("vaoCompleteStart");
 const vaoCompleteEnd = document.getElementById("vaoCompleteEnd");
 const vaoCompleteMeters = document.getElementById("vaoCompleteMeters");
 
+const controlCompleteModal = document.getElementById("controlCompleteModal");
+const closeControlCompleteBtn = document.getElementById("closeControlCompleteBtn");
+const cancelControlCompleteBtn = document.getElementById("cancelControlCompleteBtn");
+const saveControlCompleteBtn = document.getElementById("saveControlCompleteBtn");
+const controlCompleteSubtitle = document.getElementById("controlCompleteSubtitle");
+const controlDokuFeedback = document.getElementById("controlDokuFeedback");
+const controlGeneratedText = document.getElementById("controlGeneratedText");
+
+const poolPlanningBtn = document.getElementById("poolPlanningBtn");
+const poolPlanningCount = document.getElementById("poolPlanningCount");
+const planningPoolModal = document.getElementById("planningPoolModal");
+const closePlanningPoolBtn = document.getElementById("closePlanningPoolBtn");
+const planningPoolList = document.getElementById("planningPoolList");
+
+const planningPoolScheduleModal = document.getElementById("planningPoolScheduleModal");
+const closePlanningPoolScheduleBtn = document.getElementById("closePlanningPoolScheduleBtn");
+const cancelPlanningPoolScheduleBtn = document.getElementById("cancelPlanningPoolScheduleBtn");
+const confirmPlanningPoolScheduleBtn = document.getElementById("confirmPlanningPoolScheduleBtn");
+const planningPoolScheduleSubtitle = document.getElementById("planningPoolScheduleSubtitle");
+const planningPoolDateInput = document.getElementById("planningPoolDateInput");
+const planningPoolTeamSelect = document.getElementById("planningPoolTeamSelect");
+const planningPoolLoadPreview = document.getElementById("planningPoolLoadPreview");
+
 const exportBuilderBtn = document.getElementById("exportBuilderBtn");
 const exportBuilderModal = document.getElementById("exportBuilderModal");
 const closeExportBuilderBtn = document.getElementById("closeExportBuilderBtn");
@@ -290,11 +367,16 @@ function getIsoDate(date) {
 }
 
 function makeDate(iso) {
+  if (!iso) return new Date();
   return new Date(`${iso}T00:00:00`);
 }
 
 function formatDate(date) {
-  return new Intl.DateTimeFormat("de-DE").format(date);
+  return new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(date);
 }
 
 function formatShortDateFromIso(iso) {
@@ -393,6 +475,21 @@ function canUnlockReservation(order) {
   return order.vaoReservedBy === getCurrentUserLabel();
 }
 
+function canUnlockControlReservation(order) {
+  return order.controlReservedBy === getCurrentUserLabel();
+}
+
+function getControlCategoryText(value) {
+  if (value === "klein") return "Klein";
+  if (value === "mittel") return "Mittel";
+  if (value === "gross") return "Groß";
+  if (value === "planung") return "Planung";
+  if (value === "nacharbeit") return "Nacharbeit";
+  if (value === "klaerung") return "Klärung";
+  if (value === "nicht_umsetzbar") return "Nicht umsetzbar";
+  return "";
+}
+
 function getVaoText(status) {
   if (status === "gestellt") return "VAO gestellt";
   if (status === "da") return "VAO da";
@@ -462,6 +559,8 @@ function getOrdersForScope() {
 
   return orders.filter((order) => {
     if (!weekDates.includes(order.date)) return false;
+    if (order.sourceStage === "control_pool") return false;
+    if (order.sourceStage === "planning_pool") return false;
     if (liveUnaToggle.checked) return true;
     return order.bt === currentBT;
   });
@@ -471,7 +570,9 @@ function getVisibleOrdersForDayAndTeam(dayIso, team) {
   return orders.filter((order) =>
     order.bt === currentBT &&
     order.date === dayIso &&
-    order.team === team
+    order.team === team &&
+    order.sourceStage !== "control_pool" &&
+    order.sourceStage !== "planning_pool"
   );
 }
 
@@ -481,7 +582,9 @@ function getTeamMeters(dayIso, team, excludeOrderId = null) {
       order.bt === currentBT &&
       order.date === dayIso &&
       order.team === team &&
-      order.id !== excludeOrderId
+      order.id !== excludeOrderId &&
+      order.sourceStage !== "control_pool" &&
+      order.sourceStage !== "planning_pool"
     )
     .reduce((sum, order) => {
       const meters = parseMeters(order.meters);
@@ -495,6 +598,8 @@ function hasEffortOnTeam(dayIso, team, excludeOrderId = null) {
     order.date === dayIso &&
     order.team === team &&
     order.id !== excludeOrderId &&
+    order.sourceStage !== "control_pool" &&
+    order.sourceStage !== "planning_pool" &&
     Boolean(order.effortType)
   );
 }
@@ -538,7 +643,7 @@ function appendMoveLog(order, oldDate, oldTeam, newDate, newTeam, source) {
   const method = source === "drag" ? "per Drag & Drop" : "über Auftrag verschieben";
 
   const logLine =
-    `[${formatDateTimeNow()}] ${getCurrentUserLabel()} hat den Auftrag ${method} verschoben: ${oldTeam} / ${formatShortDateFromIso(oldDate)} → ${newTeam} / ${formatShortDateFromIso(newDate)}.`;
+    `[${formatDateTimeNow()}] ${getCurrentUserLabel()} hat den Auftrag ${method} verschoben: ${oldTeam || "-"} / ${formatShortDateFromIso(oldDate)} → ${newTeam || "-"} / ${formatShortDateFromIso(newDate)}.`;
 
   order.details = order.details
     ? `${order.details}\n${logLine}`
@@ -557,35 +662,6 @@ function getExportFieldLabel(key) {
   return EXPORT_FIELDS.find((field) => field.key === key)?.label || key;
 }
 
-function getExportOrders() {
-  const weekDates = getCurrentWeekDates();
-  const scope = getRadioValue("exportScope");
-
-  return orders
-    .filter((order) => {
-      if (!weekDates.includes(order.date)) return false;
-      if (scope === "una") return true;
-      return order.bt === currentBT;
-    })
-    .sort((a, b) => {
-      if (a.bt !== b.bt) return a.bt.localeCompare(b.bt);
-      if (a.date !== b.date) return a.date.localeCompare(b.date);
-      return a.team.localeCompare(b.team);
-    });
-}
-
-function getExportFileName() {
-  const kw = getISOWeek(currentDate);
-  const year = currentDate.getFullYear();
-  const scope = getRadioValue("exportScope");
-
-  if (scope === "una") {
-    return `Export_UNA_KW${kw}_${year}.xls`;
-  }
-
-  return `Export_${currentBT}_KW${kw}_${year}.xls`;
-}
-
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -594,8 +670,99 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function getPlanningPoolOrders() {
+  return orders
+    .filter((order) => order.sourceStage === "planning_pool")
+    .sort((a, b) => {
+      if (a.bt !== b.bt) return a.bt.localeCompare(b.bt);
+      return (a.address || "").localeCompare(b.address || "");
+    });
+}
+
+function updatePlanningPoolCounter() {
+  if (!poolPlanningCount) return;
+
+  const count = getPlanningPoolOrders().length;
+  poolPlanningCount.textContent = count;
+
+  if (poolPlanningBtn) {
+    poolPlanningBtn.classList.toggle("has-items", count > 0);
+  }
+}
+
+function buildControlGeneratedText(order) {
+  const productionReady = getRadioValue("controlPtiSketch");
+  const blocks = [...document.querySelectorAll(".control-block-btn.active")]
+    .map((btn) => btn.dataset.controlBlock);
+
+  const size = getControlCategoryText(getRadioValue("controlCategory"));
+  const location = getRadioValue("controlSmDoku");
+  const surface = document.querySelector(".control-surface-btn.active")?.dataset.surface || "";
+
+  const lines = [
+    `Kontrolle abgeschlossen von ${getCurrentUserLabel()} am ${formatDateTimeNow()}.`,
+    `Auftrag: ${order.address || "-"}`,
+    `KLS-ID: ${order.klsId || "-"}`,
+    ""
+  ];
+
+  if (productionReady === "nein") {
+    if (blocks.length === 1) {
+      lines.push(`Der Auftrag kann nicht bearbeitet werden, weil ${blocks[0]} fehlt.`);
+    }
+
+    if (blocks.length > 1) {
+      lines.push(`Der Auftrag kann nicht bearbeitet werden, weil ${blocks.join(" und ")} fehlen.`);
+    }
+
+    if (!blocks.length) {
+      lines.push("Der Auftrag kann aktuell nicht bearbeitet werden, weil Unterlagen fehlen.");
+    }
+
+    return lines.join("\n");
+  }
+
+  lines.push("Auftrag ist produktionsreif.");
+
+  if (size) lines.push(`Größe: ${size}`);
+  if (location) lines.push(`Lage: ${location}`);
+  if (surface) lines.push(`Oberfläche: ${surface}`);
+
+  return lines.join("\n");
+}
+
+function openControlCompleteModal(orderId) {
+  const order = orders.find((item) => item.id === orderId);
+  if (!order) return;
+
+  pendingControlCompleteOrderId = order.id;
+
+  controlCompleteSubtitle.textContent = order.address || "Auftrag prüfen und kategorisieren";
+
+  setRadioValue("controlPtiSketch", "ja");
+
+  document.querySelectorAll(".control-block-btn").forEach((btn) => btn.classList.remove("active"));
+  document.querySelectorAll(".control-surface-btn").forEach((btn) => btn.classList.remove("active"));
+
+  setRadioValue("controlCategory", "");
+  setRadioValue("controlSmDoku", "");
+
+  document.getElementById("controlYesArea")?.classList.remove("hidden");
+  document.getElementById("controlNoArea")?.classList.add("hidden");
+
+  controlDokuFeedback.value = "";
+  controlGeneratedText.value = buildControlGeneratedText(order);
+
+  openModal(controlCompleteModal);
+}
+
+/***********************************************************
+ * MOVE / PVS / DRAG & DROP
+ ***********************************************************/
+
 function prepareMoveFlow(orderId, newDate, newTeam, source = "button") {
   const order = orders.find((item) => item.id === orderId);
+
   if (!order) return;
 
   pendingMoveOrderId = order.id;
@@ -608,19 +775,20 @@ function prepareMoveFlow(orderId, newDate, newTeam, source = "button") {
     oldTeam: order.team
   };
 
-  const effortConflict = hasEffortOnTeam(newDate, newTeam, order.id);
+  const effortConflict = hasEffortOnTeam(
+    newDate,
+    newTeam,
+    order.id
+  );
 
   if (effortConflict) {
-    const proceed = confirm("Auf diesem Trupp liegt ein Mehraufwand. Willst du trotzdem noch etwas drauf packen?");
+    const proceed = confirm(
+      "Auf diesem Trupp liegt bereits ein Mehraufwand. Trotzdem verschieben?"
+    );
 
     if (!proceed) {
-      if (source === "button") {
-        openModal(moveOrderModal);
-        renderMoveLoadPreview();
-      }
-
-      pendingMoveData = null;
       pendingMoveOrderId = null;
+      pendingMoveData = null;
       draggedOrderId = null;
       return;
     }
@@ -628,7 +796,7 @@ function prepareMoveFlow(orderId, newDate, newTeam, source = "button") {
 
   if (hasVaoConflict(order, newDate)) {
     vaoMoveWarningText.textContent =
-      `Willst du die VAO wirklich aus dem Gültigkeitszeitraum verschieben? Sie ist noch gültig bis ${formatShortDateFromIso(order.vaoEnd)}.`;
+      `Die VAO ist aktuell bis ${formatShortDateFromIso(order.vaoEnd)} gültig. Trotzdem verschieben?`;
 
     closeModal(moveOrderModal);
     openModal(vaoMoveWarningModal);
@@ -639,7 +807,10 @@ function prepareMoveFlow(orderId, newDate, newTeam, source = "button") {
 }
 
 function continueMoveAfterVao() {
-  const order = orders.find((item) => item.id === pendingMoveOrderId);
+  const order = orders.find(
+    (item) => item.id === pendingMoveOrderId
+  );
+
   if (!order) return;
 
   closeModal(vaoMoveWarningModal);
@@ -653,7 +824,9 @@ function continueMoveAfterVao() {
 }
 
 function applyMove(pvsMode) {
-  const order = orders.find((item) => item.id === pendingMoveOrderId);
+  const order = orders.find(
+    (item) => item.id === pendingMoveOrderId
+  );
 
   if (!order || !pendingMoveData) return;
 
@@ -677,7 +850,9 @@ function applyMove(pvsMode) {
 
   if (pvsMode === "new") {
     order.pvsRequired = "ja";
-    order.pvsSetupDate = calculatePvsSetupDate(order.date);
+    order.pvsSetupDate = calculatePvsSetupDate(
+      pendingMoveData.newDate
+    );
   }
 
   closeModal(moveOrderModal);
@@ -686,39 +861,342 @@ function applyMove(pvsMode) {
 
   pendingMoveOrderId = null;
   pendingMoveData = null;
-  pendingMoveSource = "button";
   draggedOrderId = null;
 
   renderAll();
 }
 
-function addDropEvents(target, dayIso, team) {
-  target.addEventListener("dragover", (event) => {
+function addDropEvents(element, dayIso, team) {
+  element.addEventListener("dragover", (event) => {
     event.preventDefault();
-    target.classList.add("drag-over");
+    element.classList.add("drag-over");
   });
 
-  target.addEventListener("dragleave", () => {
-    target.classList.remove("drag-over");
+  element.addEventListener("dragleave", () => {
+    element.classList.remove("drag-over");
   });
 
-  target.addEventListener("drop", (event) => {
+  element.addEventListener("drop", (event) => {
     event.preventDefault();
-    target.classList.remove("drag-over");
+
+    element.classList.remove("drag-over");
 
     if (!draggedOrderId) return;
 
-    prepareMoveFlow(draggedOrderId, dayIso, team, "drag");
+    prepareMoveFlow(
+      draggedOrderId,
+      dayIso,
+      team,
+      "drag"
+    );
   });
 }
 
-/* MAIN RENDER */
+/***********************************************************
+ * KONTROLLE POOL
+ ***********************************************************/
+
+function saveControlData(order) {
+  const controlData = {
+    ptiSketch: getRadioValue("controlPtiSketch"),
+    smDoku: getRadioValue("controlSmDoku"),
+    category: getRadioValue("controlCategory"),
+    categoryText: getControlCategoryText(
+      getRadioValue("controlCategory")
+    ),
+    dokuFeedback: safeText(
+      controlDokuFeedback.value
+    ),
+    generatedText: safeText(
+      controlGeneratedText.value
+    ),
+    completedBy: getCurrentUserLabel(),
+    completedAt: formatDateTimeNow()
+  };
+
+  order.controlData = controlData;
+
+  const historyLine =
+    `[${controlData.completedAt}] ${controlData.completedBy} hat die Kontrolle abgeschlossen. Kategorie: ${controlData.categoryText}`;
+
+  order.details = order.details
+    ? `${order.details}\n${historyLine}\n${controlData.generatedText}`
+    : `${historyLine}\n${controlData.generatedText}`;
+
+  order.controlReservedBy = "";
+  order.controlReservedAt = "";
+  order.controlProcessing = false;
+
+  order.sourceStage = "planning_pool";
+}
+
+/***********************************************************
+ * KONTROLLE MODAL V2 LOGIK
+ ***********************************************************/
+
+function refreshControlModalText() {
+  const order = orders.find((item) => item.id === pendingControlCompleteOrderId);
+  if (!order) return;
+
+  const productionReady = getRadioValue("controlPtiSketch");
+
+  document.getElementById("controlYesArea")?.classList.toggle("hidden", productionReady !== "ja");
+  document.getElementById("controlNoArea")?.classList.toggle("hidden", productionReady !== "nein");
+
+  controlGeneratedText.value = buildControlGeneratedText(order);
+}
+
+document.querySelectorAll('input[name="controlPtiSketch"]').forEach((input) => {
+  input.addEventListener("change", refreshControlModalText);
+});
+
+document.querySelectorAll('input[name="controlCategory"], input[name="controlSmDoku"]').forEach((input) => {
+  input.addEventListener("change", refreshControlModalText);
+});
+
+document.querySelectorAll(".control-block-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    btn.classList.toggle("active");
+    refreshControlModalText();
+  });
+});
+
+document.querySelectorAll(".control-surface-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".control-surface-btn").forEach((item) => item.classList.remove("active"));
+    btn.classList.add("active");
+    refreshControlModalText();
+  });
+});
+
+/***********************************************************
+ * PLANUNGSPOOL
+ ***********************************************************/
+
+function renderPlanningPool() {
+  if (!planningPoolList) return;
+
+  planningPoolList.innerHTML = "";
+
+  const planningOrders = getPlanningPoolOrders();
+
+  updatePlanningPoolCounter();
+
+  if (!planningOrders.length) {
+    planningPoolList.innerHTML = `
+      <div class="planning-pool-empty">
+        Keine Aufträge im Pool vorhanden.
+      </div>
+    `;
+    return;
+  }
+
+  planningOrders.forEach((order) => {
+    const card = document.createElement("div");
+
+    card.className = "planning-pool-card";
+
+    card.innerHTML = `
+      <div class="planning-pool-card-left">
+
+        <div class="planning-pool-address">
+          ${order.address || "-"}
+        </div>
+
+        <div class="planning-pool-meta">
+
+          <span class="planning-pool-chip">
+            ${order.bt}
+          </span>
+
+          ${
+            order.klsId
+              ? `
+              <span class="planning-pool-chip">
+                ${order.klsId}
+              </span>
+            `
+              : ""
+          }
+
+          ${
+            order.controlData?.categoryText
+              ? `
+              <span class="planning-pool-chip planning-pool-category">
+                ${order.controlData.categoryText}
+              </span>
+            `
+              : ""
+          }
+
+          ${
+            order.controlData?.completedBy
+              ? `
+              <span class="planning-pool-chip">
+                ${order.controlData.completedBy}
+              </span>
+            `
+              : ""
+          }
+
+        </div>
+
+      </div>
+
+      <div class="planning-pool-actions">
+
+        <button
+          class="planning-pool-action-btn"
+          data-plan-id="${order.id}"
+          title="Einplanen"
+        >
+          ✅
+        </button>
+
+      </div>
+    `;
+
+    planningPoolList.appendChild(card);
+  });
+
+  planningPoolList
+    .querySelectorAll("[data-plan-id]")
+    .forEach((button) => {
+      button.addEventListener("click", () => {
+        openPlanningPoolSchedule(
+          button.dataset.planId
+        );
+      });
+    });
+}
+
+function openPlanningPoolSchedule(orderId) {
+  const order = orders.find(
+    (item) => item.id === orderId
+  );
+
+  if (!order) return;
+
+  pendingPlanningPoolOrderId = order.id;
+
+  planningPoolScheduleSubtitle.textContent =
+    order.address || "Auftrag einplanen";
+
+  planningPoolDateInput.value =
+    getIsoDate(new Date());
+
+  planningPoolTeamSelect.innerHTML = "";
+
+  TEAMS.forEach((team) => {
+    const option =
+      document.createElement("option");
+
+    option.value = team;
+    option.textContent = team;
+
+    planningPoolTeamSelect.appendChild(option);
+  });
+
+  renderPlanningPoolLoadPreview();
+
+  openModal(
+    planningPoolScheduleModal
+  );
+}
+
+function renderPlanningPoolLoadPreview() {
+  if (!planningPoolLoadPreview) return;
+
+  planningPoolLoadPreview.innerHTML = "";
+
+  const date = planningPoolDateInput.value;
+
+  if (!date) return;
+
+  TEAMS.forEach((team) => {
+    const meters =
+      getTeamMeters(date, team);
+
+    const row =
+      document.createElement("div");
+
+    row.className =
+      `move-load-row ${getMoveLoadClass(meters)}`;
+
+    row.innerHTML = `
+      <span>${team}</span>
+      <span>${meters} m</span>
+    `;
+
+    row.addEventListener("click", () => {
+      planningPoolTeamSelect.value =
+        team;
+
+      renderPlanningPoolLoadPreview();
+    });
+
+    planningPoolLoadPreview.appendChild(
+      row
+    );
+  });
+}
+
+function confirmPlanningPoolSchedule() {
+  const order = orders.find(
+    (item) => item.id === pendingPlanningPoolOrderId
+  );
+
+  if (!order) return;
+
+  const selectedDate = planningPoolDateInput.value;
+  const selectedTeam = planningPoolTeamSelect.value;
+
+  if (!selectedDate || !selectedTeam) {
+    alert("Bitte Datum und Trupp auswählen.");
+    return;
+  }
+
+  order.date = selectedDate;
+  order.team = selectedTeam;
+  order.bt = currentBT;
+
+  order.sourceStage = "daily";
+  order.vaoStatus = "nicht_gestellt";
+  order.vaoReservedBy = "";
+  order.vaoReservedAt = "";
+  order.vaoProcessing = false;
+
+  order.appointmentStatus = order.appointmentStatus || "nicht_bestaetigt";
+
+  const logLine =
+    `[${formatDateTimeNow()}] ${getCurrentUserLabel()} hat den Auftrag aus dem Pool in die Daily eingeplant: ${selectedTeam} / ${formatShortDateFromIso(selectedDate)}.`;
+
+  order.details = order.details
+    ? `${order.details}\n${logLine}`
+    : logLine;
+
+  pendingPlanningPoolOrderId = null;
+
+  closeModal(planningPoolScheduleModal);
+  closeModal(planningPoolModal);
+
+  currentMainView = "week";
+  currentDate = makeDate(selectedDate);
+  dailyViewDate = selectedDate;
+
+  renderAll();
+}
+
+/***********************************************************
+ * MAIN RENDER
+ ***********************************************************/
 
 function renderAll() {
   renderHeader();
   renderBtDropdown();
   renderPdfBtSelect();
   renderMainViews();
+  updatePlanningPoolCounter();
 
   if (currentMainView === "week") {
     renderWeek();
@@ -740,39 +1218,79 @@ function renderAll() {
   if (!exportBuilderModal.classList.contains("hidden")) {
     renderExportBuilder();
   }
+
+  if (!planningPoolModal.classList.contains("hidden")) {
+    renderPlanningPool();
+  }
 }
 
 function renderHeader() {
-  weekDisplay.textContent = `${currentBT} · ${getWeekLabel()}`;
+  weekDisplay.textContent =
+    `${currentBT} · ${getWeekLabel()}`;
 
   if (currentMainView === "vao") {
-    mainTitle.textContent = "VAO-Offenliste";
-    mainSubtitle.textContent = "Offene VAO-Aufträge nach BT";
+    mainTitle.textContent =
+      currentPoolView === "control"
+        ? "Kontrolle Pool"
+        : "VAO-Offenliste";
+
+    mainSubtitle.textContent =
+      currentPoolView === "control"
+        ? "Aufträge aus der Schnittstelle zur Kontrolle"
+        : "Offene VAO-Aufträge nach BT";
+
     vaoOpenListBtn.classList.add("active");
     backToWeekBtn.classList.add("hidden");
+
     return;
   }
 
   vaoOpenListBtn.classList.remove("active");
 
   if (dailyViewDate) {
-    mainTitle.textContent = "Disposition Tagesansicht";
-    mainSubtitle.textContent = `${currentBT} · ${getWeekLabel()}`;
+    mainTitle.textContent =
+      "Disposition Tagesansicht";
+
+    mainSubtitle.textContent =
+      `${currentBT} · ${getWeekLabel()}`;
+
     backToWeekBtn.classList.remove("hidden");
   } else {
-    mainTitle.textContent = "Disposition Wochenübersicht";
-    mainSubtitle.textContent = `${currentBT} · ${getWeekLabel()}`;
+    mainTitle.textContent =
+      "Disposition Wochenübersicht";
+
+    mainSubtitle.textContent =
+      `${currentBT} · ${getWeekLabel()}`;
+
     backToWeekBtn.classList.add("hidden");
   }
 }
 
 function renderMainViews() {
-  weekView.classList.toggle("active-view", currentMainView === "week");
-  weekView.classList.toggle("hidden", currentMainView !== "week");
+  weekView.classList.toggle(
+    "active-view",
+    currentMainView === "week"
+  );
 
-  vaoOpenMainView.classList.toggle("active-view", currentMainView === "vao");
-  vaoOpenMainView.classList.toggle("hidden", currentMainView !== "vao");
+  weekView.classList.toggle(
+    "hidden",
+    currentMainView !== "week"
+  );
+
+  vaoOpenMainView.classList.toggle(
+    "active-view",
+    currentMainView === "vao"
+  );
+
+  vaoOpenMainView.classList.toggle(
+    "hidden",
+    currentMainView !== "vao"
+  );
 }
+
+/***********************************************************
+ * WEEK / DAILY RENDER
+ ***********************************************************/
 
 function renderWeek() {
   weekGrid.innerHTML = "";
@@ -787,8 +1305,11 @@ function renderWeek() {
   }
 
   weekDays.forEach((day) => {
-    const column = document.createElement("section");
-    column.className = "day-column";
+    const column =
+      document.createElement("section");
+
+    column.className =
+      "day-column";
 
     if (day.iso === todayIso) {
       column.classList.add("current-day");
@@ -798,17 +1319,26 @@ function renderWeek() {
       column.classList.add("active-daily-column");
     }
 
-    const isDailyMode = dailyViewDate === day.iso;
+    const isDailyMode =
+      dailyViewDate === day.iso;
 
     column.innerHTML = `
       <div class="day-header">
         <div class="day-header-row">
           <div>
-            <h3 class="day-title">${day.name}</h3>
-            <div class="day-date">${formatDate(day.date)}</div>
+            <h3 class="day-title">
+              ${day.name}
+            </h3>
+
+            <div class="day-date">
+              ${formatDate(day.date)}
+            </div>
           </div>
 
-          <button class="day-view-btn ${isDailyMode ? "active" : ""}" type="button">
+          <button
+            class="day-view-btn ${isDailyMode ? "active" : ""}"
+            type="button"
+          >
             ${isDailyMode ? "📖" : "📘"}
           </button>
         </div>
@@ -817,12 +1347,19 @@ function renderWeek() {
       <div class="day-body"></div>
     `;
 
-    column.querySelector(".day-view-btn").addEventListener("click", () => {
-      dailyViewDate = dailyViewDate === day.iso ? null : day.iso;
-      renderAll();
-    });
+    column
+      .querySelector(".day-view-btn")
+      .addEventListener("click", () => {
+        dailyViewDate =
+          dailyViewDate === day.iso
+            ? null
+            : day.iso;
 
-    const body = column.querySelector(".day-body");
+        renderAll();
+      });
+
+    const body =
+      column.querySelector(".day-body");
 
     if (isDailyMode) {
       renderDailyDayView(body, day.iso);
@@ -835,143 +1372,238 @@ function renderWeek() {
 }
 
 function renderWeeklyDayView(container, dayIso) {
-const availableTeams = [];
-const unavailableTeams = [];
-
-TEAMS.forEach((team) => {
-  const adjustment = getAdjustment(dayIso, team);
-
-  if (adjustment) {
-    unavailableTeams.push(team);
-  } else {
-    availableTeams.push(team);
-  }
-});
-
-[...availableTeams, ...unavailableTeams].forEach((team) => {
-    const adjustment = getAdjustment(dayIso, team);
-    const ordersForTeam = getVisibleOrdersForDayAndTeam(dayIso, team);
-    const totalMeters = getTeamMeters(dayIso, team);
-
-    const teamBlock = document.createElement("div");
-    teamBlock.className = "team-block";
-
-    if (adjustment) teamBlock.classList.add("team-unavailable");
-
-    teamBlock.innerHTML = `
-      ${
-        adjustment
-          ? `<div class="team-unavailable-label">
-              ${getAdjustmentText(adjustment.status)}
-              <span class="team-unavailable-until">bis ${formatShortDateFromIso(adjustment.endDate)}</span>
-            </div>`
-          : ""
-      }
-
-      <div class="team-head">
-        <div class="team-title">${team} / Tagespensum</div>
-
-        <div class="team-head-right">
-          <div class="team-pensum">${totalMeters} m</div>
-          <button class="add-order-btn" type="button">+</button>
-        </div>
-      </div>
-
-      <div class="team-orders"></div>
-    `;
-
-    teamBlock.querySelector(".add-order-btn").addEventListener("click", () => {
-      createTarget = { team, date: dayIso };
-      openCreateOrder();
-    });
-
-    const ordersWrap = teamBlock.querySelector(".team-orders");
-
-    if (!ordersForTeam.length) {
-      ordersWrap.innerHTML = `<div class="empty-box">Keine Aufträge</div>`;
-    }
-
-    ordersForTeam.forEach((order) => {
-      ordersWrap.appendChild(createOrderCard(order));
-    });
-
-    addDropEvents(teamBlock, dayIso, team);
-    container.appendChild(teamBlock);
-  });
-}
-
-function renderDailyDayView(container, dayIso) {
-  const layout = document.createElement("div");
-  layout.className = "daily-horizontal-layout";
-
   const availableTeams = [];
   const unavailableTeams = [];
 
   TEAMS.forEach((team) => {
-    if (getAdjustment(dayIso, team)) {
+    const adjustment =
+      getAdjustment(dayIso, team);
+
+    if (adjustment) {
       unavailableTeams.push(team);
     } else {
       availableTeams.push(team);
     }
   });
 
-  [...availableTeams, ...unavailableTeams].forEach((team) => {
-    const adjustment = getAdjustment(dayIso, team);
-    const ordersForTeam = getVisibleOrdersForDayAndTeam(dayIso, team);
-    const totalMeters = getTeamMeters(dayIso, team);
+  [...availableTeams, ...unavailableTeams].forEach(
+    (team) => {
+      const adjustment =
+        getAdjustment(dayIso, team);
 
-    const row = document.createElement("div");
-    row.className = "daily-team-row";
+      const ordersForTeam =
+        getVisibleOrdersForDayAndTeam(
+          dayIso,
+          team
+        );
 
-    if (adjustment) row.classList.add("team-unavailable");
+      const totalMeters =
+        getTeamMeters(dayIso, team);
 
-    row.innerHTML = `
-      <div class="daily-team-header">
-        <div class="daily-team-title">${team}</div>
+      const teamBlock =
+        document.createElement("div");
 
+      teamBlock.className = "team-block";
+
+      if (adjustment) {
+        teamBlock.classList.add(
+          "team-unavailable"
+        );
+      }
+
+      teamBlock.innerHTML = `
         ${
           adjustment
-            ? `<div class="team-unavailable-label">
-                ${getAdjustmentText(adjustment.status)}
-                <span class="team-unavailable-until">bis ${formatShortDateFromIso(adjustment.endDate)}</span>
-              </div>`
+            ? `
+            <div class="team-unavailable-label">
+              ${getAdjustmentText(adjustment.status)}
+
+              <span class="team-unavailable-until">
+                bis ${formatShortDateFromIso(adjustment.endDate)}
+              </span>
+            </div>
+          `
             : ""
         }
 
-        <div class="team-head-right">
-          <div class="daily-team-meter">${totalMeters} m</div>
-          <button class="add-order-btn" type="button">+</button>
+        <div class="team-head">
+          <div class="team-title">
+            ${team} / Tagespensum
+          </div>
+
+          <div class="team-head-right">
+            <div class="team-pensum">
+              ${totalMeters} m
+            </div>
+
+            <button
+              class="add-order-btn"
+              type="button"
+            >
+              +
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div class="daily-orders-row"></div>
-    `;
+        <div class="team-orders"></div>
+      `;
 
-    row.querySelector(".add-order-btn").addEventListener("click", () => {
-      createTarget = { team, date: dayIso };
-      openCreateOrder();
-    });
+      teamBlock
+        .querySelector(".add-order-btn")
+        .addEventListener("click", () => {
+          createTarget = {
+            team,
+            date: dayIso
+          };
 
-    const rowOrders = row.querySelector(".daily-orders-row");
+          openCreateOrder();
+        });
 
-    if (!ordersForTeam.length) {
-      rowOrders.innerHTML = `<div class="empty-box">Keine Aufträge</div>`;
+      const ordersWrap =
+        teamBlock.querySelector(".team-orders");
+
+      if (!ordersForTeam.length) {
+        ordersWrap.innerHTML =
+          `<div class="empty-box">Keine Aufträge</div>`;
+      }
+
+      ordersForTeam.forEach((order) => {
+        ordersWrap.appendChild(
+          createOrderCard(order)
+        );
+      });
+
+      addDropEvents(teamBlock, dayIso, team);
+
+      container.appendChild(teamBlock);
     }
+  );
+}
 
-    ordersForTeam.forEach((order) => {
-      rowOrders.appendChild(createOrderCard(order));
-    });
+function renderDailyDayView(container, dayIso) {
+  const layout =
+    document.createElement("div");
 
-    addDropEvents(row, dayIso, team);
-    layout.appendChild(row);
+  layout.className =
+    "daily-horizontal-layout";
+
+  const availableTeams = [];
+  const unavailableTeams = [];
+
+  TEAMS.forEach((team) => {
+    const adjustment =
+      getAdjustment(dayIso, team);
+
+    if (adjustment) {
+      unavailableTeams.push(team);
+    } else {
+      availableTeams.push(team);
+    }
   });
+
+  [...availableTeams, ...unavailableTeams].forEach(
+    (team) => {
+      const adjustment =
+        getAdjustment(dayIso, team);
+
+      const ordersForTeam =
+        getVisibleOrdersForDayAndTeam(
+          dayIso,
+          team
+        );
+
+      const totalMeters =
+        getTeamMeters(dayIso, team);
+
+      const row =
+        document.createElement("div");
+
+      row.className =
+        "daily-team-row";
+
+      if (adjustment) {
+        row.classList.add(
+          "team-unavailable"
+        );
+      }
+
+      row.innerHTML = `
+        <div class="daily-team-header">
+          <div class="daily-team-title">
+            ${team}
+          </div>
+
+          ${
+            adjustment
+              ? `
+              <div class="team-unavailable-label">
+                ${getAdjustmentText(adjustment.status)}
+
+                <span class="team-unavailable-until">
+                  bis ${formatShortDateFromIso(adjustment.endDate)}
+                </span>
+              </div>
+            `
+              : ""
+          }
+
+          <div class="team-head-right">
+            <div class="daily-team-meter">
+              ${totalMeters} m
+            </div>
+
+            <button
+              class="add-order-btn"
+              type="button"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div class="daily-orders-row"></div>
+      `;
+
+      row
+        .querySelector(".add-order-btn")
+        .addEventListener("click", () => {
+          createTarget = {
+            team,
+            date: dayIso
+          };
+
+          openCreateOrder();
+        });
+
+      const rowOrders =
+        row.querySelector(".daily-orders-row");
+
+      if (!ordersForTeam.length) {
+        rowOrders.innerHTML =
+          `<div class="empty-box">Keine Aufträge</div>`;
+      }
+
+      ordersForTeam.forEach((order) => {
+        rowOrders.appendChild(
+          createOrderCard(order)
+        );
+      });
+
+      addDropEvents(row, dayIso, team);
+
+      layout.appendChild(row);
+    }
+  );
 
   container.appendChild(layout);
 }
 
 function createOrderCard(order) {
   const card = document.createElement("div");
-  card.className = `order-card ${getOrderStatusClass(order)}`;
+
+  card.className =
+    `order-card ${getOrderStatusClass(order)}`;
+
   card.draggable = true;
 
   card.addEventListener("dragstart", () => {
@@ -991,7 +1623,9 @@ function createOrderCard(order) {
   card.innerHTML = `
     <div class="order-card-head compact-order-head">
       <div class="order-card-main">
-        <div class="order-card-address">${order.address || "Ohne Adresse"}</div>
+        <div class="order-card-address">
+          ${order.address || "Ohne Adresse"}
+        </div>
 
         <div class="order-card-subline">
           ${order.klsId ? `<span>${order.klsId}</span>` : ""}
@@ -1045,25 +1679,58 @@ function createOrderCard(order) {
   return card;
 }
 
-/* VAO MAIN VIEW */
+/***********************************************************
+ * VAO OFFENLISTE / KONTROLLE POOL
+ ***********************************************************/
 
-function getVaoOpenOrdersByBt() {
+function getPoolOrdersByBt() {
   const grouped = {};
 
   BTS.forEach((bt) => {
-    grouped[bt] = orders
-      .filter((order) =>
-        order.bt === bt &&
-        (!order.vaoStatus || order.vaoStatus === "nicht_gestellt")
-      )
-      .sort((a, b) => makeDate(a.date) - makeDate(b.date));
+    if (currentPoolView === "control") {
+      grouped[bt] = orders
+        .filter((order) =>
+          order.bt === bt &&
+          order.sourceStage === "control_pool"
+        )
+        .sort((a, b) =>
+          (a.address || "").localeCompare(b.address || "")
+        );
+    } else {
+      grouped[bt] = orders
+        .filter((order) =>
+          order.bt === bt &&
+          order.sourceStage !== "control_pool" &&
+          order.sourceStage !== "planning_pool" &&
+          (!order.vaoStatus || order.vaoStatus === "nicht_gestellt")
+        )
+        .sort((a, b) =>
+          makeDate(a.date || getIsoDate(new Date())) -
+          makeDate(b.date || getIsoDate(new Date()))
+        );
+    }
   });
 
   return grouped;
 }
 
 function renderVaoOpenList() {
-  const grouped = getVaoOpenOrdersByBt();
+  const grouped = getPoolOrdersByBt();
+
+  poolViewTitle.textContent =
+    currentPoolView === "control"
+      ? "Kontrolle Pool"
+      : "VAO-Offenliste";
+
+  poolViewSubtitle.textContent =
+    currentPoolView === "control"
+      ? "Aufträge aus der Schnittstelle zur Kontrolle"
+      : "Alle Aufträge mit „VAO nicht gestellt“";
+
+  poolViewSwitchBtn.classList.toggle(
+    "active",
+    currentPoolView === "control"
+  );
 
   vaoOpenListContainer.innerHTML = "";
 
@@ -1073,71 +1740,176 @@ function renderVaoOpenList() {
     const btOrders = grouped[bt];
     totalOpen += btOrders.length;
 
-    const block = document.createElement("section");
-    block.className = "vao-open-bt-block";
+    const block =
+      document.createElement("section");
+
+    block.className =
+      "vao-open-bt-block";
 
     block.innerHTML = `
       <div class="vao-open-bt-header">
-        <div class="vao-open-bt-title">${bt}</div>
-        <div class="vao-open-bt-count">${btOrders.length} offen</div>
+        <div class="vao-open-bt-title">
+          ${bt}
+        </div>
+
+        <div class="vao-open-bt-count">
+          ${btOrders.length} offen
+        </div>
       </div>
 
       <div class="vao-open-orders"></div>
     `;
 
-    const orderWrap = block.querySelector(".vao-open-orders");
+    const orderWrap =
+      block.querySelector(".vao-open-orders");
 
     if (!btOrders.length) {
-      orderWrap.innerHTML = `<div class="vao-empty">Keine offenen VAOs.</div>`;
+      orderWrap.innerHTML = `
+        <div class="vao-empty">
+          ${
+            currentPoolView === "control"
+              ? "Keine Aufträge im Kontrolle Pool."
+              : "Keine offenen VAOs."
+          }
+        </div>
+      `;
     }
 
     btOrders.forEach((order) => {
-      const card = document.createElement("div");
+      const isControl =
+        currentPoolView === "control";
+
+      const card =
+        document.createElement("div");
+
+      const reservedBy =
+        isControl
+          ? order.controlReservedBy
+          : order.vaoReservedBy;
+
+      const reservedAt =
+        isControl
+          ? order.controlReservedAt
+          : order.vaoReservedAt;
+
+      const processing =
+        isControl
+          ? order.controlProcessing
+          : order.vaoProcessing;
 
       card.className = `vao-open-card ${
-        order.vaoProcessing ? "processing" : ""
-      } ${order.vaoReservedBy ? "locked" : ""}`;
+        isControl ? "control-pool-card" : ""
+      } ${processing ? "processing" : ""} ${
+        reservedBy ? "locked" : ""
+      }`;
 
       const reservedText =
-        order.vaoReservedBy && order.vaoReservedAt
-          ? `Reserviert von ${order.vaoReservedBy} · ${order.vaoReservedAt}`
+        reservedBy && reservedAt
+          ? `Reserviert von ${reservedBy} · ${reservedAt}`
           : "";
 
       card.innerHTML = `
         <div class="vao-open-left">
-          <div class="vao-open-address">${order.address || "Ohne Adresse"}</div>
+          <div class="vao-open-address">
+            ${order.address || "Ohne Adresse"}
+          </div>
 
           <div class="vao-open-meta">
             <span class="vao-meta-chip">${order.bt}</span>
-            <span class="vao-meta-chip">${order.team}</span>
-            <span class="vao-meta-chip">${formatShortDateFromIso(order.date)}</span>
 
-            ${order.klsId ? `<span class="vao-meta-chip">${order.klsId}</span>` : ""}
+            ${
+              order.team
+                ? `<span class="vao-meta-chip">${order.team}</span>`
+                : ""
+            }
 
-            ${reservedText ? `<span class="vao-meta-chip vao-reserved-chip">${reservedText}</span>` : ""}
+            ${
+              order.date
+                ? `<span class="vao-meta-chip">${formatShortDateFromIso(order.date)}</span>`
+                : ""
+            }
 
-            ${order.vaoProcessing ? `<span class="vao-meta-chip vao-processing-chip">In Bearbeitung</span>` : ""}
+            ${
+              order.klsId
+                ? `<span class="vao-meta-chip">${order.klsId}</span>`
+                : ""
+            }
+
+            ${
+              isControl
+                ? `<span class="vao-meta-chip pool-chip">Kontrolle</span>`
+                : ""
+            }
+
+            ${
+              reservedText
+                ? `<span class="vao-meta-chip vao-reserved-chip">${reservedText}</span>`
+                : ""
+            }
+
+            ${
+              processing
+                ? `<span class="vao-meta-chip vao-processing-chip">In Bearbeitung</span>`
+                : ""
+            }
           </div>
         </div>
 
         <div class="vao-open-actions">
-          <button class="vao-action-btn locked-btn" type="button" title="Reservieren">
-            ${order.vaoReservedBy ? "🔓" : "🔒"}
+          <button
+            class="vao-action-btn locked-btn"
+            type="button"
+            title="Reservieren"
+          >
+            ${reservedBy ? "🔓" : "🔒"}
           </button>
 
-          <button class="vao-action-btn ${order.vaoProcessing ? "active-flag" : ""}" type="button" title="In Bearbeitung">
+          <button
+            class="vao-action-btn ${processing ? "active-flag" : ""}"
+            type="button"
+            title="In Bearbeitung"
+          >
             🚩
           </button>
 
-          <button class="vao-action-btn done-btn" type="button" title="VAO gestellt">
+          <button
+            class="vao-action-btn done-btn"
+            type="button"
+            title="${isControl ? "Kontrolle abschließen" : "VAO gestellt"}"
+          >
             ✅
           </button>
         </div>
       `;
 
-      const [lockBtn, flagBtn, doneBtn] = card.querySelectorAll(".vao-action-btn");
+      const [lockBtn, flagBtn, doneBtn] =
+        card.querySelectorAll(".vao-action-btn");
 
       lockBtn.addEventListener("click", () => {
+        if (isControl) {
+          if (order.controlReservedBy) {
+            if (!canUnlockControlReservation(order)) {
+              alert("Nur die Person, die reserviert hat, kann die Reservierung wieder entfernen.");
+              return;
+            }
+
+            order.controlReservedBy = "";
+            order.controlReservedAt = "";
+
+            renderAll();
+            return;
+          }
+
+          order.controlReservedBy =
+            getCurrentUserLabel();
+
+          order.controlReservedAt =
+            formatDateTimeNow();
+
+          renderAll();
+          return;
+        }
+
         if (order.vaoReservedBy) {
           if (!canUnlockReservation(order)) {
             alert("Nur die Person, die reserviert hat, kann die Reservierung wieder entfernen.");
@@ -1146,36 +1918,92 @@ function renderVaoOpenList() {
 
           order.vaoReservedBy = "";
           order.vaoReservedAt = "";
+
           renderAll();
           return;
         }
 
-        pendingVaoReserveOrderId = order.id;
+        pendingVaoReserveOrderId =
+          order.id;
+
         openModal(vaoReserveConfirmModal);
       });
 
       flagBtn.addEventListener("click", () => {
-        if (order.vaoReservedBy && !canUnlockReservation(order)) {
+        if (isControl) {
+          if (
+            order.controlReservedBy &&
+            !canUnlockControlReservation(order)
+          ) {
+            alert("Dieser Auftrag ist von einer anderen Person reserviert.");
+            return;
+          }
+
+          order.controlProcessing =
+            !order.controlProcessing;
+
+          renderAll();
+          return;
+        }
+
+        if (
+          order.vaoReservedBy &&
+          !canUnlockReservation(order)
+        ) {
           alert("Dieser Auftrag ist von einer anderen Person reserviert.");
           return;
         }
 
-        order.vaoProcessing = !order.vaoProcessing;
+        order.vaoProcessing =
+          !order.vaoProcessing;
+
         renderAll();
       });
 
       doneBtn.addEventListener("click", () => {
-        if (order.vaoReservedBy && !canUnlockReservation(order)) {
+        if (isControl) {
+          if (
+            order.controlReservedBy &&
+            !canUnlockControlReservation(order)
+          ) {
+            alert("Dieser Auftrag ist von einer anderen Person reserviert.");
+            return;
+          }
+
+          openControlCompleteModal(order.id);
+          return;
+        }
+
+        if (
+          order.vaoReservedBy &&
+          !canUnlockReservation(order)
+        ) {
           alert("Dieser Auftrag ist von einer anderen Person reserviert.");
           return;
         }
 
-        pendingVaoCompleteOrderId = order.id;
-        vaoCompleteStart.value = order.vaoStart || "";
-        vaoCompleteEnd.value = order.vaoEnd || "";
-        vaoCompleteMeters.value = order.meters || "";
-        setRadioValue("vaoCompletePvs", order.pvsRequired || "nein");
-        setRadioValue("vaoCompletePermit", order.permit || "nein");
+        pendingVaoCompleteOrderId =
+          order.id;
+
+        vaoCompleteStart.value =
+          order.vaoStart || "";
+
+        vaoCompleteEnd.value =
+          order.vaoEnd || "";
+
+        vaoCompleteMeters.value =
+          order.meters || "";
+
+        setRadioValue(
+          "vaoCompletePvs",
+          order.pvsRequired || "nein"
+        );
+
+        setRadioValue(
+          "vaoCompletePermit",
+          order.permit || "nein"
+        );
+
         openModal(vaoCompleteModal);
       });
 
@@ -1187,47 +2015,105 @@ function renderVaoOpenList() {
 
   if (totalOpen === 0) {
     vaoOpenListContainer.innerHTML = `
-      <div class="vao-empty">Es gibt aktuell keine offenen VAO-Aufträge.</div>
+      <div class="vao-empty">
+        ${
+          currentPoolView === "control"
+            ? "Es gibt aktuell keine Aufträge im Kontrolle Pool."
+            : "Es gibt aktuell keine offenen VAO-Aufträge."
+        }
+      </div>
     `;
   }
 }
 
 function renderVaoTodoList() {
+  const isControl =
+    currentPoolView === "control";
+
+  poolTodoTitle.textContent =
+    "To Do Liste";
+
+  poolTodoSubtitle.textContent =
+    isControl
+      ? "Deine reservierten Kontroll-Aufträge"
+      : "Deine reservierten VAO-Aufträge";
+
   const myOrders = orders
-    .filter((order) => order.vaoReservedBy === getCurrentUserLabel())
+    .filter((order) =>
+      isControl
+        ? order.controlReservedBy === getCurrentUserLabel()
+        : order.vaoReservedBy === getCurrentUserLabel()
+    )
     .sort((a, b) => {
-      if (a.bt !== b.bt) return a.bt.localeCompare(b.bt);
-      return makeDate(a.date) - makeDate(b.date);
+      if (a.bt !== b.bt) {
+        return a.bt.localeCompare(b.bt);
+      }
+
+      return (a.address || "").localeCompare(
+        b.address || ""
+      );
     });
 
   vaoTodoListContainer.innerHTML = "";
 
   if (!myOrders.length) {
     vaoTodoListContainer.innerHTML = `
-      <div class="vao-empty">Du hast aktuell keine VAO-Aufträge reserviert.</div>
+      <div class="vao-empty">
+        ${
+          isControl
+            ? "Du hast aktuell keine Kontroll-Aufträge reserviert."
+            : "Du hast aktuell keine VAO-Aufträge reserviert."
+        }
+      </div>
     `;
     return;
   }
 
   BTS.forEach((bt) => {
-    const btOrders = myOrders.filter((order) => order.bt === bt);
+    const btOrders =
+      myOrders.filter((order) => order.bt === bt);
 
     if (!btOrders.length) return;
 
-    const group = document.createElement("div");
-    group.className = "todo-bt-group";
-    group.innerHTML = `<div class="todo-bt-title">${bt}</div>`;
+    const group =
+      document.createElement("div");
+
+    group.className =
+      "todo-bt-group";
+
+    group.innerHTML =
+      `<div class="todo-bt-title">${bt}</div>`;
 
     btOrders.forEach((order) => {
-      const item = document.createElement("div");
-      item.className = "todo-order-card";
+      const item =
+        document.createElement("div");
+
+      item.className =
+        "todo-order-card";
 
       item.innerHTML = `
-        <div class="todo-order-address">${order.address || "Ohne Adresse"}</div>
+        <div class="todo-order-address">
+          ${order.address || "Ohne Adresse"}
+        </div>
 
         <div class="todo-order-meta">
-          <span class="todo-order-chip">${order.team}</span>
-          <span class="todo-order-chip">${formatShortDateFromIso(order.date)}</span>
+          ${
+            order.team
+              ? `<span class="todo-order-chip">${order.team}</span>`
+              : ""
+          }
+
+          ${
+            order.date
+              ? `<span class="todo-order-chip">${formatShortDateFromIso(order.date)}</span>`
+              : ""
+          }
+
+          ${
+            isControl
+              ? `<span class="todo-order-chip">Kontrolle</span>`
+              : ""
+          }
         </div>
       `;
 
@@ -1238,7 +2124,9 @@ function renderVaoTodoList() {
   });
 }
 
-/* LIVE DASHBOARD */
+/***********************************************************
+ * LIVE DASHBOARD
+ ***********************************************************/
 
 function renderLiveDashboard() {
   const data = getOrdersForScope();
@@ -1459,6 +2347,8 @@ function renderTrendChart() {
       const isInWeek = orderDate >= monday && orderDate <= friday;
 
       if (!isInWeek) return false;
+      if (order.sourceStage === "control_pool") return false;
+      if (order.sourceStage === "planning_pool") return false;
       if (liveUnaToggle.checked) return true;
 
       return order.bt === currentBT;
@@ -1521,7 +2411,40 @@ function renderTrendChart() {
   });
 }
 
-/* EXPORT BUILDER */
+/***********************************************************
+ * EXPORT BUILDER
+ ***********************************************************/
+
+function getExportOrders() {
+  const weekDates = getCurrentWeekDates();
+  const scope = getRadioValue("exportScope");
+
+  return orders
+    .filter((order) => {
+      if (!weekDates.includes(order.date)) return false;
+      if (order.sourceStage === "control_pool") return false;
+      if (order.sourceStage === "planning_pool") return false;
+      if (scope === "una") return true;
+      return order.bt === currentBT;
+    })
+    .sort((a, b) => {
+      if (a.bt !== b.bt) return a.bt.localeCompare(b.bt);
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.team.localeCompare(b.team);
+    });
+}
+
+function getExportFileName() {
+  const kw = getISOWeek(currentDate);
+  const year = currentDate.getFullYear();
+  const scope = getRadioValue("exportScope");
+
+  if (scope === "una") {
+    return `Export_UNA_KW${kw}_${year}.xls`;
+  }
+
+  return `Export_${currentBT}_KW${kw}_${year}.xls`;
+}
 
 function renderExportBuilder() {
   exportWeekLabel.textContent = getWeekLabel();
@@ -1621,6 +2544,7 @@ function renderExportColumns() {
 
   exportColumnsState.forEach((fieldKey, index) => {
     const slot = document.createElement("div");
+
     slot.className = "export-column-slot";
     slot.dataset.columnIndex = index;
 
@@ -1631,11 +2555,23 @@ function renderExportColumns() {
 
       ${
         fieldKey
-          ? `<div class="export-column-filled">
-              <span>${getExportFieldLabel(fieldKey)}</span>
-              <button class="export-remove-column" type="button">×</button>
-            </div>`
-          : `<div class="export-column-empty">Baustein hier ablegen</div>`
+          ? `
+          <div class="export-column-filled">
+            <span>${getExportFieldLabel(fieldKey)}</span>
+
+            <button
+              class="export-remove-column"
+              type="button"
+            >
+              ×
+            </button>
+          </div>
+        `
+          : `
+          <div class="export-column-empty">
+            Baustein hier ablegen
+          </div>
+        `
       }
     `;
 
@@ -1650,14 +2586,19 @@ function renderExportColumns() {
 
     slot.addEventListener("drop", (event) => {
       event.preventDefault();
+
       slot.classList.remove("drag-over");
 
       if (!draggedExportFieldKey) return;
 
-      setExportFieldAtColumn(index, draggedExportFieldKey);
+      setExportFieldAtColumn(
+        index,
+        draggedExportFieldKey
+      );
     });
 
-    const removeBtn = slot.querySelector(".export-remove-column");
+    const removeBtn =
+      slot.querySelector(".export-remove-column");
 
     if (removeBtn) {
       removeBtn.addEventListener("click", () => {
@@ -1674,8 +2615,11 @@ function getExportCellValue(order, key) {
 }
 
 function renderExportPreview() {
-  const activeColumns = exportColumnsState.filter(Boolean);
-  const data = getExportOrders().slice(0, 5);
+  const activeColumns =
+    exportColumnsState.filter(Boolean);
+
+  const data =
+    getExportOrders().slice(0, 5);
 
   if (!activeColumns.length) {
     exportPreview.innerHTML = `
@@ -1689,95 +2633,150 @@ function renderExportPreview() {
   if (!data.length) {
     exportPreview.innerHTML = `
       <div class="export-preview-empty">
-        Keine Aufträge in dieser KW vorhanden.
+        Keine Aufträge vorhanden.
       </div>
     `;
     return;
   }
 
-  const head = activeColumns
-    .map((key) => `<th>${escapeHtml(getExportFieldLabel(key))}</th>`)
-    .join("");
+  const head =
+    activeColumns
+      .map(
+        (key) =>
+          `<th>${escapeHtml(
+            getExportFieldLabel(key)
+          )}</th>`
+      )
+      .join("");
 
-  const rows = data
-    .map((order) => {
-      const cells = activeColumns
-        .map((key) => `<td>${escapeHtml(getExportCellValue(order, key))}</td>`)
-        .join("");
+  const rows =
+    data
+      .map((order) => {
+        const cells =
+          activeColumns
+            .map(
+              (key) =>
+                `<td>${escapeHtml(
+                  getExportCellValue(
+                    order,
+                    key
+                  )
+                )}</td>`
+            )
+            .join("");
 
-      return `<tr>${cells}</tr>`;
-    })
-    .join("");
+        return `<tr>${cells}</tr>`;
+      })
+      .join("");
 
   exportPreview.innerHTML = `
     <table>
       <thead>
         <tr>${head}</tr>
       </thead>
-      <tbody>${rows}</tbody>
+
+      <tbody>
+        ${rows}
+      </tbody>
     </table>
   `;
 }
 
 function downloadExportFile() {
-  const activeColumns = exportColumnsState.filter(Boolean);
+  const activeColumns =
+    exportColumnsState.filter(Boolean);
+
   const data = getExportOrders();
 
   if (!activeColumns.length) {
-    alert("Bitte mindestens eine Spalte auswählen.");
+    alert(
+      "Bitte mindestens eine Spalte auswählen."
+    );
     return;
   }
 
   if (!data.length) {
-    alert("Keine Aufträge in dieser KW vorhanden.");
+    alert(
+      "Keine Aufträge in dieser KW vorhanden."
+    );
     return;
   }
 
-  const header = activeColumns
-    .map((key) => `<th>${escapeHtml(getExportFieldLabel(key))}</th>`)
-    .join("");
+  const header =
+    activeColumns
+      .map(
+        (key) =>
+          `<th>${escapeHtml(
+            getExportFieldLabel(key)
+          )}</th>`
+      )
+      .join("");
 
-  const rows = data
-    .map((order) => {
-      const cells = activeColumns
-        .map((key) => `<td>${escapeHtml(getExportCellValue(order, key))}</td>`)
-        .join("");
+  const rows =
+    data
+      .map((order) => {
+        const cells =
+          activeColumns
+            .map(
+              (key) =>
+                `<td>${escapeHtml(
+                  getExportCellValue(
+                    order,
+                    key
+                  )
+                )}</td>`
+            )
+            .join("");
 
-      return `<tr>${cells}</tr>`;
-    })
-    .join("");
+        return `<tr>${cells}</tr>`;
+      })
+      .join("");
 
   const html = `
     <html>
       <head>
-        <meta charset="UTF-8" />
+        <meta charset="UTF-8">
       </head>
+
       <body>
         <table border="1">
           <thead>
             <tr>${header}</tr>
           </thead>
-          <tbody>${rows}</tbody>
+
+          <tbody>
+            ${rows}
+          </tbody>
         </table>
       </body>
     </html>
   `;
 
-  const blob = new Blob([html], {
-    type: "application/vnd.ms-excel;charset=utf-8;"
-  });
+  const blob = new Blob(
+    [html],
+    {
+      type: "application/vnd.ms-excel;charset=utf-8;"
+    }
+  );
 
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
+  const url =
+    URL.createObjectURL(blob);
+
+  const link =
+    document.createElement("a");
 
   link.href = url;
-  link.download = getExportFileName();
+  link.download =
+    getExportFileName();
+
   link.click();
 
   URL.revokeObjectURL(url);
 }
 
-/* FORM */
+/***********************************************************
+ * ORDER FORM
+ ***********************************************************/
 
 function resetOrderForm() {
   orderForm.reset();
@@ -1791,15 +2790,34 @@ function resetOrderForm() {
     waitingReason: ""
   };
 
-  orderVaoStatus.value = "nicht_gestellt";
+  orderVaoStatus.value =
+    "nicht_gestellt";
+
   orderCompleted.checked = false;
 
-  setRadioValue("pvsRequired", "nein");
-  setRadioValue("permit", "nein");
-  setRadioValue("baz", "nein");
-  setRadioValue("faz", "nein");
+  setRadioValue(
+    "pvsRequired",
+    "nein"
+  );
 
-  deleteOrderBtn.classList.add("hidden");
+  setRadioValue(
+    "permit",
+    "nein"
+  );
+
+  setRadioValue(
+    "baz",
+    "nein"
+  );
+
+  setRadioValue(
+    "faz",
+    "nein"
+  );
+
+  deleteOrderBtn.classList.add(
+    "hidden"
+  );
 }
 
 function openCreateOrder() {
@@ -1808,7 +2826,10 @@ function openCreateOrder() {
 }
 
 function openEditOrder(orderId) {
-  const order = orders.find((item) => item.id === orderId);
+  const order =
+    orders.find(
+      (item) => item.id === orderId
+    );
 
   if (!order) return;
 
@@ -1816,34 +2837,85 @@ function openEditOrder(orderId) {
 
   editingOrderId = orderId;
 
-  deleteOrderBtn.classList.remove("hidden");
+  deleteOrderBtn.classList.remove(
+    "hidden"
+  );
 
-  orderAddress.value = order.address || "";
-  orderKlsId.value = order.klsId || "";
-  orderSmNumber.value = order.smNumber || "";
-  orderAspName.value = order.aspName || "";
-  orderAspPhone.value = order.aspPhone || "";
-  orderEmail.value = order.email || "";
-  orderExpansionStatus.value = order.expansionStatus || "";
-  orderBuildingType.value = order.buildingType || "";
-  orderMeters.value = order.meters || "";
-  orderNvtArea.value = order.nvtArea || "";
-  orderVaoStatus.value = order.vaoStatus || "nicht_gestellt";
-  orderVaoStart.value = order.vaoStart || "";
-  orderVaoEnd.value = order.vaoEnd || "";
-  orderDetails.value = order.details || "";
-  orderCompleted.checked = Boolean(order.completed);
+  orderAddress.value =
+    order.address || "";
 
-  setRadioValue("pvsRequired", order.pvsRequired || "nein");
-  setRadioValue("permit", order.permit || "nein");
-  setRadioValue("baz", order.baz || "nein");
-  setRadioValue("faz", order.faz || "nein");
+  orderKlsId.value =
+    order.klsId || "";
+
+  orderSmNumber.value =
+    order.smNumber || "";
+
+  orderAspName.value =
+    order.aspName || "";
+
+  orderAspPhone.value =
+    order.aspPhone || "";
+
+  orderEmail.value =
+    order.email || "";
+
+  orderExpansionStatus.value =
+    order.expansionStatus || "";
+
+  orderBuildingType.value =
+    order.buildingType || "";
+
+  orderMeters.value =
+    order.meters || "";
+
+  orderNvtArea.value =
+    order.nvtArea || "";
+
+  orderVaoStatus.value =
+    order.vaoStatus || "nicht_gestellt";
+
+  orderVaoStart.value =
+    order.vaoStart || "";
+
+  orderVaoEnd.value =
+    order.vaoEnd || "";
+
+  orderDetails.value =
+    order.details || "";
+
+  orderCompleted.checked =
+    Boolean(order.completed);
+
+  setRadioValue(
+    "pvsRequired",
+    order.pvsRequired || "nein"
+  );
+
+  setRadioValue(
+    "permit",
+    order.permit || "nein"
+  );
+
+  setRadioValue(
+    "baz",
+    order.baz || "nein"
+  );
+
+  setRadioValue(
+    "faz",
+    order.faz || "nein"
+  );
 
   tempAppointment = {
-    start: order.appointmentStart || "",
-    end: order.appointmentEnd || "",
-    status: order.appointmentStatus || "nicht_bestaetigt",
-    waitingReason: order.waitingReason || ""
+    start:
+      order.appointmentStart || "",
+    end:
+      order.appointmentEnd || "",
+    status:
+      order.appointmentStatus ||
+      "nicht_bestaetigt",
+    waitingReason:
+      order.waitingReason || ""
   };
 
   openModal(orderModal);
@@ -1851,28 +2923,90 @@ function openEditOrder(orderId) {
 
 function collectOrderPayload() {
   return {
-    address: safeText(orderAddress.value),
-    klsId: safeText(orderKlsId.value),
-    smNumber: safeText(orderSmNumber.value),
-    aspName: safeText(orderAspName.value),
-    aspPhone: safeText(orderAspPhone.value),
-    email: safeText(orderEmail.value),
-    expansionStatus: safeText(orderExpansionStatus.value),
-    buildingType: safeText(orderBuildingType.value),
-    meters: safeText(orderMeters.value),
-    nvtArea: safeText(orderNvtArea.value),
-    vaoStatus: orderVaoStatus.value || "nicht_gestellt",
-    vaoStart: orderVaoStart.value,
-    vaoEnd: orderVaoEnd.value,
-    pvsRequired: getRadioValue("pvsRequired"),
-    permit: getRadioValue("permit"),
-    baz: getRadioValue("baz"),
-    faz: getRadioValue("faz"),
-    details: orderDetails.value,
-    appointmentStart: tempAppointment.start,
-    appointmentEnd: tempAppointment.end,
-    appointmentStatus: tempAppointment.status,
-    waitingReason: tempAppointment.waitingReason || ""
+    address: safeText(
+      orderAddress.value
+    ),
+
+    klsId: safeText(
+      orderKlsId.value
+    ),
+
+    smNumber: safeText(
+      orderSmNumber.value
+    ),
+
+    aspName: safeText(
+      orderAspName.value
+    ),
+
+    aspPhone: safeText(
+      orderAspPhone.value
+    ),
+
+    email: safeText(
+      orderEmail.value
+    ),
+
+    expansionStatus: safeText(
+      orderExpansionStatus.value
+    ),
+
+    buildingType: safeText(
+      orderBuildingType.value
+    ),
+
+    meters: safeText(
+      orderMeters.value
+    ),
+
+    nvtArea: safeText(
+      orderNvtArea.value
+    ),
+
+    vaoStatus:
+      orderVaoStatus.value ||
+      "nicht_gestellt",
+
+    vaoStart:
+      orderVaoStart.value,
+
+    vaoEnd:
+      orderVaoEnd.value,
+
+    pvsRequired:
+      getRadioValue(
+        "pvsRequired"
+      ),
+
+    permit:
+      getRadioValue(
+        "permit"
+      ),
+
+    baz:
+      getRadioValue(
+        "baz"
+      ),
+
+    faz:
+      getRadioValue(
+        "faz"
+      ),
+
+    details:
+      orderDetails.value,
+
+    appointmentStart:
+      tempAppointment.start,
+
+    appointmentEnd:
+      tempAppointment.end,
+
+    appointmentStatus:
+      tempAppointment.status,
+
+    waitingReason:
+      tempAppointment.waitingReason || ""
   };
 }
 
@@ -1882,7 +3016,9 @@ orderForm.addEventListener("submit", (event) => {
   const payload = collectOrderPayload();
 
   if (editingOrderId) {
-    const order = orders.find((item) => item.id === editingOrderId);
+    const order = orders.find(
+      (item) => item.id === editingOrderId
+    );
 
     if (!order) return;
 
@@ -1915,111 +3051,170 @@ orderForm.addEventListener("submit", (event) => {
       effortType: "",
       vaoReservedBy: "",
       vaoReservedAt: "",
-      vaoProcessing: false
+      vaoProcessing: false,
+      sourceStage: "daily",
+      controlProcessing: false,
+      controlReservedBy: "",
+      controlReservedAt: "",
+      controlData: null
     });
   }
 
   closeModal(orderModal);
+
   renderAll();
 });
 
-/* COMPLETED */
+/***********************************************************
+ * COMPLETED / EFFORT / DELETE
+ ***********************************************************/
 
 orderCompleted.addEventListener("change", () => {
   if (!editingOrderId) {
     orderCompleted.checked = false;
-    alert("Bitte Auftrag erst speichern, danach Fertiggestellt setzen.");
+
+    alert(
+      "Bitte Auftrag erst speichern, danach Fertiggestellt setzen."
+    );
+
     return;
   }
 
-  const order = orders.find((item) => item.id === editingOrderId);
+  const order =
+    orders.find(
+      (item) => item.id === editingOrderId
+    );
+
   if (!order) return;
 
   if (!orderCompleted.checked) {
     order.completed = false;
     order.blownIn = false;
+
     renderAll();
     return;
   }
 
-  pendingCompletedOrderId = editingOrderId;
+  pendingCompletedOrderId =
+    editingOrderId;
+
   openModal(completedQuestionModal);
 });
 
 completedNoBtn.addEventListener("click", () => {
-  const order = orders.find((item) => item.id === pendingCompletedOrderId);
+  const order =
+    orders.find(
+      (item) =>
+        item.id === pendingCompletedOrderId
+    );
+
   if (!order) return;
 
   order.completed = true;
   order.blownIn = false;
+
   orderCompleted.checked = true;
 
   closeModal(completedQuestionModal);
+
   renderAll();
 });
 
 completedYesBtn.addEventListener("click", () => {
-  const order = orders.find((item) => item.id === pendingCompletedOrderId);
+  const order =
+    orders.find(
+      (item) =>
+        item.id === pendingCompletedOrderId
+    );
+
   if (!order) return;
 
   order.completed = true;
   order.blownIn = true;
+
   orderCompleted.checked = true;
 
   closeModal(completedQuestionModal);
+
   renderAll();
 });
 
-/* EFFORT */
-
 openEffortBtn.addEventListener("click", () => {
   if (!editingOrderId) {
-    alert("Bitte Auftrag erst speichern, danach Aufwandskontrolle setzen.");
+    alert(
+      "Bitte Auftrag erst speichern, danach Aufwandskontrolle setzen."
+    );
+
     return;
   }
 
-  pendingEffortOrderId = editingOrderId;
+  pendingEffortOrderId =
+    editingOrderId;
 
-  const order = orders.find((item) => item.id === editingOrderId);
+  const order =
+    orders.find(
+      (item) =>
+        item.id === editingOrderId
+    );
 
   if (order?.effortType) {
-    setRadioValue("effortType", order.effortType);
+    setRadioValue(
+      "effortType",
+      order.effortType
+    );
   } else {
-    setRadioValue("effortType", "asphalt");
+    setRadioValue(
+      "effortType",
+      "asphalt"
+    );
   }
 
   openModal(effortModal);
 });
 
 saveEffortBtn.addEventListener("click", () => {
-  const order = orders.find((item) => item.id === pendingEffortOrderId);
+  const order =
+    orders.find(
+      (item) =>
+        item.id === pendingEffortOrderId
+    );
+
   if (!order) return;
 
-  order.effortType = getRadioValue("effortType");
+  order.effortType =
+    getRadioValue("effortType");
 
   closeModal(effortModal);
+
   renderAll();
 });
 
 clearEffortBtn.addEventListener("click", () => {
-  const order = orders.find((item) => item.id === pendingEffortOrderId);
+  const order =
+    orders.find(
+      (item) =>
+        item.id === pendingEffortOrderId
+    );
+
   if (!order) return;
 
   order.effortType = "";
 
   closeModal(effortModal);
+
   renderAll();
 });
 
-/* DELETE */
-
 deleteOrderBtn.addEventListener("click", () => {
   if (!editingOrderId) return;
+
   openModal(deleteOrderConfirmModal);
 });
 
 confirmDeleteOrderBtn.addEventListener("click", () => {
-  orders = orders.filter((item) => item.id !== editingOrderId);
+  orders = orders.filter(
+    (item) => item.id !== editingOrderId
+  );
 
   closeModal(deleteOrderConfirmModal);
   closeModal(orderModal);
@@ -2027,13 +3222,23 @@ confirmDeleteOrderBtn.addEventListener("click", () => {
   renderAll();
 });
 
-/* TIME */
+/***********************************************************
+ * TIME / WAITING REASON / DETAILS
+ ***********************************************************/
 
 openTimeModalBtn.addEventListener("click", () => {
-  appointmentStart.value = tempAppointment.start || "";
-  appointmentEnd.value = tempAppointment.end || "";
-  appointmentStatus.value = tempAppointment.status || "nicht_bestaetigt";
-  waitingReasonSelect.value = tempAppointment.waitingReason || "";
+  appointmentStart.value =
+    tempAppointment.start || "";
+
+  appointmentEnd.value =
+    tempAppointment.end || "";
+
+  appointmentStatus.value =
+    tempAppointment.status ||
+    "nicht_bestaetigt";
+
+  waitingReasonSelect.value =
+    tempAppointment.waitingReason || "";
 
   toggleWaitingReasonField();
 
@@ -2041,14 +3246,19 @@ openTimeModalBtn.addEventListener("click", () => {
 });
 
 saveTimeBtn.addEventListener("click", () => {
-  const previousWaitingReason = tempAppointment.waitingReason || "";
+  const previousWaitingReason =
+    tempAppointment.waitingReason || "";
 
   tempAppointment = {
-    start: appointmentStart.value,
-    end: appointmentEnd.value,
-    status: appointmentStatus.value,
+    start:
+      appointmentStart.value,
+    end:
+      appointmentEnd.value,
+    status:
+      appointmentStatus.value,
     waitingReason:
-      appointmentStatus.value === "wartegrund"
+      appointmentStatus.value ===
+      "wartegrund"
         ? waitingReasonSelect.value
         : ""
   };
@@ -2059,122 +3269,106 @@ saveTimeBtn.addEventListener("click", () => {
     tempAppointment.waitingReason &&
     tempAppointment.waitingReason !== previousWaitingReason
   ) {
-    const order = orders.find((item) => item.id === editingOrderId);
+    const order =
+      orders.find(
+        (item) =>
+          item.id === editingOrderId
+      );
 
     if (order) {
-      appendWaitingReasonLog(order, tempAppointment.waitingReason);
-      orderDetails.value = order.details || "";
+      appendWaitingReasonLog(
+        order,
+        tempAppointment.waitingReason
+      );
+
+      orderDetails.value =
+        order.details || "";
     }
   }
 
   closeModal(timeModal);
 });
 
-appointmentStatus.addEventListener("change", toggleWaitingReasonField);
-
-/* DETAILS */
+appointmentStatus.addEventListener(
+  "change",
+  toggleWaitingReasonField
+);
 
 insertSeparatorBtn.addEventListener("click", () => {
-  const line = "------------------------------------------------------------";
+  const line =
+    "------------------------------------------------------------";
 
   if (!orderDetails.value.trim()) {
-    orderDetails.value = `${line}\n`;
+    orderDetails.value =
+      `${line}\n`;
   } else {
-    orderDetails.value += `\n${line}\n`;
+    orderDetails.value +=
+      `\n${line}\n`;
   }
 
   orderDetails.focus();
 });
 
-/* MAP LINKS */
+/***********************************************************
+ * MAP LINKS
+ ***********************************************************/
 
 function openMapLink(type) {
-  const address = safeText(orderAddress.value);
+  const address =
+    safeText(orderAddress.value);
+
   if (!address) return;
 
-  const encoded = encodeURIComponent(address);
+  const encoded =
+    encodeURIComponent(address);
 
   if (type === "earth") {
-    window.open(`https://earth.google.com/web/search/${encoded}`, "_blank");
+    window.open(
+      `https://earth.google.com/web/search/${encoded}`,
+      "_blank"
+    );
   }
 
   if (type === "apple") {
-    window.open(`https://maps.apple.com/?q=${encoded}`, "_blank");
+    window.open(
+      `https://maps.apple.com/?q=${encoded}`,
+      "_blank"
+    );
   }
 
   if (type === "google") {
-    window.open(`https://www.google.com/maps/search/?api=1&query=${encoded}`, "_blank");
+    window.open(
+      `https://www.google.com/maps/search/?api=1&query=${encoded}`,
+      "_blank"
+    );
   }
 }
 
-openGoogleEarthBtn.addEventListener("click", () => openMapLink("earth"));
-openAppleMapsBtn.addEventListener("click", () => openMapLink("apple"));
-openGoogleMapsBtn.addEventListener("click", () => openMapLink("google"));
+openGoogleEarthBtn.addEventListener(
+  "click",
+  () => openMapLink("earth")
+);
 
-/* BT */
+openAppleMapsBtn.addEventListener(
+  "click",
+  () => openMapLink("apple")
+);
 
-function renderBtDropdown() {
-  btDropdownMenu.innerHTML = "";
+openGoogleMapsBtn.addEventListener(
+  "click",
+  () => openMapLink("google")
+);
 
-  BTS.forEach((bt) => {
-    const button = document.createElement("button");
 
-    button.type = "button";
-    button.className = "dropdown-item";
-    button.textContent = bt;
+/***********************************************************
+ * BT / WOCHE
+ ***********************************************************/
 
-    button.addEventListener("click", () => {
-      currentBT = bt;
-      currentDate = new Date();
-      dailyViewDate = null;
-      currentMainView = "week";
-      btDropdownMenu.classList.add("hidden");
-      renderAll();
-    });
 
-    btDropdownMenu.appendChild(button);
-  });
-}
 
-btDropdownBtn.addEventListener("click", (event) => {
-  event.stopPropagation();
-  btDropdownMenu.classList.toggle("hidden");
-});
-
-document.addEventListener("click", (event) => {
-  if (!event.target.closest(".bt-select-wrap")) {
-    btDropdownMenu.classList.add("hidden");
-  }
-});
-
-/* WEEK CONTROL */
-
-prevWeekBtn.addEventListener("click", () => {
-  currentDate.setDate(currentDate.getDate() - 7);
-  dailyViewDate = null;
-  renderAll();
-});
-
-nextWeekBtn.addEventListener("click", () => {
-  currentDate.setDate(currentDate.getDate() + 7);
-  dailyViewDate = null;
-  renderAll();
-});
-
-todayBtn.addEventListener("click", () => {
-  currentDate = new Date();
-  dailyViewDate = null;
-  currentMainView = "week";
-  renderAll();
-});
-
-backToWeekBtn.addEventListener("click", () => {
-  dailyViewDate = null;
-  currentMainView = "week";
-  renderAll();
-});
-
-/* WEEK ADJUST */
+/***********************************************************
+ * WOCHENANPASSUNG
+ ***********************************************************/
 
 function renderWeekAdjustments() {
   weekAdjustTeamList.innerHTML = "";
@@ -2182,7 +3376,6 @@ function renderWeekAdjustments() {
 
   TEAMS.forEach((team) => {
     const button = document.createElement("button");
-
     button.type = "button";
     button.className = "week-adjust-team-btn";
 
@@ -2194,8 +3387,8 @@ function renderWeekAdjustments() {
     button.addEventListener("click", () => {
       selectedAdjustTeam = team;
       teamAdjustTitle.textContent = `${currentBT} · ${team}`;
-      teamAdjustStart.value = getIsoDate(new Date());
-      teamAdjustEnd.value = getIsoDate(new Date());
+      teamAdjustStart.value = getCurrentWeekDates()[0];
+      teamAdjustEnd.value = getCurrentWeekDates()[4];
       setRadioValue("teamAdjustStatus", "krank");
       openModal(teamAdjustModal);
     });
@@ -2205,37 +3398,33 @@ function renderWeekAdjustments() {
 
   const list = teamAdjustments.filter((item) => item.bt === currentBT);
 
-  if (list.length === 0) {
+  if (!list.length) {
     existingAdjustmentsList.innerHTML = `
-      <div class="empty-box">
-        Keine Anpassungen vorhanden.
-      </div>
+      <div class="empty-box">Keine Anpassungen vorhanden.</div>
     `;
     return;
   }
 
-  list.forEach((item) => {
+  list.forEach((adjustment) => {
     const row = document.createElement("div");
     row.className = "adjustment-card";
 
     row.innerHTML = `
       <div class="adjustment-info">
         <div class="adjustment-title">
-          ${item.team} · ${getAdjustmentText(item.status)}
+          ${adjustment.team} · ${getAdjustmentText(adjustment.status)}
         </div>
 
         <div class="adjustment-time">
-          ${formatShortDateFromIso(item.startDate)} - ${formatShortDateFromIso(item.endDate)}
+          ${formatShortDateFromIso(adjustment.startDate)} - ${formatShortDateFromIso(adjustment.endDate)}
         </div>
       </div>
 
-      <button type="button" class="adjustment-remove-btn">
-        🗑
-      </button>
+      <button type="button" class="adjustment-remove-btn">🗑</button>
     `;
 
-    row.querySelector("button").addEventListener("click", () => {
-      teamAdjustments = teamAdjustments.filter((entry) => entry.id !== item.id);
+    row.querySelector(".adjustment-remove-btn").addEventListener("click", () => {
+      teamAdjustments = teamAdjustments.filter((item) => item.id !== adjustment.id);
       renderAll();
     });
 
@@ -2249,15 +3438,17 @@ weekAdjustBtn.addEventListener("click", () => {
 });
 
 saveTeamAdjustBtn.addEventListener("click", () => {
-  const startDate = teamAdjustStart.value;
-  const endDate = teamAdjustEnd.value;
+  if (!selectedAdjustTeam) {
+    alert("Bitte einen Trupp auswählen.");
+    return;
+  }
 
-  if (!startDate || !endDate) {
+  if (!teamAdjustStart.value || !teamAdjustEnd.value) {
     alert("Bitte Start- und Enddatum auswählen.");
     return;
   }
 
-  if (endDate < startDate) {
+  if (teamAdjustEnd.value < teamAdjustStart.value) {
     alert("Das Enddatum darf nicht vor dem Startdatum liegen.");
     return;
   }
@@ -2267,15 +3458,17 @@ saveTeamAdjustBtn.addEventListener("click", () => {
     bt: currentBT,
     team: selectedAdjustTeam,
     status: getRadioValue("teamAdjustStatus"),
-    startDate,
-    endDate
+    startDate: teamAdjustStart.value,
+    endDate: teamAdjustEnd.value
   });
 
   closeModal(teamAdjustModal);
   renderAll();
 });
 
-/* MOVE ORDER */
+/***********************************************************
+ * MOVE ORDER
+ ***********************************************************/
 
 function renderMoveLoadPreview() {
   const selectedDate = moveDateInput.value;
@@ -2315,14 +3508,13 @@ openMoveOrderBtn.addEventListener("click", () => {
     return;
   }
 
+  const order = orders.find((item) => item.id === editingOrderId);
+  if (!order) return;
+
   pendingMoveOrderId = editingOrderId;
   pendingMoveSource = "button";
 
-  const order = orders.find((item) => item.id === editingOrderId);
-
-  if (!order) return;
-
-  moveDateInput.value = order.date;
+  moveDateInput.value = order.date || getIsoDate(new Date());
   moveTeamSelect.innerHTML = "";
 
   TEAMS.forEach((team) => {
@@ -2332,7 +3524,7 @@ openMoveOrderBtn.addEventListener("click", () => {
     moveTeamSelect.appendChild(option);
   });
 
-  moveTeamSelect.value = order.team;
+  moveTeamSelect.value = order.team || TEAMS[0];
 
   renderMoveLoadPreview();
   openModal(moveOrderModal);
@@ -2343,7 +3535,6 @@ moveTeamSelect.addEventListener("change", renderMoveLoadPreview);
 
 confirmMoveOrderBtn.addEventListener("click", () => {
   const order = orders.find((item) => item.id === pendingMoveOrderId);
-
   if (!order) return;
 
   const newDate = moveDateInput.value;
@@ -2357,21 +3548,153 @@ confirmMoveOrderBtn.addEventListener("click", () => {
   prepareMoveFlow(order.id, newDate, newTeam, "button");
 });
 
-confirmVaoMoveBtn.addEventListener("click", () => {
-  continueMoveAfterVao();
-});
-
+confirmVaoMoveBtn.addEventListener("click", continueMoveAfterVao);
 pvsKeepBtn.addEventListener("click", () => applyMove("keep"));
 pvsDeleteBtn.addEventListener("click", () => applyMove("delete"));
 pvsNewBtn.addEventListener("click", () => applyMove("new"));
 
-/* SEARCH */
+/***********************************************************
+ * VAO
+ ***********************************************************/
 
-searchInput.addEventListener("keydown", (event) => {
+confirmVaoReserveBtn.addEventListener("click", () => {
+  const order = orders.find((item) => item.id === pendingVaoReserveOrderId);
+  if (!order) return;
+
+  order.vaoReservedBy = getCurrentUserLabel();
+  order.vaoReservedAt = formatDateTimeNow();
+
+  closeModal(vaoReserveConfirmModal);
+  pendingVaoReserveOrderId = null;
+
+  renderAll();
+});
+
+saveVaoCompleteBtn.addEventListener("click", () => {
+  const order = orders.find((item) => item.id === pendingVaoCompleteOrderId);
+  if (!order) return;
+
+  order.vaoStatus = "gestellt";
+
+  if (vaoCompleteStart.value) order.vaoStart = vaoCompleteStart.value;
+  if (vaoCompleteEnd.value) order.vaoEnd = vaoCompleteEnd.value;
+  if (vaoCompleteMeters.value) order.meters = vaoCompleteMeters.value;
+
+  order.permit = getRadioValue("vaoCompletePermit");
+  order.pvsRequired = getRadioValue("vaoCompletePvs");
+
+  order.pvsSetupDate =
+    order.pvsRequired === "ja"
+      ? calculatePvsSetupDate(order.date)
+      : "";
+
+  order.vaoReservedBy = "";
+  order.vaoReservedAt = "";
+  order.vaoProcessing = false;
+
+  const logLine =
+    `[${formatDateTimeNow()}] ${getCurrentUserLabel()} hat die VAO auf gestellt gesetzt.`;
+
+  order.details = order.details
+    ? `${order.details}\n${logLine}`
+    : logLine;
+
+  closeModal(vaoCompleteModal);
+  pendingVaoCompleteOrderId = null;
+
+  renderAll();
+});
+
+/***********************************************************
+ * KONTROLLE ABSCHLIESSEN
+ ***********************************************************/
+
+saveControlCompleteBtn.addEventListener("click", () => {
+  const order = orders.find((item) => item.id === pendingControlCompleteOrderId);
+  if (!order) return;
+
+  saveControlData(order);
+
+  pendingControlCompleteOrderId = null;
+
+  closeModal(controlCompleteModal);
+  renderAll();
+});
+
+controlDokuFeedback.addEventListener("input", () => {
+  const order = orders.find((item) => item.id === pendingControlCompleteOrderId);
+  if (!order) return;
+
+  controlGeneratedText.value = buildControlGeneratedText(order);
+});
+
+document
+  .querySelectorAll('input[name="controlPtiSketch"], input[name="controlSmDoku"], input[name="controlCategory"]')
+  .forEach((input) => {
+    input.addEventListener("change", () => {
+      const order = orders.find((item) => item.id === pendingControlCompleteOrderId);
+      if (!order) return;
+
+      controlGeneratedText.value = buildControlGeneratedText(order);
+    });
+  });
+
+/***********************************************************
+ * PLANUNGSPOOL
+ ***********************************************************/
+
+poolPlanningBtn?.addEventListener("click", () => {
+  renderPlanningPool();
+  openModal(planningPoolModal);
+});
+
+planningPoolDateInput?.addEventListener("change", renderPlanningPoolLoadPreview);
+planningPoolTeamSelect?.addEventListener("change", renderPlanningPoolLoadPreview);
+confirmPlanningPoolScheduleBtn?.addEventListener("click", confirmPlanningPoolSchedule);
+
+/***********************************************************
+ * EXPORT
+ ***********************************************************/
+
+clearExportColumnsBtn?.addEventListener("click", () => {
+  exportColumnsState = [];
+  renderExportBuilder();
+});
+
+downloadExportBtn?.addEventListener("click", downloadExportFile);
+
+exportBuilderBtn?.addEventListener("click", () => {
+  renderExportBuilder();
+  openModal(exportBuilderModal);
+});
+
+document.querySelectorAll('input[name="exportScope"]').forEach((radio) => {
+  radio.addEventListener("change", () => {
+    renderExportPreview();
+  });
+});
+
+/***********************************************************
+ * LIVE DASHBOARD
+ ***********************************************************/
+
+liveDashboardBtn?.addEventListener("click", () => {
+  renderLiveDashboard();
+  openModal(liveDashboardModal);
+});
+
+avgMetersToggle?.addEventListener("change", renderLiveDashboard);
+absenceToggle?.addEventListener("change", renderLiveDashboard);
+liveUnaToggle?.addEventListener("change", renderLiveDashboard);
+
+/***********************************************************
+ * SEARCH
+ ***********************************************************/
+
+searchInput?.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
 
   const query = lower(searchInput.value);
-
   if (!query) return;
 
   const results = orders.filter((order) =>
@@ -2386,7 +3709,7 @@ searchInput.addEventListener("keydown", (event) => {
 
   searchResultsContainer.innerHTML = "";
 
-  if (results.length === 0) {
+  if (!results.length) {
     searchResultsContainer.innerHTML = `
       <div class="warning-text">
         Zu deiner Suchanfrage konnte ich leider nichts finden.
@@ -2394,32 +3717,48 @@ searchInput.addEventListener("keydown", (event) => {
     `;
   } else {
     results
-      .sort((a, b) => makeDate(b.date) - makeDate(a.date))
+      .sort((a, b) => {
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        return makeDate(b.date) - makeDate(a.date);
+      })
       .forEach((order) => {
         const item = document.createElement("div");
         item.className = "search-result-card";
 
         item.innerHTML = `
-          <div class="search-result-title">
-            ${order.address || "-"}
-          </div>
+          <div class="search-result-title">${order.address || "-"}</div>
 
           <div class="search-result-meta">
             <div>KLS-ID: ${order.klsId || "-"}</div>
-            <div>Trupp: ${order.team}</div>
-            <div>Datum: ${formatDate(makeDate(order.date))}</div>
-            <div>KW ${getISOWeek(makeDate(order.date))} / ${makeDate(order.date).getFullYear()}</div>
+            <div>Trupp: ${order.team || "-"}</div>
+            <div>Datum: ${order.date ? formatDate(makeDate(order.date)) : "-"}</div>
+            <div>${order.date ? `KW ${getISOWeek(makeDate(order.date))} / ${makeDate(order.date).getFullYear()}` : "Ohne Datum"}</div>
           </div>
         `;
 
         item.addEventListener("click", () => {
+          if (order.sourceStage === "control_pool") {
+            currentMainView = "vao";
+            currentPoolView = "control";
+            closeModal(searchResultsModal);
+            renderAll();
+            return;
+          }
+
+          if (order.sourceStage === "planning_pool") {
+            closeModal(searchResultsModal);
+            renderPlanningPool();
+            openModal(planningPoolModal);
+            return;
+          }
+
           currentBT = order.bt;
-          currentDate = makeDate(order.date);
-          dailyViewDate = order.date;
+          currentDate = order.date ? makeDate(order.date) : new Date();
+          dailyViewDate = order.date || null;
           currentMainView = "week";
 
           closeModal(searchResultsModal);
-
           renderAll();
 
           setTimeout(() => openEditOrder(order.id), 100);
@@ -2432,9 +3771,15 @@ searchInput.addEventListener("keydown", (event) => {
   openModal(searchResultsModal);
 });
 
-/* PDF */
+searchInfoBtn?.addEventListener("click", () => openModal(searchInfoModal));
+
+/***********************************************************
+ * PDF
+ ***********************************************************/
 
 function renderPdfBtSelect() {
+  if (!pdfBtSelect) return;
+
   pdfBtSelect.innerHTML = "";
 
   BTS.forEach((bt) => {
@@ -2447,23 +3792,25 @@ function renderPdfBtSelect() {
   pdfBtSelect.value = currentBT;
 }
 
-pdfExportBtn.addEventListener("click", () => {
+pdfExportBtn?.addEventListener("click", () => {
   renderPdfBtSelect();
   pdfBtSelect.value = currentBT;
   pdfDateInput.value = getIsoDate(new Date());
   openModal(pdfModal);
 });
 
-createPdfBtn.addEventListener("click", () => {
+createPdfBtn?.addEventListener("click", () => {
   const selectedBT = pdfBtSelect.value;
   const selectedDate = pdfDateInput.value;
 
   const dayOrders = orders.filter((order) =>
     order.bt === selectedBT &&
-    order.date === selectedDate
+    order.date === selectedDate &&
+    order.sourceStage !== "control_pool" &&
+    order.sourceStage !== "planning_pool"
   );
 
-  if (dayOrders.length === 0) {
+  if (!dayOrders.length) {
     alert("Für diesen Tag gibt es keine Aufträge.");
     return;
   }
@@ -2471,20 +3818,24 @@ createPdfBtn.addEventListener("click", () => {
   window.print();
 });
 
-/* EMAIL */
+/***********************************************************
+ * EMAIL
+ ***********************************************************/
 
-openEmailGeneratorBtn.addEventListener("click", () => {
+openEmailGeneratorBtn?.addEventListener("click", () => {
   openModal(emailGeneratorModal);
 });
 
-generateEmailBtn.addEventListener("click", () => {
+generateEmailBtn?.addEventListener("click", () => {
   orderDetails.value +=
     `\nE-Mail Generator genutzt: ${emailTemplateSelect.value || "keine Vorlage"} / ${orderEmail.value || "keine E-Mail"}\n`;
 
   closeModal(emailGeneratorModal);
 });
 
-/* VAO ACTIONS */
+/***********************************************************
+ * VIEW SWITCH
+ ***********************************************************/
 
 vaoOpenListBtn.addEventListener("click", () => {
   currentMainView = currentMainView === "vao" ? "week" : "vao";
@@ -2492,137 +3843,741 @@ vaoOpenListBtn.addEventListener("click", () => {
   renderAll();
 });
 
-confirmVaoReserveBtn.addEventListener("click", () => {
-  const order = orders.find((item) => item.id === pendingVaoReserveOrderId);
-
-  if (!order) return;
-
-  order.vaoReservedBy = getCurrentUserLabel();
-  order.vaoReservedAt = formatDateTimeNow();
-
-  closeModal(vaoReserveConfirmModal);
-
-  pendingVaoReserveOrderId = null;
-
+poolViewSwitchBtn?.addEventListener("click", () => {
+  currentPoolView = currentPoolView === "vao" ? "control" : "vao";
   renderAll();
 });
 
-saveVaoCompleteBtn.addEventListener("click", () => {
-  const order = orders.find((item) => item.id === pendingVaoCompleteOrderId);
-
-  if (!order) return;
-
-  order.vaoStatus = "gestellt";
-
-  if (vaoCompleteStart.value) {
-    order.vaoStart = vaoCompleteStart.value;
-  }
-
-  if (vaoCompleteEnd.value) {
-    order.vaoEnd = vaoCompleteEnd.value;
-  }
-
-  if (vaoCompleteMeters.value) {
-    order.meters = vaoCompleteMeters.value;
-  }
-
-  order.pvsRequired = getRadioValue("vaoCompletePvs");
-  order.permit = getRadioValue("vaoCompletePermit");
-
-  order.pvsSetupDate =
-    order.pvsRequired === "ja"
-      ? calculatePvsSetupDate(order.date)
-      : "";
-
-  order.vaoProcessing = false;
-  order.vaoReservedBy = "";
-  order.vaoReservedAt = "";
-
-  const logLine =
-    `[${formatDateTimeNow()}] ${getCurrentUserLabel()} hat die VAO auf gestellt gesetzt.`;
-
-  order.details = order.details
-    ? `${order.details}\n${logLine}`
-    : logLine;
-
-  closeModal(vaoCompleteModal);
-
-  pendingVaoCompleteOrderId = null;
-
-  renderAll();
-});
-
-/* EXPORT EVENTS */
-
-exportBuilderBtn.addEventListener("click", () => {
-  renderExportBuilder();
-  openModal(exportBuilderModal);
-});
-
-document.querySelectorAll('input[name="exportScope"]').forEach((radio) => {
-  radio.addEventListener("change", () => {
-    renderExportPreview();
-  });
-});
-
-clearExportColumnsBtn.addEventListener("click", () => {
-  exportColumnsState = [];
-  renderExportBuilder();
-});
-
-downloadExportBtn.addEventListener("click", downloadExportFile);
-
-/* LIVE EVENTS */
-
-liveDashboardBtn.addEventListener("click", () => {
-  renderLiveDashboard();
-  openModal(liveDashboardModal);
-});
-
-avgMetersToggle.addEventListener("change", renderLiveDashboard);
-absenceToggle.addEventListener("change", renderLiveDashboard);
-liveUnaToggle.addEventListener("change", renderLiveDashboard);
-
-/* CLOSE BUTTONS */
+/***********************************************************
+ * CLOSE BUTTONS
+ ***********************************************************/
 
 [
   [closeModalBtn, orderModal],
   [cancelBtn, orderModal],
+
   [closeDeleteConfirmBtn, deleteOrderConfirmModal],
   [cancelDeleteOrderBtn, deleteOrderConfirmModal],
+
   [closeCompletedQuestionBtn, completedQuestionModal],
+
   [closeEffortModalBtn, effortModal],
   [cancelEffortBtn, effortModal],
+
   [closeTimeModalBtn, timeModal],
   [cancelTimeBtn, timeModal],
-  [closeSearchInfoBtn, searchInfoModal],
-  [closeSearchResultsBtn, searchResultsModal],
-  [closePdfModalBtn, pdfModal],
-  [cancelPdfBtn, pdfModal],
-  [closeEmailGeneratorBtn, emailGeneratorModal],
-  [cancelEmailGeneratorBtn, emailGeneratorModal],
-  [closeMoveOrderBtn, moveOrderModal],
-  [cancelMoveOrderBtn, moveOrderModal],
-  [closeVaoMoveWarningBtn, vaoMoveWarningModal],
-  [cancelVaoMoveBtn, vaoMoveWarningModal],
-  [closePvsMoveChoiceBtn, pvsMoveChoiceModal],
-  [closeLiveDashboardBtn, liveDashboardModal],
+
   [closeWeekAdjustBtn, weekAdjustModal],
+
   [closeTeamAdjustBtn, teamAdjustModal],
   [cancelTeamAdjustBtn, teamAdjustModal],
+
+  [closeLiveDashboardBtn, liveDashboardModal],
+
+  [closeSearchInfoBtn, searchInfoModal],
+  [closeSearchResultsBtn, searchResultsModal],
+
+  [closePdfModalBtn, pdfModal],
+  [cancelPdfBtn, pdfModal],
+
+  [closeEmailGeneratorBtn, emailGeneratorModal],
+  [cancelEmailGeneratorBtn, emailGeneratorModal],
+
+  [closeMoveOrderBtn, moveOrderModal],
+  [cancelMoveOrderBtn, moveOrderModal],
+
+  [closeVaoMoveWarningBtn, vaoMoveWarningModal],
+  [cancelVaoMoveBtn, vaoMoveWarningModal],
+
+  [closePvsMoveChoiceBtn, pvsMoveChoiceModal],
+
   [closeVaoReserveConfirmBtn, vaoReserveConfirmModal],
   [cancelVaoReserveBtn, vaoReserveConfirmModal],
+
   [closeVaoCompleteModalBtn, vaoCompleteModal],
   [cancelVaoCompleteBtn, vaoCompleteModal],
+
+  [closeControlCompleteBtn, controlCompleteModal],
+  [cancelControlCompleteBtn, controlCompleteModal],
+
+  [closePlanningPoolBtn, planningPoolModal],
+
+  [closePlanningPoolScheduleBtn, planningPoolScheduleModal],
+  [cancelPlanningPoolScheduleBtn, planningPoolScheduleModal],
+
   [closeExportBuilderBtn, exportBuilderModal]
-].forEach(([button, modal]) => {
-  button.addEventListener("click", () => closeModal(modal));
+].forEach(([btn, modal]) => {
+  btn?.addEventListener("click", () => closeModal(modal));
 });
 
-searchInfoBtn.addEventListener("click", () => openModal(searchInfoModal));
+/***********************************************************
+ * BT / WOCHE / VIEW SWITCH
+ ***********************************************************/
 
-/* INIT */
+function renderBtDropdown() {
+  if (!btDropdownMenu) return;
+
+  btDropdownMenu.innerHTML = "";
+
+  BTS.forEach((bt) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = bt === currentBT ? "bt-option active" : "bt-option";
+    button.textContent = bt;
+
+    button.addEventListener("click", () => {
+      currentBT = bt;
+      btDropdownMenu.classList.add("hidden");
+      renderAll();
+    });
+
+    btDropdownMenu.appendChild(button);
+  });
+
+  btDropdownBtn.textContent = currentBT;
+}
+
+function renderPdfBtSelect() {
+  if (!pdfBtSelect) return;
+
+  pdfBtSelect.innerHTML = "";
+
+  BTS.forEach((bt) => {
+    const option = document.createElement("option");
+    option.value = bt;
+    option.textContent = bt;
+    pdfBtSelect.appendChild(option);
+  });
+
+  pdfBtSelect.value = currentBT;
+}
+
+btDropdownBtn?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  btDropdownMenu.classList.toggle("hidden");
+});
+
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".bt-select-wrap")) {
+    btDropdownMenu?.classList.add("hidden");
+  }
+});
+
+prevWeekBtn?.addEventListener("click", () => {
+  currentDate.setDate(currentDate.getDate() - 7);
+  dailyViewDate = null;
+  currentMainView = "week";
+  renderAll();
+});
+
+nextWeekBtn?.addEventListener("click", () => {
+  currentDate.setDate(currentDate.getDate() + 7);
+  dailyViewDate = null;
+  currentMainView = "week";
+  renderAll();
+});
+
+todayBtn?.addEventListener("click", () => {
+  currentDate = new Date();
+  dailyViewDate = null;
+  currentMainView = "week";
+  renderAll();
+});
+
+backToWeekBtn?.addEventListener("click", () => {
+  dailyViewDate = null;
+  currentMainView = "week";
+  renderAll();
+});
+
+vaoOpenListBtn?.addEventListener("click", () => {
+  currentMainView = currentMainView === "vao" ? "week" : "vao";
+  dailyViewDate = null;
+  renderAll();
+});
+
+poolViewSwitchBtn?.addEventListener("click", () => {
+  currentPoolView = currentPoolView === "vao" ? "control" : "vao";
+  renderAll();
+});
+
+/***********************************************************
+ * INIT
+ ***********************************************************/
 
 renderBtDropdown();
 renderPdfBtSelect();
+updatePlanningPoolCounter();
+renderAll();
+
+/***********************************************************
+ * WOCHENANPASSUNG
+ ***********************************************************/
+
+function renderWeekAdjustments() {
+  weekAdjustTeamList.innerHTML = "";
+
+  TEAMS.forEach((team) => {
+    const button =
+      document.createElement("button");
+
+    button.type = "button";
+    button.className =
+      "adjust-team-btn";
+
+    button.textContent = team;
+
+    button.addEventListener("click", () => {
+      selectedAdjustTeam =
+        team;
+
+      teamAdjustTitle.textContent =
+        `Wochenanpassung ${team}`;
+
+      teamAdjustStart.value =
+        getCurrentWeekDates()[0];
+
+      teamAdjustEnd.value =
+        getCurrentWeekDates()[4];
+
+      openModal(teamAdjustModal);
+    });
+
+    weekAdjustTeamList.appendChild(
+      button
+    );
+  });
+
+  existingAdjustmentsList.innerHTML =
+    "";
+
+  teamAdjustments
+    .filter(
+      (item) => item.bt === currentBT
+    )
+    .forEach((adjustment) => {
+      const row =
+        document.createElement("div");
+
+      row.className =
+        "adjustment-row";
+
+      row.innerHTML = `
+        <div>
+          <strong>${adjustment.team}</strong>
+          ·
+          ${getAdjustmentText(adjustment.status)}
+          ·
+          ${formatShortDateFromIso(adjustment.startDate)}
+          -
+          ${formatShortDateFromIso(adjustment.endDate)}
+        </div>
+
+        <button
+          type="button"
+          class="delete-adjustment-btn"
+        >
+          ✕
+        </button>
+      `;
+
+      row
+        .querySelector(
+          ".delete-adjustment-btn"
+        )
+        .addEventListener(
+          "click",
+          () => {
+            teamAdjustments =
+              teamAdjustments.filter(
+                (item) =>
+                  item.id !==
+                  adjustment.id
+              );
+
+            renderWeekAdjustments();
+            renderAll();
+          }
+        );
+
+      existingAdjustmentsList.appendChild(
+        row
+      );
+    });
+}
+
+saveTeamAdjustBtn.addEventListener(
+  "click",
+  () => {
+    teamAdjustments.push({
+      id: crypto.randomUUID(),
+      bt: currentBT,
+      team: selectedAdjustTeam,
+      status:
+        getRadioValue(
+          "teamAdjustStatus"
+        ),
+      startDate:
+        teamAdjustStart.value,
+      endDate:
+        teamAdjustEnd.value
+    });
+
+    closeModal(teamAdjustModal);
+    renderAll();
+  }
+);
+
+/***********************************************************
+ * VAO
+ ***********************************************************/
+
+confirmVaoReserveBtn.addEventListener(
+  "click",
+  () => {
+    const order =
+      orders.find(
+        (item) =>
+          item.id ===
+          pendingVaoReserveOrderId
+      );
+
+    if (!order) return;
+
+    order.vaoReservedBy =
+      getCurrentUserLabel();
+
+    order.vaoReservedAt =
+      formatDateTimeNow();
+
+    closeModal(
+      vaoReserveConfirmModal
+    );
+
+    renderAll();
+  }
+);
+
+saveVaoCompleteBtn.addEventListener(
+  "click",
+  () => {
+    const order =
+      orders.find(
+        (item) =>
+          item.id ===
+          pendingVaoCompleteOrderId
+      );
+
+    if (!order) return;
+
+    order.vaoStatus = "gestellt";
+
+    order.vaoStart =
+      vaoCompleteStart.value;
+
+    order.vaoEnd =
+      vaoCompleteEnd.value;
+
+    order.meters =
+      vaoCompleteMeters.value;
+
+    order.permit =
+      getRadioValue(
+        "vaoCompletePermit"
+      );
+
+    order.pvsRequired =
+      getRadioValue(
+        "vaoCompletePvs"
+      );
+
+    if (
+      order.pvsRequired === "ja"
+    ) {
+      order.pvsSetupDate =
+        calculatePvsSetupDate(
+          order.date
+        );
+    }
+
+    order.vaoReservedBy = "";
+    order.vaoReservedAt = "";
+    order.vaoProcessing = false;
+
+    closeModal(vaoCompleteModal);
+
+    renderAll();
+  }
+);
+
+/***********************************************************
+ * KONTROLLE ABSCHLIESSEN
+ ***********************************************************/
+
+saveControlCompleteBtn.addEventListener(
+  "click",
+  () => {
+    const order =
+      orders.find(
+        (item) =>
+          item.id ===
+          pendingControlCompleteOrderId
+      );
+
+    if (!order) return;
+
+    saveControlData(order);
+
+    pendingControlCompleteOrderId =
+      null;
+
+    closeModal(
+      controlCompleteModal
+    );
+
+    renderAll();
+  }
+);
+
+controlDokuFeedback.addEventListener(
+  "input",
+  () => {
+    const order =
+      orders.find(
+        (item) =>
+          item.id ===
+          pendingControlCompleteOrderId
+      );
+
+    if (!order) return;
+
+    controlGeneratedText.value =
+      buildControlGeneratedText(
+        order
+      );
+  }
+);
+
+document
+  .querySelectorAll(
+    'input[name="controlPtiSketch"], input[name="controlSmDoku"], input[name="controlCategory"]'
+  )
+  .forEach((input) => {
+    input.addEventListener(
+      "change",
+      () => {
+        const order =
+          orders.find(
+            (item) =>
+              item.id ===
+              pendingControlCompleteOrderId
+          );
+
+        if (!order) return;
+
+        controlGeneratedText.value =
+          buildControlGeneratedText(
+            order
+          );
+      }
+    );
+  });
+
+/***********************************************************
+ * PLANUNGSPOOL
+ ***********************************************************/
+
+poolPlanningBtn?.addEventListener(
+  "click",
+  () => {
+    renderPlanningPool();
+    openModal(
+      planningPoolModal
+    );
+  }
+);
+
+planningPoolDateInput?.addEventListener(
+  "change",
+  renderPlanningPoolLoadPreview
+);
+
+planningPoolTeamSelect?.addEventListener(
+  "change",
+  renderPlanningPoolLoadPreview
+);
+
+confirmPlanningPoolScheduleBtn?.addEventListener(
+  "click",
+  confirmPlanningPoolSchedule
+);
+
+/***********************************************************
+ * EXPORT
+ ***********************************************************/
+
+clearExportColumnsBtn?.addEventListener(
+  "click",
+  () => {
+    exportColumnsState = [null];
+
+    renderExportBuilder();
+  }
+);
+
+downloadExportBtn?.addEventListener(
+  "click",
+  downloadExportFile
+);
+
+exportBuilderBtn?.addEventListener(
+  "click",
+  () => {
+    renderExportBuilder();
+    openModal(
+      exportBuilderModal
+    );
+  }
+);
+
+/***********************************************************
+ * SUCHE
+ ***********************************************************/
+
+searchInput?.addEventListener(
+  "keydown",
+  (event) => {
+    if (event.key !== "Enter")
+      return;
+
+    const query =
+      lower(searchInput.value);
+
+    const results =
+      orders.filter((order) =>
+        [
+          order.address,
+          order.klsId,
+          order.smNumber
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(query)
+      );
+
+    searchResultsContainer.innerHTML =
+      "";
+
+    results.forEach((order) => {
+      const item =
+        document.createElement("div");
+
+      item.className =
+        "search-result-card";
+
+      item.textContent =
+        `${order.address} · ${order.klsId}`;
+
+      item.addEventListener(
+        "click",
+        () => {
+          closeModal(
+            searchResultsModal
+          );
+
+          openEditOrder(
+            order.id
+          );
+        }
+      );
+
+      searchResultsContainer.appendChild(
+        item
+      );
+    });
+
+    openModal(
+      searchResultsModal
+    );
+  }
+);
+
+/***********************************************************
+ * VIEW SWITCH
+ ***********************************************************/
+
+vaoOpenListBtn.addEventListener(
+  "click",
+  () => {
+    currentMainView =
+      currentMainView === "vao"
+        ? "week"
+        : "vao";
+
+    renderAll();
+  }
+);
+
+poolViewSwitchBtn?.addEventListener(
+  "click",
+  () => {
+    currentPoolView =
+      currentPoolView === "vao"
+        ? "control"
+        : "vao";
+
+    renderAll();
+  }
+);
+
+/***********************************************************
+ * CLOSE BUTTONS
+ ***********************************************************/
+
+[
+  [closeModalBtn, orderModal],
+  [cancelBtn, orderModal],
+
+  [
+    closeDeleteConfirmBtn,
+    deleteOrderConfirmModal
+  ],
+  [
+    cancelDeleteOrderBtn,
+    deleteOrderConfirmModal
+  ],
+
+  [
+    closeCompletedQuestionBtn,
+    completedQuestionModal
+  ],
+
+  [
+    closeEffortModalBtn,
+    effortModal
+  ],
+  [
+    cancelEffortBtn,
+    effortModal
+  ],
+
+  [closeTimeModalBtn, timeModal],
+  [cancelTimeBtn, timeModal],
+
+  [
+    closeWeekAdjustBtn,
+    weekAdjustModal
+  ],
+
+  [
+    closeTeamAdjustBtn,
+    teamAdjustModal
+  ],
+  [
+    cancelTeamAdjustBtn,
+    teamAdjustModal
+  ],
+
+  [
+    closeLiveDashboardBtn,
+    liveDashboardModal
+  ],
+
+  [
+    closeSearchInfoBtn,
+    searchInfoModal
+  ],
+
+  [
+    closeSearchResultsBtn,
+    searchResultsModal
+  ],
+
+  [
+    closePdfModalBtn,
+    pdfModal
+  ],
+  [
+    cancelPdfBtn,
+    pdfModal
+  ],
+
+  [
+    closeEmailGeneratorBtn,
+    emailGeneratorModal
+  ],
+  [
+    cancelEmailGeneratorBtn,
+    emailGeneratorModal
+  ],
+
+  [
+    closeMoveOrderBtn,
+    moveOrderModal
+  ],
+  [
+    cancelMoveOrderBtn,
+    moveOrderModal
+  ],
+
+  [
+    closeVaoReserveConfirmBtn,
+    vaoReserveConfirmModal
+  ],
+  [
+    cancelVaoReserveBtn,
+    vaoReserveConfirmModal
+  ],
+
+  [
+    closeVaoCompleteModalBtn,
+    vaoCompleteModal
+  ],
+  [
+    cancelVaoCompleteBtn,
+    vaoCompleteModal
+  ],
+
+  [
+    closeControlCompleteBtn,
+    controlCompleteModal
+  ],
+  [
+    cancelControlCompleteBtn,
+    controlCompleteModal
+  ],
+
+  [
+    closePlanningPoolBtn,
+    planningPoolModal
+  ],
+
+  [
+    closePlanningPoolScheduleBtn,
+    planningPoolScheduleModal
+  ],
+  [
+    cancelPlanningPoolScheduleBtn,
+    planningPoolScheduleModal
+  ],
+
+  [
+    closeExportBuilderBtn,
+    exportBuilderModal
+  ]
+].forEach(([btn, modal]) => {
+  btn?.addEventListener(
+    "click",
+    () => closeModal(modal)
+  );
+});
+
+/***********************************************************
+ * INIT
+ ***********************************************************/
+
+pdfDateInput &&
+  (pdfDateInput.value =
+    getIsoDate(new Date()));
+
 renderAll();
