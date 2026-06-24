@@ -42,6 +42,27 @@ let pendingVaoReserveOrderId = null;
 let pendingVaoCompleteOrderId = null;
 let pendingControlCompleteOrderId = null;
 let pendingPlanningPoolOrderId = null;
+let pendingAssignOrderId = null;
+let pendingPermitOrderId = null;
+let selectedRulePlanTemplateId = null;
+let selectedRulePlanFormat = null;
+
+let rulePlanProjects = {};
+let currentVzProjectOrderId = null;
+let vzMeasurePoints = [];
+
+let permitDrafts = {};
+let cityKnowledge = {};
+
+const CURRENT_USER = {
+  id: "disponent",
+  name: "Disponent"
+};
+
+const USERS = [
+  { id: "disponent", name: "Disponent" },
+  { id: "test", name: "Test" }
+];
 
 let exportColumnsState = [];
 
@@ -340,6 +361,54 @@ const planningPoolDateInput = document.getElementById("planningPoolDateInput");
 const planningPoolTeamSelect = document.getElementById("planningPoolTeamSelect");
 const planningPoolLoadPreview = document.getElementById("planningPoolLoadPreview");
 
+const vzPlanEditorModal = document.getElementById("vzPlanEditorModal");
+const closeVzEditorBtn = document.getElementById("closeVzEditorBtn");
+const vzEditorSubtitle = document.getElementById("vzEditorSubtitle");
+const vzPlanCanvasWrap = document.getElementById("vzPlanCanvasWrap");
+const vzPlanBaseImage = document.getElementById("vzPlanBaseImage");
+const vzMeasureLayer = document.getElementById("vzMeasureLayer");
+const vzResetMeasureBtn = document.getElementById("vzResetMeasureBtn");
+const vzConfirmMeasureBtn = document.getElementById("vzConfirmMeasureBtn");
+const vzUndoBtn = document.getElementById("vzUndoBtn");
+const vzRedoBtn = document.getElementById("vzRedoBtn");
+const rulePlanModal = document.getElementById("rulePlanModal");
+const closeRulePlanBtn = document.getElementById("closeRulePlanBtn");
+const startRulePlanTemplateBtn = document.getElementById("startRulePlanTemplateBtn");
+const startRulePlanNewBtn = document.getElementById("startRulePlanNewBtn");
+const startCustomRulePlanBtn = document.getElementById("startCustomRulePlanBtn");
+const rulePlanTemplateSection = document.getElementById("rulePlanTemplateSection");
+const rulePlanTemplateList = document.getElementById("rulePlanTemplateList");
+const rulePlanPreview = document.getElementById("rulePlanPreview");
+const rulePlanFormatBox = document.getElementById("rulePlanFormatBox");
+const permitFolderModal = document.getElementById("permitFolderModal");
+const closePermitFolderBtn = document.getElementById("closePermitFolderBtn");
+const permitFolderSubtitle = document.getElementById("permitFolderSubtitle");
+const permitDetectedCity = document.getElementById("permitDetectedCity");
+const permitCityInput = document.getElementById("permitCityInput");
+const permitTemplateSelect = document.getElementById("permitTemplateSelect");
+const savePermitDraftBtn = document.getElementById("savePermitDraftBtn");
+const createPermitPdfBtn = document.getElementById("createPermitPdfBtn");
+const openPermitMailBtn = document.getElementById("openPermitMailBtn");
+const permitPlanCreateBtn = document.getElementById("permitPlanCreateBtn");
+
+const permitLapFiles = document.getElementById("permitLapFiles");
+const permitPlanFiles = document.getElementById("permitPlanFiles");
+const permitProofFiles = document.getElementById("permitProofFiles");
+const permitExtraFiles = document.getElementById("permitExtraFiles");
+const knowledgeBotLauncher = document.getElementById("knowledgeBotLauncher");
+const knowledgeBotWindow = document.getElementById("knowledgeBotWindow");
+const closeKnowledgeBotBtn = document.getElementById("closeKnowledgeBotBtn");
+const knowledgeBotMessages = document.getElementById("knowledgeBotMessages");
+const knowledgeBotInput = document.getElementById("knowledgeBotInput");
+const sendKnowledgeBotBtn = document.getElementById("sendKnowledgeBotBtn");
+const assignOrderModal = document.getElementById("assignOrderModal");
+const closeAssignOrderBtn = document.getElementById("closeAssignOrderBtn");
+const cancelAssignOrderBtn = document.getElementById("cancelAssignOrderBtn");
+const confirmAssignOrderBtn = document.getElementById("confirmAssignOrderBtn");
+const assignOrderSubtitle = document.getElementById("assignOrderSubtitle");
+const assignUserSelect = document.getElementById("assignUserSelect");
+const assignNoteInput = document.getElementById("assignNoteInput");
+
 const exportBuilderBtn = document.getElementById("exportBuilderBtn");
 const exportBuilderModal = document.getElementById("exportBuilderModal");
 const closeExportBuilderBtn = document.getElementById("closeExportBuilderBtn");
@@ -468,7 +537,23 @@ function lower(value) {
 }
 
 function getCurrentUserLabel() {
-  return "Disponent";
+  return CURRENT_USER.name;
+}
+
+function getCurrentUserId() {
+  return CURRENT_USER.id;
+}
+
+function isAssignedToOtherUser(order) {
+  return Boolean(order.assignedTo && order.assignedTo !== getCurrentUserId());
+}
+
+function isAssignedToCurrentUser(order) {
+  return order.assignedTo === getCurrentUserId();
+}
+
+function canCurrentUserWorkOnOrder(order) {
+  return !order.assignedTo || isAssignedToCurrentUser(order);
 }
 
 function canUnlockReservation(order) {
@@ -1810,12 +1895,16 @@ function renderVaoOpenList() {
 
       card.innerHTML = `
         <div class="vao-open-left">
-          <div class="vao-open-address">
+          
             ${order.address || "Ohne Adresse"}
+          <div class="vao-open-address">
+           ${
+            order.assignedTo
+              ? `<span title="Zugewiesen und gesperrt">🔗🔒</span>`
+               : ""
+           }
+           ${order.address || "Ohne Adresse"}
           </div>
-
-          <div class="vao-open-meta">
-            <span class="vao-meta-chip">${order.bt}</span>
 
             ${
               order.team
@@ -1852,16 +1941,39 @@ function renderVaoOpenList() {
                 ? `<span class="vao-meta-chip vao-processing-chip">In Bearbeitung</span>`
                 : ""
             }
+            ${
+              order.assignedTo
+                 ? `<span class="vao-meta-chip vao-assigned-chip">Zugewiesen an ${order.assignedToName || order.assignedTo}</span>`
+                  : ""
+            }
           </div>
         </div>
 
         <div class="vao-open-actions">
+        <button
+          class="vao-action-btn permit-folder-btn"
+          type="button"
+          title="Antragsmappe öffnen"
+        >
+          <img class="vao-action-icon" src="Antrag.png" alt="Antragsmappe" />
+        </button>
+        <button
+           class="vao-action-btn assign-btn"
+           type="button"
+           title="Auftrag zuweisen"
+        >
+           <img class="vao-action-icon" src="Auftrag zuweisen.png" alt="Auftrag zuweisen" />
+          </button>
           <button
             class="vao-action-btn locked-btn"
             type="button"
             title="Reservieren"
           >
-            ${reservedBy ? "🔓" : "🔒"}
+            ${
+              reservedBy
+                ? `<img class="vao-action-icon" src="Schloß offen.png" alt="Reservierung öffnen" />`
+                : `<img class="vao-action-icon" src="Schloß zu.png" alt="Reservieren" />`
+            }
           </button>
 
           <button
@@ -1869,7 +1981,7 @@ function renderVaoOpenList() {
             type="button"
             title="In Bearbeitung"
           >
-            🚩
+            <img class="vao-action-icon" src="Flagge.png" alt="In Bearbeitung" />
           </button>
 
           <button
@@ -1877,13 +1989,23 @@ function renderVaoOpenList() {
             type="button"
             title="${isControl ? "Kontrolle abschließen" : "VAO gestellt"}"
           >
-            ✅
+            <img class="vao-action-icon" src="Haken.png" alt="Abschließen" />
           </button>
         </div>
       `;
 
-      const [lockBtn, flagBtn, doneBtn] =
-        card.querySelectorAll(".vao-action-btn");
+        const [permitBtn, assignBtn, lockBtn, flagBtn, doneBtn] =
+          card.querySelectorAll(".vao-action-btn");
+          permitBtn.addEventListener("click", () => {
+            openPermitFolder(order.id);
+         });
+        assignBtn.addEventListener("click", () => {
+          pendingAssignOrderId = order.id;
+          assignOrderSubtitle.textContent = order.address || "Auftrag an anderen Nutzer übergeben";
+          assignUserSelect.value = "test";
+          assignNoteInput.value = "";
+          openModal(assignOrderModal);
+        });
 
       lockBtn.addEventListener("click", () => {
         if (isControl) {
@@ -1930,6 +2052,21 @@ function renderVaoOpenList() {
       });
 
       flagBtn.addEventListener("click", () => {
+          if (!canCurrentUserWorkOnOrder(order)) {
+            const request = confirm(
+              `Dieser Auftrag ist an ${order.assignedToName || order.assignedTo} zugewiesen. Freigabe anfragen?`
+             );
+
+            if (request) {
+              order.releaseRequestedBy = getCurrentUserId();
+              order.releaseRequestedByName = getCurrentUserLabel();
+              order.releaseRequestedAt = formatDateTimeNow();
+              order.releaseRequestPending = true;
+              renderAll();
+            }
+
+            return;
+          }
         if (isControl) {
           if (
             order.controlReservedBy &&
@@ -2027,31 +2164,28 @@ function renderVaoOpenList() {
 }
 
 function renderVaoTodoList() {
-  const isControl =
-    currentPoolView === "control";
+  const isControl = currentPoolView === "control";
 
-  poolTodoTitle.textContent =
-    "To Do Liste";
+  poolTodoTitle.textContent = "To Do Liste";
 
-  poolTodoSubtitle.textContent =
-    isControl
-      ? "Deine reservierten Kontroll-Aufträge"
-      : "Deine reservierten VAO-Aufträge";
+  poolTodoSubtitle.textContent = isControl
+    ? "Reservierte Kontroll-Aufträge und Zuweisungen"
+    : "Reservierte VAO-Aufträge und Zuweisungen";
 
   const myOrders = orders
-    .filter((order) =>
-      isControl
+    .filter((order) => {
+      const reservedMatch = isControl
         ? order.controlReservedBy === getCurrentUserLabel()
-        : order.vaoReservedBy === getCurrentUserLabel()
-    )
-    .sort((a, b) => {
-      if (a.bt !== b.bt) {
-        return a.bt.localeCompare(b.bt);
-      }
+        : order.vaoReservedBy === getCurrentUserLabel();
 
-      return (a.address || "").localeCompare(
-        b.address || ""
-      );
+      const assignedMatch =
+        order.assignedTo === "test" || order.assignedToName === "Test";
+
+      return reservedMatch || assignedMatch;
+    })
+    .sort((a, b) => {
+      if (a.bt !== b.bt) return a.bt.localeCompare(b.bt);
+      return (a.address || "").localeCompare(b.address || "");
     });
 
   vaoTodoListContainer.innerHTML = "";
@@ -2059,42 +2193,53 @@ function renderVaoTodoList() {
   if (!myOrders.length) {
     vaoTodoListContainer.innerHTML = `
       <div class="vao-empty">
-        ${
-          isControl
-            ? "Du hast aktuell keine Kontroll-Aufträge reserviert."
-            : "Du hast aktuell keine VAO-Aufträge reserviert."
-        }
+        Keine offenen To-dos vorhanden.
       </div>
     `;
     return;
   }
 
   BTS.forEach((bt) => {
-    const btOrders =
-      myOrders.filter((order) => order.bt === bt);
+    const btOrders = myOrders.filter((order) => order.bt === bt);
 
     if (!btOrders.length) return;
 
-    const group =
-      document.createElement("div");
+    const group = document.createElement("div");
+    group.className = "todo-bt-group";
 
-    group.className =
-      "todo-bt-group";
-
-    group.innerHTML =
-      `<div class="todo-bt-title">${bt}</div>`;
+    group.innerHTML = `<div class="todo-bt-title">${bt}</div>`;
 
     btOrders.forEach((order) => {
-      const item =
-        document.createElement("div");
+      const isAssigned =
+        order.assignedTo === "test" ||
+        order.assignedToName === "Test";
 
-      item.className =
-        "todo-order-card";
+      const hasReleaseRequest =
+        order.releaseRequestPending &&
+        order.assignedTo === getCurrentUserId();
+
+      const item = document.createElement("div");
+      item.className = "todo-order-card";
 
       item.innerHTML = `
         <div class="todo-order-address">
           ${order.address || "Ohne Adresse"}
+          ${
+            isAssigned && order.assignedNote
+              ? `<span class="assigned-note-bubble" title="${escapeHtml(order.assignedNote)}">💬</span>`
+              : ""
+          }
         </div>
+        ${
+          hasReleaseRequest
+            ? `
+            <div class="release-request-actions">
+              <button class="release-accept-btn">✅</button>
+              <button class="release-decline-btn">❌</button>
+            </div>
+          `
+            : ""
+        }
 
         <div class="todo-order-meta">
           ${
@@ -2112,10 +2257,48 @@ function renderVaoTodoList() {
           ${
             isControl
               ? `<span class="todo-order-chip">Kontrolle</span>`
+              : `<span class="todo-order-chip">VAO</span>`
+          }
+
+          ${
+            isAssigned
+              ? `<span class="todo-order-chip">Zugewiesen</span>`
               : ""
           }
         </div>
       `;
+
+      item.addEventListener("click", () => {
+        const acceptBtn = item.querySelector(".release-accept-btn");
+        const declineBtn = item.querySelector(".release-decline-btn");
+
+        acceptBtn?.addEventListener("click", (e) => {
+          e.stopPropagation();
+
+          order.assignedTo = "";
+          order.assignedToName = "";
+          order.assignedNote = "";
+
+          order.releaseRequestedBy = "";
+          order.releaseRequestedByName = "";
+          order.releaseRequestedAt = "";
+          order.releaseRequestPending = false;
+
+          renderAll();
+        });
+
+        declineBtn?.addEventListener("click", (e) => {
+          e.stopPropagation();
+
+          order.releaseRequestedBy = "";
+          order.releaseRequestedByName = "";
+          order.releaseRequestedAt = "";
+          order.releaseRequestPending = false;
+
+          renderAll();
+        });
+        openEditOrder(order.id);
+      });
 
       group.appendChild(item);
     });
@@ -3056,7 +3239,10 @@ orderForm.addEventListener("submit", (event) => {
       controlProcessing: false,
       controlReservedBy: "",
       controlReservedAt: "",
-      controlData: null
+      controlData: null,
+      releaseRequestedBy: "",
+      releaseRequestedByName: "",
+      releaseRequestedAt: "",
     });
   }
 
@@ -3905,6 +4091,9 @@ poolViewSwitchBtn?.addEventListener("click", () => {
   [closePlanningPoolScheduleBtn, planningPoolScheduleModal],
   [cancelPlanningPoolScheduleBtn, planningPoolScheduleModal],
 
+  [closePermitFolderBtn, permitFolderModal],
+  [closeAssignOrderBtn, assignOrderModal],
+  [cancelAssignOrderBtn, assignOrderModal],
   [closeExportBuilderBtn, exportBuilderModal]
 ].forEach(([btn, modal]) => {
   btn?.addEventListener("click", () => closeModal(modal));
@@ -4002,8 +4191,1052 @@ poolViewSwitchBtn?.addEventListener("click", () => {
 });
 
 /***********************************************************
+ * REGELPLAN BUILDER
+ ***********************************************************/
+
+const RULE_PLAN_TEMPLATES = [
+  {
+    id: "regelplan_b_ii_i_9",
+    name: "Regelplan B II I 9",
+    description: "Standard-Regelplan aus hochgeladener Vorlage.",
+    previewImage: "Regelplan B II I 9.png",
+    source: "standard"
+  }
+];
+
+function getRulePlanProject(orderId) {
+  if (!rulePlanProjects[orderId]) {
+    rulePlanProjects[orderId] = {
+      templateId: "",
+      templateName: "",
+      format: "",
+      layerLocked: {
+        base: true,
+        signs: false,
+        notes: false,
+        measurement: false
+      },
+      undoStack: [],
+      redoStack: [],
+      signs: [],
+      notes: [],
+      warnings: [],
+      createdAt: formatDateTimeNow(),
+      updatedAt: formatDateTimeNow()
+    };
+  }
+
+  return rulePlanProjects[orderId];
+}
+
+function renderRulePlanTemplates(mode = "standard") {
+  rulePlanTemplateList.innerHTML = "";
+
+  const templates = RULE_PLAN_TEMPLATES.filter((item) =>
+    mode === "custom" ? item.source === "custom" : item.source === "standard"
+  );
+
+  if (!templates.length) {
+    rulePlanTemplateList.innerHTML = `
+      <div class="vao-empty">
+        Keine Vorlagen vorhanden.
+      </div>
+    `;
+    return;
+  }
+
+  templates.forEach((template) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className =
+      template.id === selectedRulePlanTemplateId
+        ? "ruleplan-template-card active"
+        : "ruleplan-template-card";
+
+    btn.innerHTML = `
+      <strong>${template.name}</strong>
+      <span>${template.description}</span>
+    `;
+
+    btn.addEventListener("click", () => {
+      selectedRulePlanTemplateId = template.id;
+
+      rulePlanPreview.innerHTML = `
+        <div class="ruleplan-preview-title">
+          Vorschau: ${template.name}
+        </div>
+
+        <div class="ruleplan-preview-image-wrap">
+          <img src="${template.previewImage}" alt="${template.name}" />
+        </div>
+      `;
+
+      rulePlanFormatBox.classList.remove("hidden");
+
+      renderRulePlanTemplates(mode);
+    });
+
+    rulePlanTemplateList.appendChild(btn);
+  });
+}
+
+function startRulePlanFlow(mode) {
+  selectedRulePlanTemplateId = null;
+  selectedRulePlanFormat = null;
+
+  rulePlanTemplateSection.classList.remove("hidden");
+  rulePlanFormatBox.classList.add("hidden");
+
+  rulePlanPreview.innerHTML = "Keine Vorlage ausgewählt";
+
+  renderRulePlanTemplates(mode);
+}
+
+startRulePlanTemplateBtn?.addEventListener("click", () => {
+  startRulePlanFlow("standard");
+});
+
+startCustomRulePlanBtn?.addEventListener("click", () => {
+  startRulePlanFlow("custom");
+});
+
+startRulePlanNewBtn?.addEventListener("click", () => {
+  selectedRulePlanTemplateId = "new_vz_plan";
+  selectedRulePlanFormat = null;
+
+  rulePlanTemplateSection.classList.remove("hidden");
+  rulePlanPreview.innerHTML = `
+    <h4>Neuer VZ-Plan</h4>
+    <p>Leere Vorlage ohne Regelplan-Basis.</p>
+  `;
+  rulePlanFormatBox.classList.remove("hidden");
+});
+
+document.querySelectorAll(".ruleplan-format-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (!pendingPermitOrderId) {
+      alert("Bitte zuerst eine Antragsmappe öffnen.");
+      return;
+    }
+
+    selectedRulePlanFormat = btn.dataset.format;
+
+    const project = getRulePlanProject(pendingPermitOrderId);
+    const template = RULE_PLAN_TEMPLATES.find(
+      (item) => item.id === selectedRulePlanTemplateId
+    );
+
+    project.templateId = selectedRulePlanTemplateId;
+    project.templateName =
+      template?.name ||
+      (selectedRulePlanTemplateId === "new_vz_plan" ? "Neuer VZ-Plan" : "Eigene Vorlage");
+    project.format = selectedRulePlanFormat;
+    project.updatedAt = formatDateTimeNow();
+
+    openVzPlanEditor(pendingPermitOrderId);
+    closeModal(rulePlanModal);
+  });
+});
+
+closeRulePlanBtn?.addEventListener("click", () => {
+  closeModal(rulePlanModal);
+});
+
+/***********************************************************
+ * VZ PLAN EDITOR
+ ***********************************************************/
+
+function openVzPlanEditor(orderId) {
+  const project = getRulePlanProject(orderId);
+  const template = RULE_PLAN_TEMPLATES.find((item) => item.id === project.templateId);
+
+  currentVzProjectOrderId = orderId;
+  vzMeasurePoints = [];
+
+  vzPlanBaseImage.src = template?.previewImage || "";
+  vzEditorSubtitle.textContent = "Bitte setze einen Meter-Richtwert: Punkt 1 und Punkt 2 anklicken.";
+
+  vzConfirmMeasureBtn.classList.add("hidden");
+
+  clearVzMeasureLayer();
+  openModal(vzPlanEditorModal);
+}
+
+function clearVzMeasureLayer() {
+  vzMeasureLayer.innerHTML = "";
+}
+
+function renderVzMeasureLine() {
+  clearVzMeasureLayer();
+
+  vzMeasurePoints.forEach((point) => {
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", point.x);
+    circle.setAttribute("cy", point.y);
+    circle.setAttribute("r", "6");
+    circle.setAttribute("class", "vz-measure-point");
+    vzMeasureLayer.appendChild(circle);
+  });
+
+  if (vzMeasurePoints.length === 2) {
+    const [a, b] = vzMeasurePoints;
+
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", a.x);
+    line.setAttribute("y1", a.y);
+    line.setAttribute("x2", b.x);
+    line.setAttribute("y2", b.y);
+    line.setAttribute("class", "vz-measure-line");
+
+    vzMeasureLayer.prepend(line);
+    vzConfirmMeasureBtn.classList.remove("hidden");
+    vzEditorSubtitle.textContent = "Messstrecke gesetzt. Bitte bestätigen oder neu setzen.";
+  }
+}
+
+vzPlanCanvasWrap?.addEventListener("click", (event) => {
+  if (!currentVzProjectOrderId) return;
+  if (vzMeasurePoints.length >= 2) return;
+
+  const rect = vzPlanCanvasWrap.getBoundingClientRect();
+
+  vzMeasurePoints.push({
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  });
+
+  renderVzMeasureLine();
+});
+
+vzResetMeasureBtn?.addEventListener("click", () => {
+  vzMeasurePoints = [];
+  clearVzMeasureLayer();
+  vzConfirmMeasureBtn.classList.add("hidden");
+  vzEditorSubtitle.textContent = "Bitte setze den Meter-Richtwert neu: Punkt 1 und Punkt 2 anklicken.";
+});
+
+vzConfirmMeasureBtn?.addEventListener("click", () => {
+  if (!currentVzProjectOrderId || vzMeasurePoints.length !== 2) return;
+
+  const meters = prompt("Wie viele Meter entspricht diese Strecke?");
+
+  if (!meters) return;
+
+  const [a, b] = vzMeasurePoints;
+  const pixelDistance = Math.hypot(b.x - a.x, b.y - a.y);
+  const meterValue = Number(String(meters).replace(",", "."));
+
+  if (!meterValue || meterValue <= 0) {
+    alert("Bitte eine gültige Meterzahl eingeben.");
+    return;
+  }
+
+  const project = getRulePlanProject(currentVzProjectOrderId);
+
+  project.measurement = {
+    points: vzMeasurePoints,
+    meters: meterValue,
+    pixels: pixelDistance,
+    pixelsPerMeter: pixelDistance / meterValue
+  };
+
+  project.updatedAt = formatDateTimeNow();
+
+  vzEditorSubtitle.textContent =
+    `Meter-Richtwert gesetzt: ${meterValue} m · ${Math.round(project.measurement.pixelsPerMeter)} px/m`;
+
+  vzConfirmMeasureBtn.classList.add("hidden");
+});
+
+closeVzEditorBtn?.addEventListener("click", () => {
+  closeModal(vzPlanEditorModal);
+});
+
+/***********************************************************
+ * ANTRAGSMAPPE
+ ***********************************************************/
+
+function detectCityFromAddress(address) {
+  const text = lower(address);
+
+  if (text.includes("stuttgart")) return "Stuttgart";
+  if (text.includes("ludwigsburg")) return "Ludwigsburg";
+  if (text.includes("fellbach")) return "Fellbach";
+  if (text.includes("waiblingen")) return "Waiblingen";
+
+  return "";
+}
+
+function getPermitDraft(orderId) {
+  if (!permitDrafts[orderId]) {
+    permitDrafts[orderId] = {
+      city: "",
+      template: "standard",
+      files: {
+        lap: [],
+        plan: [],
+        proof: [],
+        extra: []
+      }
+    };
+  }
+
+  return permitDrafts[orderId];
+}
+
+function openPermitFolder(orderId) {
+  const order = orders.find((item) => item.id === orderId);
+  if (!order) return;
+
+  pendingPermitOrderId = order.id;
+
+  const draft = getPermitDraft(order.id);
+  const detectedCity = detectCityFromAddress(order.address);
+
+  if (!draft.city && detectedCity) {
+    draft.city = detectedCity;
+  }
+
+  if (draft.city === "Stuttgart") {
+    draft.template = "stuttgart";
+  }
+
+  const cityKey = lower(draft.city);
+  const cityData = cityKnowledge[cityKey];
+
+  if (cityData?.template) {
+    draft.template = cityData.template;
+}
+
+  permitFolderSubtitle.textContent = `${order.address || "Ohne Adresse"} · ${order.klsId || "-"}`;
+  permitDetectedCity.textContent = draft.city
+    ? `Stadt erkannt: ${draft.city}`
+    : "Stadt konnte nicht automatisch erkannt werden.";
+
+  permitCityInput.value = draft.city || "";
+  permitTemplateSelect.value = draft.template || "standard";
+
+  renderPermitFiles();
+
+  openModal(permitFolderModal);
+}
+
+function getPermitFileListElement(slot) {
+  if (slot === "lap") return permitLapFiles;
+  if (slot === "plan") return permitPlanFiles;
+  if (slot === "proof") return permitProofFiles;
+  if (slot === "extra") return permitExtraFiles;
+  return null;
+}
+
+function addPermitFile(slot, file) {
+  if (!pendingPermitOrderId || !file) return;
+
+  const draft = getPermitDraft(pendingPermitOrderId);
+
+  draft.files[slot].push({
+    id: crypto.randomUUID(),
+    name: file.name,
+    size: file.size,
+    type: file.type
+  });
+
+  renderPermitFiles();
+}
+
+function renderPermitFiles() {
+  if (!pendingPermitOrderId) return;
+
+  const draft = getPermitDraft(pendingPermitOrderId);
+
+  ["lap", "plan", "proof", "extra"].forEach((slot) => {
+    const container = getPermitFileListElement(slot);
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    draft.files[slot].forEach((file) => {
+      const row = document.createElement("div");
+      row.className = "permit-file-item";
+
+      row.innerHTML = `
+        <span>${file.name}</span>
+        <button class="permit-file-remove" type="button">🗑</button>
+      `;
+
+      row.querySelector(".permit-file-remove").addEventListener("click", () => {
+        draft.files[slot] = draft.files[slot].filter((item) => item.id !== file.id);
+        renderPermitFiles();
+      });
+
+      container.appendChild(row);
+    });
+  });
+}
+
+function savePermitDraft() {
+  if (!pendingPermitOrderId) return;
+
+  const draft = getPermitDraft(pendingPermitOrderId);
+
+  draft.city = safeText(permitCityInput.value);
+  draft.template = permitTemplateSelect.value;
+
+  const order = orders.find((item) => item.id === pendingPermitOrderId);
+
+  if (order) {
+    order.permitDraftStatus = "gespeichert";
+    order.permitDraftCity = draft.city;
+    order.permitDraftTemplate = draft.template;
+
+    const logLine =
+      `[${formatDateTimeNow()}] Antragsmappe als Entwurf gespeichert. Stadt: ${draft.city || "-"}, Vorlage: ${draft.template || "-"}.`;
+
+    order.details = order.details
+      ? `${order.details}\n${logLine}`
+      : logLine;
+  }
+
+  renderAll();
+  alert("Antragsmappe wurde als Entwurf gespeichert.");
+}
+
+document.querySelectorAll(".permit-dropzone").forEach((zone) => {
+  zone.addEventListener("click", () => {
+    const slot = zone.dataset.permitSlot;
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+
+    input.addEventListener("change", () => {
+      [...input.files].forEach((file) => addPermitFile(slot, file));
+    });
+
+    input.click();
+  });
+
+  zone.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    zone.classList.add("drag-over");
+  });
+
+  zone.addEventListener("dragleave", () => {
+    zone.classList.remove("drag-over");
+  });
+
+  zone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    zone.classList.remove("drag-over");
+
+    const slot = zone.dataset.permitSlot;
+    [...event.dataTransfer.files].forEach((file) => addPermitFile(slot, file));
+  });
+});
+
+savePermitDraftBtn?.addEventListener("click", savePermitDraft);
+
+permitPlanCreateBtn?.addEventListener("click", () => {
+  openModal(rulePlanModal);
+});
+
+createPermitPdfBtn?.addEventListener("click", () => {
+  if (!pendingPermitOrderId) return;
+
+  savePermitDraft();
+
+  const order = orders.find((item) => item.id === pendingPermitOrderId);
+  const draft = getPermitDraft(pendingPermitOrderId);
+
+  if (!order) return;
+
+  const fileRows = Object.entries(draft.files)
+    .map(([slot, files]) => {
+      const labelMap = {
+        lap: "LAP / Lageplan",
+        plan: "Regelplan / VZ-Plan",
+        proof: "Nachweis",
+        extra: "Zusatzdateien"
+      };
+
+      const fileText = files.length
+        ? files.map((file) => `<li>${escapeHtml(file.name)}</li>`).join("")
+        : "<li>Keine Datei hinterlegt</li>";
+
+      return `
+        <h3>${labelMap[slot]}</h3>
+        <ul>${fileText}</ul>
+      `;
+    })
+    .join("");
+
+  const pdfWindow = window.open("", "_blank");
+
+  pdfWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="de">
+    <head>
+      <meta charset="UTF-8" />
+      <title>Antragsmappe ${escapeHtml(order.klsId || "")}</title>
+
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          padding: 32px;
+          color: #111827;
+        }
+
+        h1 {
+          color: #e20074;
+          margin-bottom: 6px;
+        }
+
+        h2 {
+          margin-top: 28px;
+          border-bottom: 1px solid #ddd;
+          padding-bottom: 8px;
+        }
+
+        h3 {
+          margin-top: 22px;
+        }
+
+        .meta {
+          color: #64748b;
+          margin-bottom: 24px;
+        }
+
+        .box {
+          border: 1px solid #d9dee8;
+          border-radius: 12px;
+          padding: 16px;
+          margin-bottom: 16px;
+        }
+
+        table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        td {
+          border-bottom: 1px solid #eee;
+          padding: 8px;
+          vertical-align: top;
+        }
+
+        td:first-child {
+          font-weight: bold;
+          width: 220px;
+        }
+
+        @media print {
+          button {
+            display: none;
+          }
+        }
+      </style>
+    </head>
+
+    <body>
+      <button onclick="window.print()">PDF drucken / speichern</button>
+
+      <h1>Antragsmappe</h1>
+      <div class="meta">
+        Erstellt am ${formatDateTimeNow()}
+      </div>
+
+      <div class="box">
+        <table>
+          <tr>
+            <td>Auftrag</td>
+            <td>${escapeHtml(order.address || "-")}</td>
+          </tr>
+
+          <tr>
+            <td>KLS-ID</td>
+            <td>${escapeHtml(order.klsId || "-")}</td>
+          </tr>
+
+          <tr>
+            <td>BT</td>
+            <td>${escapeHtml(order.bt || "-")}</td>
+          </tr>
+
+          <tr>
+            <td>Trupp</td>
+            <td>${escapeHtml(order.team || "-")}</td>
+          </tr>
+
+          <tr>
+            <td>Stadt / Gemeinde</td>
+            <td>${escapeHtml(draft.city || "-")}</td>
+          </tr>
+
+          <tr>
+            <td>Vorlage</td>
+            <td>${escapeHtml(draft.template || "-")}</td>
+          </tr>
+        </table>
+      </div>
+
+      <h2>Anlagen</h2>
+      ${fileRows}
+    </body>
+    </html>
+  `);
+
+  pdfWindow.document.close();
+});
+
+openPermitMailBtn?.addEventListener("click", () => {
+  if (!pendingPermitOrderId) return;
+
+  savePermitDraft();
+
+  const order = orders.find((item) => item.id === pendingPermitOrderId);
+  const draft = getPermitDraft(pendingPermitOrderId);
+
+  if (!order) return;
+
+const cityData = cityKnowledge[cityKey];
+
+const cityMailMap = {
+  stuttgart: "verkehrsbehoerde@stuttgart.de",
+  ludwigsburg: "verkehr@ludwigsburg.de",
+  fellbach: "verkehr@fellbach.de",
+  waiblingen: "verkehr@waiblingen.de"
+};
+
+const to = cityData?.email || cityMailMap[cityKey] || "";
+
+  const subject =
+    `Antrag VAO / verkehrsrechtliche Anordnung – ${order.klsId || "ohne KLS-ID"}`;
+
+  const body = [
+    "Sehr geehrte Damen und Herren,",
+    "",
+    "anbei erhalten Sie den Antrag zur verkehrsrechtlichen Anordnung.",
+    "",
+    `Adresse: ${order.address || "-"}`,
+    `KLS-ID: ${order.klsId || "-"}`,
+    `BT: ${order.bt || "-"}`,
+    `Trupp: ${order.team || "-"}`,
+    `Stadt/Gemeinde: ${draft.city || "-"}`,
+    cityData?.vaoLeadTime
+      ? `VAO-Vorlaufzeit: ${cityData.vaoLeadTime}${cityData.vaoLeadTimeUntil ? ` bis ${cityData.vaoLeadTimeUntil}` : ""}`
+      : "",
+    cityData?.vaoValidity
+      ? `VAO-Gültigkeit: ${cityData.vaoValidity}`
+      : "",
+    cityData?.invoiceInfo
+      ? `Rechnungsinfo: ${cityData.invoiceInfo}`
+      : "",
+    "",
+    "Folgende Unterlagen wurden vorbereitet:",
+    `- LAP / Lageplan: ${draft.files.lap.length ? draft.files.lap.map((file) => file.name).join(", ") : "nicht hinterlegt"}`,
+    `- Regelplan / VZ-Plan: ${draft.files.plan.length ? draft.files.plan.map((file) => file.name).join(", ") : "nicht hinterlegt"}`,
+    `- Nachweis: ${draft.files.proof.length ? draft.files.proof.map((file) => file.name).join(", ") : "nicht hinterlegt"}`,
+    `- Zusatzdateien: ${draft.files.extra.length ? draft.files.extra.map((file) => file.name).join(", ") : "nicht hinterlegt"}`,
+    "",
+    "Mit freundlichen Grüßen",
+    getCurrentUserLabel()
+  ].join("\n");
+
+  const mailto =
+    `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  window.location.href = mailto;
+});
+
+/***********************************************************
+ * AUFTRAG ZUWEISEN
+ ***********************************************************/
+
+confirmAssignOrderBtn?.addEventListener("click", () => {
+  const order = orders.find((item) => item.id === pendingAssignOrderId);
+  if (!order) return;
+
+  const selectedUser = assignUserSelect.value;
+  const note = safeText(assignNoteInput.value);
+
+  order.assignedTo = selectedUser;
+  order.assignedToName =
+    USERS.find((user) => user.id === selectedUser)?.name || selectedUser;
+  order.assignedNote = note;
+  order.assignedBy = getCurrentUserLabel();
+  order.assignedAt = formatDateTimeNow();
+
+  const logLine =
+    `[${order.assignedAt}] ${order.assignedBy} hat den Auftrag an ${order.assignedToName} zugewiesen${note ? `: ${note}` : "."}`;
+
+  order.details = order.details
+    ? `${order.details}\n${logLine}`
+    : logLine;
+
+  pendingAssignOrderId = null;
+
+  closeModal(assignOrderModal);
+  renderAll();
+});
+
+/***********************************************************
+ * WISSENSBOT
+ ***********************************************************/
+
+/***********************************************************
+ * WISSENSBOT
+ ***********************************************************/
+
+function addKnowledgeBotMessage(text, type = "bot") {
+  const message = document.createElement("div");
+  message.className = type === "user" ? "user-message" : "bot-message";
+  message.textContent = text;
+
+  knowledgeBotMessages.appendChild(message);
+  knowledgeBotMessages.scrollTop = knowledgeBotMessages.scrollHeight;
+}
+
+function ensureCityKnowledge(cityKey) {
+  if (!cityKnowledge[cityKey]) {
+    cityKnowledge[cityKey] = {
+      facts: [],
+      vaoValidity: "",
+      vaoLeadTime: "",
+      vaoLeadTimeUntil: "",
+      email: "",
+      template: "",
+      invoiceInfo: "",
+      notes: []
+    };
+  }
+
+  return cityKnowledge[cityKey];
+}
+
+const KNOWLEDGE_TOPICS = [
+  { key: "vaoValidity", label: "VAO-Gültigkeit", words: ["vao", "gültigkeit", "gültig", "gueltig", "tage", "dauer"] },
+  { key: "vaoLeadTime", label: "VAO-Vorlaufzeit", words: ["vorlauf", "vorlaufzeit", "frist", "wochen", "beantragung", "beantragen"] },
+  { key: "email", label: "Mailadresse", words: ["mail", "email", "e-mail", "@", "empfänger", "empfaenger", "adresse"] },
+  { key: "template", label: "Vorlage", words: ["vorlage", "antrag", "formular", "muster"] },
+  { key: "invoiceInfo", label: "Rechnung", words: ["rechnung", "abrechnung", "kontierung", "kontier", "kontierelement", "kostenstelle"] },
+  { key: "permitInfo", label: "Antragsmappe", words: ["antragsmappe", "lap", "lageplan", "regelplan", "vz", "nachweis", "anlagen"] },
+  { key: "general", label: "Allgemein", words: ["info", "notiz", "hinweis", "merken", "speichern"] }
+];
+
+const KNOWLEDGE_ACTIONS = {
+  ask: ["wie", "welche", "was", "wann", "zeige", "anzeigen", "gibt es", "hinterlegt", "?"],
+  save: ["speicher", "speichern", "merk", "merken", "notier", "notieren", "aktualisiere", "setze", "ändere", "aendere", "hinterlege"],
+  delete: ["lösche", "loesche", "entferne", "vergiss"],
+  list: ["liste", "übersicht", "uebersicht", "alles", "alle infos"]
+};
+
+function normalizeKnowledgeText(text) {
+  return lower(text)
+    .replaceAll("ä", "ae")
+    .replaceAll("ö", "oe")
+    .replaceAll("ü", "ue")
+    .replaceAll("ß", "ss");
+}
+
+function getKnownCityKeys() {
+  return [
+    "stuttgart",
+    "ludwigsburg",
+    "fellbach",
+    "waiblingen",
+    ...Object.keys(cityKnowledge)
+  ];
+}
+
+function getActiveOrderContextCity() {
+  let order = null;
+
+  if (pendingPermitOrderId) {
+    order = orders.find((item) => item.id === pendingPermitOrderId);
+  }
+
+  if (!order && editingOrderId) {
+    order = orders.find((item) => item.id === editingOrderId);
+  }
+
+  if (!order && pendingVaoCompleteOrderId) {
+    order = orders.find((item) => item.id === pendingVaoCompleteOrderId);
+  }
+
+  if (!order) return "";
+
+  return detectCityFromAddress(order.address).toLowerCase();
+}
+
+function detectCitySmart(text) {
+  const value = normalizeKnowledgeText(text);
+
+  const directCity = getKnownCityKeys().find((city) =>
+    value.includes(normalizeKnowledgeText(city))
+  );
+
+  if (directCity) return directCity;
+
+  return getActiveOrderContextCity();
+}
+
+function detectKnowledgeAction(text) {
+  const value = normalizeKnowledgeText(text);
+
+  if (KNOWLEDGE_ACTIONS.delete.some((word) => value.includes(normalizeKnowledgeText(word)))) return "delete";
+  if (KNOWLEDGE_ACTIONS.list.some((word) => value.includes(normalizeKnowledgeText(word)))) return "list";
+  if (KNOWLEDGE_ACTIONS.ask.some((word) => value.includes(normalizeKnowledgeText(word)))) return "ask";
+  if (KNOWLEDGE_ACTIONS.save.some((word) => value.includes(normalizeKnowledgeText(word)))) return "save";
+
+  return "save";
+}
+
+function detectKnowledgeTopic(text) {
+  const value = normalizeKnowledgeText(text);
+
+  let bestTopic = KNOWLEDGE_TOPICS.find((topic) => topic.key === "general");
+  let bestScore = 0;
+
+  KNOWLEDGE_TOPICS.forEach((topic) => {
+    const score = topic.words.reduce((sum, word) => {
+      return sum + (value.includes(normalizeKnowledgeText(word)) ? 1 : 0);
+    }, 0);
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestTopic = topic;
+    }
+  });
+
+  return bestTopic;
+}
+
+function extractDateSmart(text) {
+  const match = text.match(/\d{1,2}\.\d{1,2}\.\d{4}/);
+  return match ? match[0] : "";
+}
+
+function extractUntilDateSmart(text) {
+  const value = normalizeKnowledgeText(text);
+
+  if (!value.includes("bis")) return "";
+
+  const match = text.match(/\d{1,2}\.\d{1,2}\.\d{4}/);
+  return match ? match[0] : "";
+}
+
+function isImportantKnowledge(text) {
+  const value = normalizeKnowledgeText(text);
+
+  return (
+    value.includes("[wichtig]") ||
+    value.includes("wichtig") ||
+    value.includes("pflicht") ||
+    value.includes("zwingend") ||
+    value.includes("muss")
+  );
+}
+
+function extractEmailSmart(text) {
+  const match = text.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
+  return match ? match[0] : "";
+}
+
+function extractDurationSmart(text) {
+  const value = normalizeKnowledgeText(text);
+
+  const weekMatch = value.match(/(\d+)\s*(woche|wochen|kw)/);
+  if (weekMatch) return `${weekMatch[1]} Wochen`;
+
+  const dayMatch = value.match(/(\d+)\s*(tag|tage)/);
+  if (dayMatch) return `${dayMatch[1]} Tage`;
+
+  return "";
+}
+
+function formatCityName(cityKey) {
+  return cityKey
+    ? cityKey.charAt(0).toUpperCase() + cityKey.slice(1)
+    : "";
+}
+
+function createKnowledgeFact(cityKey, topic, text) {
+  const data = ensureCityKnowledge(cityKey);
+
+  const fact = {
+    id: crypto.randomUUID(),
+    topic: topic.key,
+    topicLabel: topic.label,
+    text: safeText(text),
+    important: isImportantKnowledge(text),
+    validUntil: extractUntilDateSmart(text),
+    createdAt: formatDateTimeNow(),
+    createdBy: getCurrentUserLabel()
+  };
+
+  data.facts.push(fact);
+
+  data.facts.sort((a, b) => {
+    if (a.important && !b.important) return -1;
+    if (!a.important && b.important) return 1;
+    return 0;
+  });
+
+  return fact;
+}
+
+function getFactsForTopic(cityKey, topicKey) {
+  const data = ensureCityKnowledge(cityKey);
+
+  return data.facts.filter((fact) =>
+    topicKey === "general" || fact.topic === topicKey
+  );
+}
+
+function handleKnowledgeBotInput(text) {
+  const clean = safeText(text);
+
+  if (!clean) return;
+
+  addKnowledgeBotMessage(clean, "user");
+
+  const cityKey = detectCitySmart(clean);
+  const action = detectKnowledgeAction(clean);
+  const topic = detectKnowledgeTopic(clean);
+
+  if (!cityKey) {
+    addKnowledgeBotMessage("Ich konnte keine Stadt erkennen. Bitte nenne eine Stadt wie Stuttgart, Ludwigsburg, Fellbach oder Waiblingen.");
+    return;
+  }
+
+  const cityName = formatCityName(cityKey);
+  const data = ensureCityKnowledge(cityKey);
+
+  if (action === "list") {
+    if (!data.facts.length) {
+      addKnowledgeBotMessage(`Für ${cityName} sind aktuell noch keine Infos gespeichert.`);
+      return;
+    }
+
+    addKnowledgeBotMessage(
+            `Ich habe folgende Infos für ${cityName}:\n${data.facts.map((fact) => {
+        const important = fact.important ? "⚠️ " : "";
+        const until = fact.validUntil ? ` · gültig bis ${fact.validUntil}` : "";
+        return `• ${important}${fact.topicLabel}: ${fact.text}${until}`;
+      }).join("\n")}`
+    );
+    return;
+  }
+
+  if (action === "ask") {
+    if (topic.key === "vaoValidity" && data.vaoValidity) {
+      addKnowledgeBotMessage(`Die VAO-Gültigkeit in ${cityName} beträgt aktuell ${data.vaoValidity}.`);
+      return;
+    }
+
+    if (topic.key === "vaoLeadTime" && data.vaoLeadTime) {
+      addKnowledgeBotMessage(
+        data.vaoLeadTimeUntil
+          ? `Für ${cityName} gilt aktuell eine Vorlaufzeit von ${data.vaoLeadTime} bis ${data.vaoLeadTimeUntil}.`
+          : `Für ${cityName} gilt aktuell eine Vorlaufzeit von ${data.vaoLeadTime}.`
+      );
+      return;
+    }
+
+    if (topic.key === "email" && data.email) {
+      addKnowledgeBotMessage(`Für ${cityName} ist aktuell ${data.email} hinterlegt.`);
+      return;
+    }
+
+    if (topic.key === "template" && data.template) {
+      addKnowledgeBotMessage(`Für ${cityName} ist aktuell die Vorlage "${data.template}" hinterlegt.`);
+      return;
+    }
+
+    const facts = getFactsForTopic(cityKey, topic.key);
+
+    if (facts.length) {
+      addKnowledgeBotMessage(`Ich habe dazu Folgendes für ${cityName} gefunden:\n${facts.map((fact) => {
+          const important = fact.important ? "⚠️ " : "";
+          const until = fact.validUntil ? ` · gültig bis ${fact.validUntil}` : "";
+          return `• ${important}${fact.text}${until}`;
+        }).join("\n")}`
+      );
+      return;
+    }
+
+    addKnowledgeBotMessage(`Dazu habe ich aktuell noch keine Information für ${cityName}.`);
+    return;
+  }
+
+  if (action === "delete") {
+    if (topic.key === "general") {
+      data.facts = [];
+    } else {
+      data.facts = data.facts.filter((fact) => fact.topic !== topic.key);
+    }
+
+    addKnowledgeBotMessage(`Die Informationen zum Bereich "${topic.label}" für ${cityName} wurden gelöscht.`);
+    return;
+  }
+
+  if (action === "save") {
+    if (topic.key === "vaoValidity") {
+      const duration = extractDurationSmart(clean);
+      if (duration) data.vaoValidity = duration;
+    }
+
+    if (topic.key === "vaoLeadTime") {
+      const duration = extractDurationSmart(clean);
+      const untilDate = extractDateSmart(clean);
+
+      if (duration) data.vaoLeadTime = duration;
+      if (untilDate) data.vaoLeadTimeUntil = untilDate;
+    }
+
+    if (topic.key === "email") {
+      const mail = extractEmailSmart(clean);
+      if (mail) data.email = mail;
+    }
+
+    if (topic.key === "template") {
+      data.template = clean;
+    }
+
+    createKnowledgeFact(cityKey, topic, clean);
+
+    addKnowledgeBotMessage("Danke für die neue Info, ist notiert!");
+    addKnowledgeBotMessage(`✅ ${cityName} · ${topic.label} gespeichert`);
+  }
+}
+
+knowledgeBotLauncher?.addEventListener("click", () => {
+  knowledgeBotWindow.classList.toggle("hidden");
+  knowledgeBotInput?.focus();
+});
+
+closeKnowledgeBotBtn?.addEventListener("click", () => {
+  knowledgeBotWindow.classList.add("hidden");
+});
+
+sendKnowledgeBotBtn?.addEventListener("click", () => {
+  handleKnowledgeBotInput(knowledgeBotInput.value);
+  knowledgeBotInput.value = "";
+});
+
+knowledgeBotInput?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+
+  handleKnowledgeBotInput(knowledgeBotInput.value);
+  knowledgeBotInput.value = "";
+});
+
+/***********************************************************
  * INIT
  ***********************************************************/
+
+pdfDateInput &&
+  (pdfDateInput.value = getIsoDate(new Date()));
 
 renderBtDropdown();
 renderPdfBtSelect();
@@ -4401,6 +5634,36 @@ searchInput?.addEventListener(
     );
   }
 );
+
+/***********************************************************
+ * AUFTRAG ZUWEISEN
+ ***********************************************************/
+
+confirmAssignOrderBtn?.addEventListener("click", () => {
+  const order = orders.find((item) => item.id === pendingAssignOrderId);
+  if (!order) return;
+
+  const selectedUser = assignUserSelect.value;
+  const note = safeText(assignNoteInput.value);
+
+  order.assignedTo = selectedUser;
+  order.assignedToName = USERS.find((user) => user.id === selectedUser)?.name || selectedUser;
+  order.assignedNote = note;
+  order.assignedBy = getCurrentUserLabel();
+  order.assignedAt = formatDateTimeNow();
+
+  const logLine =
+    `[${order.assignedAt}] ${order.assignedBy} hat den Auftrag an ${order.assignedToName} zugewiesen${note ? `: ${note}` : "."}`;
+
+  order.details = order.details
+    ? `${order.details}\n${logLine}`
+    : logLine;
+
+  pendingAssignOrderId = null;
+
+  closeModal(assignOrderModal);
+  renderAll();
+});
 
 /***********************************************************
  * VIEW SWITCH
