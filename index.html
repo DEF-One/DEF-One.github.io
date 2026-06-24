@@ -1038,6 +1038,285 @@
   
 </div>
 
-  <script src="app.js"></script>
+<!-- AUFTRAG ZUWEISEN -->
+<div id="assignOrderModal" class="modal hidden">
+  <div class="modal-content small-modal-content">
+    <div class="small-modal-header">
+      <div>
+        <h3>Auftrag zuweisen</h3>
+        <p id="assignOrderSubtitle" class="muted-text">
+          Auftrag an anderen Nutzer übergeben
+        </p>
+      </div>
+
+      <button id="closeAssignOrderBtn" class="close-btn" type="button">&times;</button>
+    </div>
+
+    <div class="small-modal-body">
+      <div class="field-group">
+        <label for="assignUserSelect">Nutzer auswählen</label>
+        <select id="assignUserSelect">
+          <option value="test">Test</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label for="assignNoteInput">Notiz</label>
+        <textarea
+          id="assignNoteInput"
+          rows="5"
+          placeholder="Kurze Info eintragen, warum der Auftrag übergeben wird..."
+        ></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button id="cancelAssignOrderBtn" class="secondary-btn" type="button">
+          Abbrechen
+        </button>
+
+        <button id="confirmAssignOrderBtn" class="primary-btn" type="button">
+          Zuweisen
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+  
+<!-- ANTRAGSMAPPE -->
+<div id="permitFolderModal" class="modal hidden">
+  <div class="modal-content permit-folder-content">
+    <div class="small-modal-header">
+      <div>
+        <h3>Antragsmappe</h3>
+        <p id="permitFolderSubtitle" class="muted-text">
+          Antrag und Anlagen zum Auftrag vorbereiten
+        </p>
+      </div>
+
+      <button id="closePermitFolderBtn" class="close-btn" type="button">&times;</button>
+    </div>
+
+    <div class="permit-folder-body">
+      <div class="permit-folder-grid">
+        <div class="permit-card">
+          <h4>Antrag</h4>
+          <p id="permitDetectedCity">Stadt: wird aus Adresse erkannt</p>
+
+          <div class="field-group">
+            <label for="permitCityInput">Stadt / Gemeinde</label>
+            <input id="permitCityInput" type="text" placeholder="z. B. Stuttgart" />
+          </div>
+
+          <div class="field-group">
+            <label for="permitTemplateSelect">Vorlage</label>
+            <select id="permitTemplateSelect">
+              <option value="standard">Standard Antrag</option>
+              <option value="stuttgart">Stuttgart Antrag</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="permit-card">
+          <h4>LAP / Lageplan</h4>
+          <div class="permit-dropzone" data-permit-slot="lap">
+            Datei hier ablegen oder klicken
+          </div>
+          <div id="permitLapFiles" class="permit-file-list"></div>
+        </div>
+
+        <div class="permit-card">
+          <h4>Regelplan / VZ-Plan</h4>
+
+          <div class="permit-choice-row">
+            <button id="permitPlanCreateBtn" type="button" class="secondary-btn">
+              Neu erstellen
+            </button>
+
+            <button id="permitPlanUploadBtn" type="button" class="secondary-btn">
+              Fertigen Plan anhängen
+            </button>
+          </div>
+
+          <div class="permit-dropzone" data-permit-slot="plan">
+            Plan hier ablegen oder klicken
+          </div>
+          <div id="permitPlanFiles" class="permit-file-list"></div>
+        </div>
+
+        <div class="permit-card">
+          <h4>Nachweis anfügen</h4>
+          <p class="muted-text">
+            Standardnachweis kann später je Bauleiter/Gebiet hinterlegt werden.
+          </p>
+
+          <div class="permit-dropzone" data-permit-slot="proof">
+            Nachweis hier ablegen oder klicken
+          </div>
+          <div id="permitProofFiles" class="permit-file-list"></div>
+        </div>
+
+        <div class="permit-card permit-card-wide">
+          <h4>Zusatzdateien</h4>
+
+          <div id="permitExtraDropzone" class="permit-dropzone" data-permit-slot="extra">
+            Weitere Datei hier ablegen oder klicken
+          </div>
+
+          <div id="permitExtraFiles" class="permit-file-list"></div>
+        </div>
+      </div>
+
+      <div class="permit-folder-actions">
+        <button id="savePermitDraftBtn" type="button" class="secondary-btn">
+          Entwurf speichern
+        </button>
+
+        <button id="createPermitPdfBtn" type="button" class="primary-btn">
+          PDF Antrag erstellen
+        </button>
+
+        <button id="openPermitMailBtn" type="button" class="primary-btn">
+          Mail Versand vorbereiten
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DEF 1 - KI -->
+<div id="knowledgeBotLauncher">
+  <img src="KI LOGO.png" alt="DEF 1 - KI" />
+</div>
+
+<div id="knowledgeBotWindow" class="hidden">
+  <div class="knowledge-bot-header">
+    <strong>DEF 1 - KI</strong>
+    <button id="closeKnowledgeBotBtn" type="button">✕</button>
+  </div>
+
+  <div id="knowledgeBotMessages" class="knowledge-bot-messages">
+    <div class="bot-message">
+      Hallo, wie darf ich dir heute helfen.
+    </div>
+  </div>
+
+  <div class="knowledge-bot-input">
+    <input
+      id="knowledgeBotInput"
+      type="text"
+      placeholder="Nachricht eingeben..."
+    />
+
+    <button id="sendKnowledgeBotBtn" type="button">
+      Senden
+    </button>
+  </div>
+</div>
+
+<!-- REGELPLAN BUILDER -->
+<div id="rulePlanModal" class="modal hidden">
+  <div class="modal-content ruleplan-modal-content">
+
+    <div class="small-modal-header">
+      <div>
+        <h3>Regelplan Builder</h3>
+        <p class="muted-text">
+          Vorlage auswählen oder eigene Vorlage starten
+        </p>
+      </div>
+
+      <button id="closeRulePlanBtn" class="close-btn" type="button">
+        &times;
+      </button>
+    </div>
+
+    <div class="ruleplan-start-grid">
+
+      <button id="startRulePlanTemplateBtn" class="primary-btn">
+        Regelplan abwandeln
+      </button>
+
+      <button id="startRulePlanNewBtn" class="secondary-btn">
+        Neu VZ-Plan erstellen
+      </button>
+
+      <button id="startCustomRulePlanBtn" class="secondary-btn">
+        Eigene Vorlage laden
+      </button>
+
+    </div>
+
+    <div id="rulePlanTemplateSection" class="hidden">
+
+      <div class="ruleplan-left">
+        <h4>Verfügbare Regelpläne</h4>
+
+        <div id="rulePlanTemplateList" class="ruleplan-template-list"></div>
+      </div>
+
+      <div class="ruleplan-right">
+        <div id="rulePlanPreview" class="ruleplan-preview-box">
+          Keine Vorlage ausgewählt
+        </div>
+
+  <div class="ruleplan-format-box hidden" id="rulePlanFormatBox">
+        <button data-format="portrait" class="ruleplan-format-btn">
+          DIN A4 Hochformat
+        </button>
+
+        <button data-format="landscape" class="ruleplan-format-btn">
+          DIN A4 Querformat
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- VZ PLAN EDITOR -->
+<div id="vzPlanEditorModal" class="modal hidden">
+  <div class="modal-content vz-editor-content">
+
+    <div class="small-modal-header">
+      <div>
+        <h3>VZ-Plan Editor</h3>
+        <p id="vzEditorSubtitle" class="muted-text">
+          Bitte setze einen Meter-Richtwert.
+        </p>
+      </div>
+
+      <button id="closeVzEditorBtn" class="close-btn" type="button">
+        &times;
+      </button>
+    </div>
+
+    <div class="vz-editor-toolbar">
+      <button id="vzUndoBtn" type="button" class="secondary-btn">↩ Rückgängig</button>
+      <button id="vzRedoBtn" type="button" class="secondary-btn">↪ Wiederholen</button>
+      <button id="vzResetMeasureBtn" type="button" class="secondary-btn">Meter neu setzen</button>
+      <button id="vzConfirmMeasureBtn" type="button" class="primary-btn hidden">Meter bestätigen</button>
+    </div>
+
+    <div class="vz-editor-body">
+      <div id="vzPlanCanvasWrap" class="vz-plan-canvas-wrap">
+        <img id="vzPlanBaseImage" src="" alt="Regelplan" />
+
+        <svg id="vzMeasureLayer" class="vz-measure-layer"></svg>
+      </div>
+
+      <aside class="vz-side-panel">
+        <h4>Schilder</h4>
+
+        <div class="vz-hint-box">
+          Nach dem Meter-Richtwert kannst du hier Schilder platzieren.
+        </div>
+      </aside>
+    </div>
+
+  </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
