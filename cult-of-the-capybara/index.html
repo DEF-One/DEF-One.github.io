@@ -2020,6 +2020,7 @@ function damageEnemy(e,dmg){
 function hitArea(x,y,rad,ang,dmg){
   cutTufts(x,y+4,rad*0.85); if(scene==='room') cutWebs(x,y+24,rad*0.8); hitPiles(x,y,rad);
   for(const e of enemies){
+    if(e.downed&&e.type==='nager'&&e.hitBy!==P.spinId&&!e.noRevive&&!e.revived&&e.getup===undefined&&Math.hypot(e.x-x,(e.y-20)-y)<rad+30){ e.hitBy=P.spinId; nagerKO(e,'K.O.! Der bleibt liegen.'); e.flinch=0.5; }
     if(e.hitBy===P.spinId||e.dying||e.downed) continue;
     const ey=e.boss?e.y-100:(e.type==='morruk'||e.type==='mclone')?e.y-80-(e.z||0):e.type==='quak'?e.y-88*e.infl-(e.z||0):e.type==='nager'||e.type==='bookie'?e.y-40:e.y-18-(e.z||0);
     const er=e.boss?85:e.type==='morruk'?58:e.type==='mclone'?46:e.type==='quak'?50*e.infl:e.r;
@@ -2706,7 +2707,7 @@ function nagerInvul(e){
   return false;
 }
 function nagerDown(e){
-  e.downed=true; e.lieDir=P.x>e.x?-1:1; e.bt=1.5; e.t=0; fxAnim('fx_poof',e.x,e.y-20,1.2);
+  e.downed=true; e.lieDir=P.x>e.x?-1:1; e.bt=1.5; e.t=0; e.helpT=undefined; e.getup=undefined; if(e.revived) e.noRevive=true; fxAnim('fx_poof',e.x,e.y-20,1.2);
   const lines={schild:'Mein Fass …!',anf:'Brüder … rächt mich …',werf:'Ich hab doch nur geworfen!'};
   floater(e.x,e.y-130,lines[e.role],'#ffb08a');
   for(const b of nagerAlive()){ if(b===e) continue; b.rage++; b.flash=0.2; floater(b.x,b.y-140,'BRUDER!!','#ff6a5a'); if(b.role==='anf'){ b.state='roar'; b.st=0; } }
@@ -2813,7 +2814,7 @@ const MERCY=['Gnade! Bitte nicht hauen …','Wir geben auf! Wirklich!','Aua … 
 function updateDowned(dt){
   for(const e of (R_.nager||[])){ if(!e.downed) continue; e.t+=dt; e.bt=(e.bt||0)-dt;
     const d=Math.hypot(P.x-e.x,P.y-e.y);
-    if(d<130&&e.bt<=0){ e.bt=rand(3,4.5); e.bubble={txt:MERCY[Math.floor(Math.random()*MERCY.length)],t:2.4}; tone(rand(700,900),0.25,'triangle',0.04,rand(400,500)); e.flinch=0.5; }
+    if(d<130&&e.bt<=0&&!e.reviver&&e.getup===undefined){ e.bt=rand(3,4.5); e.bubble={txt:MERCY[Math.floor(Math.random()*MERCY.length)],t:2.4}; tone(rand(700,900),0.25,'triangle',0.04,rand(400,500)); e.flinch=0.5; }
     if(e.bubble){ e.bubble.t-=dt; if(e.bubble.t<=0) e.bubble=null; } e.flinch=Math.max(0,(e.flinch||0)-dt); }
 }
 function drawDownedNager(e){
@@ -2831,6 +2832,8 @@ function drawDownedNager(e){
   if(t<0.6){ rot=Math.sin(t*22)*0.25*(1-t/0.6); ox=Math.sin(t*14)*4; }
   else if(t<1.05){ const k=(t-0.6)/0.45; lie=k*k; }
   else { lie=1; const bounce=t<1.3?Math.sin((t-1.05)/0.25*Math.PI)*0.12:0; sy-=bounce; }
+  if(e.getup!==undefined){ const k=clamp(e.getup/1.0,0,1); lie=1-easeInOut(k); rot=Math.sin(k*Math.PI*3)*0.15*(1-k); ox=Math.sin(T*30)*2*(1-k); }
+  else if(e.reviver&&e.reviver.state==='revive'){ ox=Math.sin(T*18)*3; rot=Math.sin(T*9)*0.05; }
   const br=lie>=1?Math.sin(t*2.4)*0.04:0;
   const twitch=lie>=1&&Math.sin(t*1.7+e.x)>0.92?Math.sin(t*60)*2:0;
   if(lie>=1&&t>1.05&&t<1.2&&!e.thud){ e.thud=true; addShake(3); puff(e.x,e.y,'rgba(170,140,100,.8)',10); noise(0.12,0.25,400); }
@@ -2839,6 +2842,8 @@ function drawDownedNager(e){
   ctx.scale(1+0.28*lie,(1-0.5*lie)*(1+br)); ctx.rotate(rot+dir*0.12*lie);
   drawChar(e.role,'rot',lie>0.5?'north':'south',0,0,8*lie,{s:sc,sy:sy,overlay:'#3a2030',overlayA:0.15*lie});
   ctx.restore();
+  if(lie>=1&&e.noRevive&&Math.random()<0.03) addPart({x:e.x+10,y:e.y-50,vx:8,vy:-24,life:1.4,size:15,color:'#bfe8ff',kind:'text',txt:'z'});
+  if(lie>=1&&!e.noRevive&&!e.revived&&e.helpT!==undefined&&!e.reviver){ const w=70, x=e.x-w/2, y=e.y-76; ctx.fillStyle=OUT; ctx.fillRect(x-2,y-2,w+4,8); ctx.fillStyle='#3a2a2a'; ctx.fillRect(x,y,w,4); ctx.fillStyle='#c8c0b0'; ctx.fillRect(x,y,w*clamp(e.helpT/8,0,1),4); }
   if(lie>=1){
     // Beule mit Pflaster, Kreisel-Sterne
     const hx=e.x+dir*-10, hy=e.y-40;
@@ -2878,7 +2883,8 @@ function drawNager(e){
   const breathe=anim==='rot'?Math.sin(T*2.5+e.x)*0.02:0;
   drawChar(e.role,anim,dir,t,e.x,e.y-(e.z||0),Object.assign({s:sc,fps,loop,sx:1+sq,sy:1-sq+breathe,flash:e.flash>0},o));
   if(e.blockT>0){ ctx.save(); ctx.globalAlpha=e.blockT/0.3; ctx.globalCompositeOperation='lighter'; ctx.drawImage(fireSprite('255,240,200'),e.x+e.face*24-30,e.y-80,60,60); ctx.restore(); }
-  if(e.state==='revive'){ o.sy=1+Math.sin(T*12)*0.04; }
+  if(e.state==='revive'){ o.sy=0.8+Math.sin(T*9)*0.03; o.sx=1.08; o.rot=(e.face>0?1:-1)*0.18+Math.sin(T*18)*0.04; }
+  if(e.state==='shoo'){ o.overlay='#ff3030'; o.overlayA=0.15; }
   if(e.state==='dizzy'){ for(let i=0;i<3;i++){ const a=T*6+i*2.1; textO('★',e.x+Math.cos(a)*24,e.y-110+Math.sin(a)*6,16,FB,'#f6cf5a',null,3); } }
   if(e.rage>0&&!e.dying){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.18+Math.sin(T*8)*0.08; ctx.drawImage(fireSprite('255,50,40'),e.x-60,e.y-130,120,120); ctx.restore(); }
 }
@@ -3065,28 +3071,49 @@ function nagerDirector(dt){
   if(R_.nagerPhase!=='fight') return;
   const alive=nagerAlive(), downed=R_.nager.filter(n=>n.downed);
   R_.formCd=(R_.formCd===undefined?9:R_.formCd)-dt;
-  // Wiederbeleben: ein freier Bruder läuft zum Gefallenen
-  for(const dn of downed){ if(dn.revived||dn.reviver||dn.t<1.6) continue;
-    const free=alive.filter(b=>NAGER_DEF[b.role]===b.state&&!b.alone).sort((a,b)=>Math.hypot(a.x-dn.x,a.y-dn.y)-Math.hypot(b.x-dn.x,b.y-dn.y))[0];
-    if(free){ if(!G.flags.hintRev){ G.flags.hintRev=true; hint='Die Brüder helfen sich auf! Ein Treffer unterbricht sie.'; setTimeout(()=>{ if(hint.startsWith('Die Brüder')) hint=''; },6000); } free.state='toRevive'; free.st=0; free.tgt=dn; dn.reviver=free; floater(free.x,free.y-140,['Halt durch, Bruder!','Ich komm!','Nicht einschlafen!'][Math.floor(Math.random()*3)],'#ffd08a'); } }
+  // Wiederbeleben – nur wenn ein Bruder in der Nähe ist, solange der Gefallene noch um Hilfe ruft
+  for(const dn of downed){
+    if(dn.getup!==undefined){ dn.getup+=dt; if(dn.getup>=1.0) nagerStandUp(dn); continue; }
+    if(dn.noRevive||dn.revived||dn.t<1.4) continue;
+    if(dn.helpT===undefined) dn.helpT=8;
+    if(!dn.reviver){ dn.helpT-=dt; dn.callT=(dn.callT||0)-dt; if(dn.callT<=0){ dn.callT=2.6; dn.bubble={txt:['Bruder! Hilf mir!','Hilfe! Ich lieg hier!','Zieht mich hoch!'][Math.floor(Math.random()*3)],t:2}; } }
+    if(dn.helpT<=0){ nagerKO(dn,'Er ist eingeschlafen. Der bleibt liegen.'); continue; }
+    if(dn.reviver) continue;
+    const free=alive.filter(b=>NAGER_DEF[b.role]===b.state&&!b.alone&&Math.hypot(b.x-dn.x,b.y-dn.y)<320).sort((a,b)=>Math.hypot(a.x-dn.x,a.y-dn.y)-Math.hypot(b.x-dn.x,b.y-dn.y))[0];
+    if(free){ if(!G.flags.hintRev2){ G.flags.hintRev2=true; hint='Ein Bruder will helfen! Stell dich dazwischen oder triff ihn – dann bleibt der Gefallene liegen.'; setTimeout(()=>{ if(hint.startsWith('Ein Bruder')) hint=''; },7000); }
+      free.state='toRevive'; free.st=0; free.tgt=dn; dn.reviver=free; floater(free.x,free.y-140,['Halt durch, Bruder!','Ich komm!','Nicht einschlafen!'][Math.floor(Math.random()*3)],'#ffd08a'); }
+  }
   // Formation, solange alle drei stehen
   if(alive.length===3&&R_.formCd<=0){ const a=nagerBro('anf'), s=nagerBro('schild'), w=nagerBro('werf');
     if(a&&s&&w&&['walk','raise'].includes(a.state)&&!['ram','dizzy','toRevive','revive'].includes(s.state)&&!['rain','hop','toRevive','revive'].includes(w.state)){ R_.formCd=rand(15,18); a.state='roarF'; a.st=0; s.state='wall'; s.st=0; w.state='volley'; w.st=0; w.vol=0;
       banner={text:'Formation Stinkebiber!',sub:'Fass deckt, Spitz wirft, Krawall haut',t:0,small:true}; SFX.roar(); addShake(8); } }
   // Der Letzte
-  if(alive.length===1&&downed.every(n=>n.revived||n.reviveFail>=2)&&!alive[0].alone){ const l=alive[0]; l.alone=true; l.rage=Math.max(l.rage,2); floater(l.x,l.y-150,'Ihr … zahlt dafür!','#ff6a5a'); SFX.roar(); addShake(10); banner={text:'Der Letzte',sub:'Er kämpft jetzt verzweifelt',t:0,small:true}; }
+  if(alive.length===1&&downed.every(n=>n.noRevive||n.revived)&&!alive[0].alone){ const l=alive[0]; l.alone=true; l.rage=Math.max(l.rage,2); floater(l.x,l.y-150,'Ihr … zahlt dafür!','#ff6a5a'); SFX.roar(); addShake(10); banner={text:'Der Letzte',sub:'Er kämpft jetzt verzweifelt',t:0,small:true}; }
 }
 function nagerSpecial(e,dt){
   const d=dist(e,P), ang=Math.atan2(P.y-e.y,P.x-e.x), fast=1+e.rage*0.25+(e.alone?0.15:0);
   const back=()=>{ e.state=NAGER_DEF[e.role]; e.st=0; };
   switch(e.state){
-    case 'toRevive': { const t=e.tgt; if(!t||!t.downed){ back(); return true; } const a=Math.atan2(t.y-e.y,t.x-e.x); e.face=t.x>e.x?1:-1; moveBody(e,Math.cos(a)*120*fast*dt,Math.sin(a)*120*fast*dt,e.r);
-      if(Math.hypot(t.x-e.x,t.y-e.y)<70){ e.state='revive'; e.st=0; e.flash=0; floater(e.x,e.y-140,'Steh auf!','#ffd08a'); } if(e.st>5){ t.reviver=null; back(); } return true; }
-    case 'revive': { const t=e.tgt; if(!t||!t.downed){ back(); return true; } t.revProg=e.st/3.2; e.face=t.x>e.x?1:-1;
-      if(e.flash>0.08){ t.revProg=0; t.reviver=null; t.reviveFail=(t.reviveFail||0)+1; floater(e.x,e.y-140,'Aua! Lass das!','#ff8a5a'); e.rage++; back(); return true; }
+    case 'dizzy': if(e.role!=='schild'){ if(e.st>1.6) back(); return true; } break;
+    case 'toRevive': { const t=e.tgt; if(!t||!t.downed||t.noRevive){ if(t) t.reviver=null; back(); return true; }
+      const dd=Math.hypot(t.x-e.x,t.y-e.y), a=Math.atan2(t.y-e.y,t.x-e.x); e.face=t.x>e.x?1:-1;
+      const blocked=Math.hypot(P.x-t.x,P.y-t.y)<85;
+      if(blocked&&dd<150){ e.state='shoo'; e.st=0; floater(e.x,e.y-140,'Weg da! Das ist mein Bruder!','#ff8a5a'); return true; }
+      moveBody(e,Math.cos(a)*130*fast*dt,Math.sin(a)*130*fast*dt,e.r);
+      if(dd<70){ e.state='revive'; e.st=0; e.flash=0; floater(e.x,e.y-140,'Steh auf!','#ffd08a'); }
+      if(e.st>3){ t.reviver=null; back(); } return true; }
+    case 'shoo': { const t=e.tgt; e.face=P.x>e.x?1:-1; e.sq=Math.sin(T*20)*0.04;
+      if(!t||!t.downed||t.noRevive){ if(t) t.reviver=null; back(); return true; }
+      if(Math.hypot(P.x-t.x,P.y-t.y)>110){ e.state='toRevive'; e.st=0; return true; }
+      if(e.st>1.2){ t.reviver=null; back(); e.cd=0; return true; } return true; }
+    case 'revive': { const t=e.tgt; if(!t||!t.downed||t.noRevive){ if(t) t.reviver=null; back(); return true; }
+      e.face=t.x>e.x?1:-1;
+      if(Math.hypot(P.x-t.x,P.y-t.y)<70){ t.revProg=0; t.reviver=null; e.state='shoo'; e.st=0; floater(e.x,e.y-140,'Weg da!','#ff8a5a'); return true; }
+      t.revProg=e.st/3.2;
+      if(e.flash>0.08){ t.revProg=0; t.reviver=null; nagerKO(t,'Unterbrochen! Er bleibt liegen.'); floater(e.x,e.y-150,'Aua! Neiiin!','#ff8a5a'); e.rage++; e.state='dizzy'; e.st=0.6; return true; }
       if(Math.random()<dt*6) addPart({x:t.x+rand(-30,30),y:t.y-20,vx:rand(-20,20),vy:-60,life:.7,size:rand(3,5),color:'#ffd870',kind:'spark'});
-      if(e.st>3.2){ t.downed=false; t.revived=true; t.reviver=null; t.revProg=0; t.hp=Math.round(t.max*0.45); t.state=NAGER_DEF[t.role]; t.st=0; t.t=0; t.wpn=null; t.thud=false; t.bubble=null; t.flash=0.3; t.cd=1.2;
-        floater(t.x,t.y-150,'Danke, Bruder!','#ffd08a'); hearts(t.x,t.y-80,4); SFX.heart(); SFX.roar(); back(); }
+      if(Math.floor(e.st*3)!==Math.floor((e.st-dt)*3)) noise(0.08,0.12,700);
+      if(e.st>3.2){ t.revProg=0; t.getup=0; t.reviver=null; floater(t.x,t.y-150,'Hoch mit dir!','#ffd08a'); SFX.hop(); back(); e.cd=0.8; }
       return true; }
     case 'wall': { // Fass stellt sich als Schild zwischen Spieler und Werfer
       const w=nagerBro('werf'); e.fx=Math.cos(ang); e.fy=Math.sin(ang); e.face=P.x>e.x?1:-1;
@@ -3205,6 +3232,12 @@ function drawWall(w){
   ctx.save(); ctx.globalAlpha=0.5; ctx.fillStyle='rgba(200,240,240,.6)'; ctx.fillRect(Math.round(w.x-80),Math.round(w.y+6),160,2); ctx.restore();
   if(w.hp<4){ for(let i=0;i<4-w.hp;i++){ ctx.fillStyle=OUT; ctx.fillRect(Math.round(w.x-30+i*22),Math.round(w.y-18+pop),2,8); } }
 }
+
+/* Gefallener Bruder bleibt endgültig liegen */
+function nagerKO(dn,msg){ if(dn.noRevive) return; dn.noRevive=true; dn.revProg=0; dn.reviver=null; dn.bubble=null; floater(dn.x,dn.y-120,msg,'#f6cf5a'); SFX.pop(); for(let i=0;i<6;i++) addPart({x:dn.x+rand(-20,20),y:dn.y-40,vx:rand(-60,60),vy:rand(-120,-40),life:.6,size:rand(3,5),color:'#f6cf5a',kind:'spark'}); }
+/* Aufstehen abgeschlossen */
+function nagerStandUp(t){ t.downed=false; t.getup=undefined; t.revived=true; t.hp=Math.round(t.max*0.45); t.state=NAGER_DEF[t.role]; t.st=0; t.t=0; t.wpn=null; t.thud=false; t.bubble=null; t.flash=0.3; t.cd=1.2; t.helpT=undefined;
+  floater(t.x,t.y-150,'Danke, Bruder!','#ffd08a'); hearts(t.x,t.y-80,4); SFX.heart(); SFX.roar(); }
 
 /* ======================================================================
    ENDBOSS SPINNENTEMPEL: MORRUK, DER PFANDMEISTER DER TIEFE
