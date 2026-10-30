@@ -1002,6 +1002,7 @@ function drawDead(){
   if(G.deadT>0.5){ const DM=G.deadMsg; textO(DM?DM.title:'Umgekippt!',W/2,H/2-30,72,FD,'#f3e7cf','center',8,700);
     textO(DM?DM.sub:'Kein Problem. Die Maus hilft dir wieder auf.',W/2,H/2+30,22,FB,'#f0a23a','center',4,700);
     textO(TOUCH?'Tippe zum Weitermachen':'E oder Klick zum Weitermachen',W/2,H/2+70,18,FB,'#b9a98f','center',3,600); }
+  drawBossDeath();
 }
 function drawHearts(){
   const n=G.maxHp/2;
@@ -2839,7 +2840,7 @@ function updateNager(e,dt){
 }
 function updateNagerRoom(dt){
   if(!R_.nager) return;
-  if(R_.nagerPhase==='intro'&&R_.t>0.9){ R_.nagerPhase='talk'; P.mouse.alert=2; say(TALK.nagerIntro,()=>bossCard('nager',shown=>{ R_.nagerPhase='fight'; nagerStart(shown); hint='Der Schildträger blockt von vorn. Nach dem Rammen ist er benommen!'; setTimeout(()=>{ if(hint.startsWith('Der Schild')) hint=''; },7000); })); }
+  if(R_.nagerPhase==='intro'&&R_.t>0.9){ R_.nagerPhase='talk'; P.mouse.alert=2; bossIntro('nager',TALK.nagerIntro,()=>bossCard('nager',shown=>{ R_.nagerPhase='fight'; nagerStart(shown); hint='Der Schildträger blockt von vorn. Nach dem Rammen ist er benommen!'; setTimeout(()=>{ if(hint.startsWith('Der Schild')) hint=''; },7000); })); }
   nagerDirector(dt);
   for(const s of R_.rain){ s.t+=dt; if(s.t>=s.warn&&!s.hit){ s.hit=true; s.bt=0; noise(0.1,0.2,900); puff(s.x,s.y-6,'rgba(170,140,100,.8)',5); if(Math.hypot(P.x-s.x,(P.y-s.y)*1.4)<34) hurtPlayer(1,s.x,s.y); } if(s.hit) s.bt+=dt; }
   R_.rain=R_.rain.filter(s=>!s.hit||s.bt<1.6);
@@ -2969,7 +2970,7 @@ function quakDry(){ return 1-0.48*(R_.water||0); }
 function quakInWater(x,y){ const c=R_.qc; if(!c) return false; const k=quakDry(); return ((x-c.x)/(L.rx*0.92*k))**2+((y-c.y)/(L.ry*0.92*k))**2>1; }
 function updateQuakRoom(dt){
   const q=enemies.find(e=>e.type==='quak'); if(!q) return;
-  if(R_.qPhase==='intro'&&R_.t>0.8){ R_.qPhase='talk'; P.mouse.alert=2; say(TALK.quakIntro,()=>bossCard('quak',shown=>{ R_.qPhase='fight'; q.state='idle'; q.st=0; if(!shown) banner={text:'Quakbert',sub:'Hohepriester der Pfützen · Miniboss',t:0}; SFX.roar(); })); }
+  if(R_.qPhase==='intro'&&R_.t>0.8){ R_.qPhase='talk'; P.mouse.alert=2; bossIntro('quak',TALK.quakIntro,()=>bossCard('quak',shown=>{ R_.qPhase='fight'; q.state='idle'; q.st=0; if(!shown) banner={text:'Quakbert',sub:'Hohepriester der Pfützen · Miniboss',t:0}; SFX.roar(); })); }
   // Blasen
   for(const b of R_.qb){ b.t+=dt; b.x+=b.vx*dt; b.y+=b.vy*dt; b.vx*=Math.pow(0.6,dt); b.vy*=Math.pow(0.6,dt);
     const hitP=Math.hypot(P.x-b.x,(P.y-20)-b.y)<b.r+14&&P.rollT<=0&&P.ghostT<=0;
@@ -3126,6 +3127,7 @@ function drawQuakBar(){
    ====================================================================== */
 function quakSpecial(e,dt,p2,fast,d,a){
   const mouth={x:e.x+e.face*28*e.infl,y:e.y-80*e.infl};
+  if(!['flopAir','flopDrop','jump','hop'].includes(e.state)&&(e.z||0)>0) e.z=Math.max(0,e.z-dt*1500);
   // Schleimpanzer gegen Dauerhauen
   e.hitLog=(e.hitLog||[]).filter(t=>t>T-2.2);
   if(e.hitLog.length>=4&&!['inhale','choke','flopAir','flopDrop','stuck','ritual','rage','dazed'].includes(e.state)){ e.hitLog=[]; e.state='slime'; e.st=0; floater(e.x,e.y-170*e.infl,'Schleimpanzer!','#9af06a'); SFX.spore(); }
@@ -3565,7 +3567,7 @@ function updateMorruk(m,dt){
   if(m.state==='dying'){ morrDying(m,dt); return; }
   // Erwachen
   if(m.state==='statue'){ if(Math.hypot(P.x-m.x,P.y-m.y)<330&&!dialog&&R_.t>0.6){ m.state='wake'; m.st=0; P.mouse.alert=2; morrJingle(m); } return; }
-  if(m.state==='wake'){ if(m.st>1.3&&!m.talked){ m.talked=true; say(TALK.morrIntro,()=>bossCard('morruk',()=>{ m.state='knock'; m.st=0; })); } return; }
+  if(m.state==='wake'){ if(m.st>1.3&&!m.talked){ m.talked=true; bossIntro('morruk',TALK.morrIntro,()=>bossCard('morruk',()=>{ m.state='knock'; m.st=0; })); } return; }
   if(m.state==='knock'){ if((m.st>0.3&&!m.k1)||(m.st>0.8&&!m.k2)){ if(!m.k1) m.k1=true; else m.k2=true; SFX.slam(); addShake(8); for(let i=0;i<8;i++) addPart({x:rand(L.cx-L.rx,L.cx+L.rx),y:cam.y+rand(0,60),vx:0,vy:rand(60,140),life:1.4,size:rand(3,5),color:'rgba(170,150,130,.7)',kind:'puff'}); }
     if(m.st>1.4){ m.state='idle'; m.st=0; M.started=true; hint='Weiche seinen Angriffen aus. Münzen kannst du zurückschlagen!'; setTimeout(()=>{ if(hint.startsWith('Weiche')) hint=''; },6000); } return; }
   // Phasenwechsel
@@ -3619,7 +3621,7 @@ function updateMorruk(m,dt){
     case 'hookOut': if(!R_.mo.hook&&m.state==='hookOut'){ m.state='rec'; m.st=0; } break;
     case 'swapOut': m.alpha=Math.max(0,1-m.st/0.5); if(m.st>0.6){ // drei Augenpaare, eines ist echt
         const spots=[]; for(let i=0;i<3;i++){ const a=rand(0,TAU)+i*TAU/3; spots.push([P.x+Math.cos(a)*300,P.y+Math.sin(a)*220]); }
-        const real=Math.floor(Math.random()*3); spots.forEach((s,i)=>{ let [x,y]=s; if(!L.walk(x,y)){ const p=spawnSpot(240); x=p[0]; y=p[1]; } if(i===real){ m.x=x; m.y=y; } else if(enemies.filter(e=>e.type==='mclone'&&!e.dying).length<2) spawnClone(x,y,false); });
+        const real=Math.floor(Math.random()*3); spots.forEach((s,i)=>{ let [x,y]=s; if(!L.walk(x,y)){ const p=spawnSpot(240); x=p[0]; y=p[1]; } if(i===real){ m.x=x; m.y=y; } else if(enemies.filter(e=>e.type==='mclone'&&!e.dying).length<2) spawnClone(x,y,false); }); unstick(m); for(const c of enemies) if(c.type==='mclone') unstick(c);
         m.state='swapIn'; m.st=0; } break;
     case 'swapIn': m.alpha=Math.min(1,m.st/0.6); face(); if(m.st>0.9){ m.alpha=1; m.state='walk'; m.st=0; m.cd=0.2; } break;
     case 'lanternW': face(); m.lit=true; if(m.st<0.4) m.ang=leadAng(m.x,m.y,700,0.4,0); if(m.st>0.75/fast){ m.state='lantern'; m.st=0; SFX.slash(); tone(300,0.3,'sawtooth',0.1,120);
@@ -4901,7 +4903,7 @@ function bookieEnter(){
   const b=spawnEnemy('bookie',sx,sy,{hp:64,max:64,r:30,state:'enter',st:0,mini:true,face:-1,cd:1.5,phase:1,thugs:false});
   b.onCage=()=>{ if(b.state==='charge') b.cageHit=true; };
   fxAnim('fx_poof',sx,sy-30,1.6); SFX.roar(); addShake(6); P.mouse.alert=2;
-  setTimeout(()=>say(TALK.bookieIntro,()=>{ b.state='idle'; b.st=0; banner={text:'Groschen-Grimm',sub:'Der Wetteintreiber · Miniboss',t:0}; }),500);
+  setTimeout(()=>bossIntro('bookie',TALK.bookieIntro,()=>{ b.state='idle'; b.st=0; banner={text:'Groschen-Grimm',sub:'Der Wetteintreiber · Miniboss',t:0}; }),500);
 }
 function chargeHitsCage(b,ang){ const c=R_.pit; for(let k=40;k<460;k+=30){ const x=b.x+Math.cos(ang)*k, y=b.y+Math.sin(ang)*k; if(((x-c.x)/(c.rx+40))**2+((y-c.y)/(c.ry+30))**2<1) return true; } return false; }
 function updateBookie(b,dt){
@@ -5994,7 +5996,7 @@ function finalBlow(e){
   hitstop=0.22; slowmo(1.5,0.22); cine(e.x,e.y-80,0.35,1.8); addShake(20);
   WFLASH=0.8; tone(110,1.4,'sawtooth',0.1,40); noise(0.8,0.4,600); tone(523,1.2,'triangle',0.06,null,0.3); tone(784,1.4,'triangle',0.05,null,0.45);
   for(let i=0;i<50;i++){ const a=rand(0,TAU); addPart({x:e.x,y:e.y-80,vx:Math.cos(a)*rand(200,600),vy:Math.sin(a)*rand(150,450)-150,life:rand(.8,1.6),size:rand(3,7),color:['#fff3b0','#ffd23a','#ff8a5a','#ffffff'][i%4],kind:'spark',g:400}); }
-  BMUS.on=0; COMBO.n=0;
+  BMUS.on=0; COMBO.n=0; bossLogWin(e);
 }
 let WFLASH=0;
 function phaseCine(e){
@@ -6014,7 +6016,7 @@ function updateBossFx(dt,rdt){
   if(P.critN>0){ P.critT=(P.critT||0)-dt; if(P.critT<=0) P.critN=0; }
   for(const g of GLINTS) g.t+=dt; GLINTS=GLINTS.filter(g=>g.t<0.45);
   for(const d of DMGN) d.t+=rdt; DMGN=DMGN.filter(d=>d.t<0.9);
-  if(scene!=='room'){ BMUS.on=0; return; }
+  if(scene!=='room'){ BMUS.on=0; bossLogTick(null,rdt); return; }
   let boss=null;
   for(const e of enemies){ if(!isBossLike(e)||e.dying||e.downed||e.downedQ) continue;
     if(e.stag>0){ e.stag-=dt; if(Math.random()<dt*6) addPart({x:e.x+rand(-30,30),y:bossHead(e)+rand(0,20),vx:0,vy:-40,life:.6,size:rand(2,4),color:'#ffd23a',kind:'spark'}); }
@@ -6026,7 +6028,7 @@ function updateBossFx(dt,rdt){
     // Letztes Aufbäumen
     if(!e.desp&&e.hp>0&&e.hp<=(e.max||1)*0.15&&e.type!=='nager'&&!enemyInvul(e)){ e.desp=true; slowmo(0.6,0.35); cine(e.x,e.y-80,0.2,1.2); REDV=1; floater(e.x,bossHead(e)-40,'LETZTES AUFBÄUMEN!','#ff4a3a'); SFX.roar(); addShake(12); BMUS.stinger=1; }
     if(!['intro','statue','wake','sleep','enter','tiny','shrink','dying','dead'].includes(e.state)) boss=boss||e; }
-  BMUS.on=boss?1:0; BMUS.boss=boss;
+  BMUS.on=boss?1:0; BMUS.boss=boss; bossLogTick(boss,rdt);
   updateBossMusic(rdt);
 }
 /* ---------------- Kampfmusik (Schritt-Sequencer) ---------------- */
@@ -6077,6 +6079,155 @@ function drawBossFxHUD(){
 }
 
 /* ======================================================================
+   WAS SPIELER SICH VON BOSSEN WÜNSCHEN (Reddit, Foren, Spielepresse)
+   - Schnell wieder rein: kein Laufweg, kein langes Intro beim zweiten Mal
+   - Sehen, dass man besser wird: Fortschrittsbalken beim Tod (wie Cuphead),
+     bester Versuch, woran man gestorben ist + ein passender Tipp
+   - Bosse mit Persönlichkeit: sie sticheln, wenn du verlierst, und merken
+     sich, wie oft du schon da warst (wie Hades)
+   - Nicht hängen bleiben: Mäuse-Mut macht den Boss nach jeder Niederlage ein
+     wenig schwächer, abschaltbar (angelehnt an den Gott-Modus aus Hades)
+   - Stolz zeigen: Zeit, Treffer, Versuche, „Ohne Treffer!“-Bonus
+   - Lieblingsbosse wiederholen: Traumkämpfe an den Seelen beim Altar
+     (wie die Halle der Götter in Hollow Knight)
+   ====================================================================== */
+const BINFO={
+  nager:{name:'Die Nagerbrüder',who:'anf',type:'mini'},
+  quak:{name:'Quakbert',who:'quak',type:'mini2'},
+  bookie:{name:'Groschen-Grimm',who:'wette',type:'arena'},
+  morruk:{name:'Morruk',who:'morruk',type:'boss3'},
+  damm:{name:'Der Dammbauer',who:'boss',type:'boss'},
+};
+const BTAUNT={
+  nager:['Ha! Der Bau gehört uns! … Komm ruhig nochmal.','Schon wieder du? Wir haben extra Nüsse für dich gesammelt.','Drei gegen einen. Das ist Mathematik, Kleiner.'],
+  quak:['Quaaak! Der Sumpf vergisst nie. Und ich auch nicht.','Schon wieder? Du schmeckst nach Ausdauer. Quak.','Ich hab mitgezählt. Du nicht. Quak quak.'],
+  bookie:['Zurück für die nächste Runde? Das Haus freut sich!','Ich hab auf dich gewettet. Gegen dich. Hehe.','Wiederkommer kriegen bei mir Rabatt. Auf ihr Begräbnis.'],
+  morruk:['Wiederkehrende Kunden zahlen doppelt.','Dein Mut steht auf meiner Rechnung. Ganz oben.','Ich führe Buch über deine Niederlagen. Es wird ein dickes Buch.'],
+  damm:['Mein Damm hält. Du nicht.','Komm wieder, wenn du schwimmen kannst.','Noch ein Versuch? Das Wasser wartet.'],
+};
+const BTIPS={
+  quak:[['tongue','Zungenpeitsche','Wenn die Zunge zielt: zur Seite rollen, nicht nach hinten.'],['bubble','Giftblasen','Blasen kannst du zerschlagen. Bleib aus den grünen Pfützen.'],['croak','Quaker-Welle','Roll genau dann, wenn der Ring dich erreicht.'],['flop','Bauchklatscher','Wird der Schatten rot, sofort raus da. Danach steckt er fest!'],['inhale','Großer Schlund','Beim Saugen auf sein Maul hauen, dann verschluckt er sich.'],['swallow','Großer Schlund','Beim Saugen auf sein Maul hauen, dann verschluckt er sich.'],['slime','Schleimpanzer','Nicht pausenlos draufhauen. Nach drei Treffern kurz zurück.'],['ritual','Heiliger Quaker','Schlag alle Pilzkerzen aus, bevor die Zeit abläuft.'],['jump','Sprung','Raus aus dem Schatten, bevor er landet.']],
+  bookie:[['coin','Münzfächer','Zwischen den Münzen gibt es Lücken. Geh schräg rein.'],['charge','Ansturm','Stell dich vor den Käfig und roll weg, dann kracht er ins Gitter.'],['jump','Sprungangriff','Raus aus dem roten Kreis, dann zuschlagen.'],['rain','Goldregen','Lauf aus den gelben Kreisen.'],['kick','Gezinkte Walze','Schnapp dir die Hebel, bevor er sie tritt.'],['pull','Spielautomat','Drei Siebenen = Jackpot. Halte die Walzen per Hebel an.']],
+  morruk:[['claw','Klaue','Er wartet, wenn du zu früh rollst. Roll erst, wenn er zuschlägt.'],['hook','Haken','Bleib nicht in einer Linie mit ihm stehen.'],['lantern','Laterne','Der Lichtstrahl ist schmal. Geh seitlich weg.'],['coins','Münzen','Normale Münzen kannst du zurückschlagen!'],['clod','Erdklumpen','Achte auf die Schatten am Boden.'],['quake','Erdriss','Der Riss läuft gerade. Weich zur Seite aus.'],['wares','Inventur','Roll, wenn die rote Linie zu dir aufleuchtet.'],['slam','Bodenschlag','Abstand halten, wenn er die Klaue hebt.'],['sale','Ausverkauf','Nach dem Ausverkauf ist er erschöpft. Dann zuschlagen!'],['podium','Die Flut','Spring auf die Bretter und läute alle drei Glocken.']],
+  damm:[['bite','Biss','Roll durch ihn durch, nicht von ihm weg.'],['tail','Schwanzschlag','Danach ist er kurz benommen. Doppelter Schaden!'],['logs','Baumstämme','Bleib in Bewegung, die Stämme fliegen in Fächern.'],['dam','Pfähle','Lauf sofort aus den markierten Stellen.'],['wave','Flutwelle','Such die Lücke in der Welle.'],['charge','Ansturm','Lock ihn gegen seine eigenen Dammwände!'],['sub','Abtauchen','Folgen dir Blasen, weg da!'],['erupt','Abtauchen','Folgen dir Blasen, weg da!']],
+  nager:[['ram','Fass-Ramme','Lass das Fass gegen die Wand krachen, dann ist es benommen.'],['volley','Steinhagel','Bleib in Bewegung, der Werfer zielt vor dich.'],['spin','Wirbel','Abstand halten, bis er schwindelig ist.'],['rain','Steinregen','Raus aus den Schattenkreisen.']],
+};
+function bstat(k){ if(!G.bstats) G.bstats={}; if(!G.bstats[k]) G.bstats[k]={tries:0,wins:0,best:0,noHit:false,bestPct:1}; return G.bstats[k]; }
+function bkey(e){ return e.boss?'damm':e.type; }
+let BF=null, BRES=null, RM=null;
+function fmtTime(t){ const m=Math.floor(t/60), s=Math.floor(t%60); return m+':'+String(s).padStart(2,'0'); }
+function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+/* Intro: beim ersten Mal ganz, danach nur ein Satz */
+function bossIntro(k,lines,cb){ const s=bstat(k); if(s.tries>0||s.wins>0||RM){ const who=BINFO[k].who; say([{who,text:RM?pick(['Ein Traum? Dann eben im Traum noch eine Abreibung.','Du schon wieder. Diesmal ohne Gnade.','Revanche? Gern.']):pick(BTAUNT[k])}],cb); } else say(lines,cb); }
+/* pro Frame aus updateBossFx */
+function bossLogTick(boss,dt){
+  if(scene!=='room'){ BF=null; }
+  if(BRES){ BRES.t+=dt; if(BRES.t>6) BRES=null; }
+  if(!boss||G.dead) return;
+  const k=bkey(boss);
+  if(!BF||BF.room!==G.roomId||BF.k!==k){ BF={k,room:G.roomId,t:0,hits:0,last:null}; bossMercy(k); }
+  BF.t+=dt;
+  for(const e of enemies){ if(!isBossLike(e)) continue; if(/W$/.test(e.state||'')||/claw|tongue|bite|charge|coins|hook|wares|ritual|flop|inhale|rain|wave|logs|ram|volley/.test(e.state||'')) e.lastAtk=e.state; }
+}
+function bossMercy(k){
+  const s=bstat(k); if(!s.tries||SET.mut===false||RM) return; const cut=Math.min(0.2,0.04*s.tries);
+  let any=false; for(const e of enemies){ if(!isBossLike(e)||bkey(e)!==k||e.downed||e.dying) continue; if(e.hp<(e.max||e.hp)) continue; e.hp=Math.max(1,Math.round(e.max*(1-cut))); any=true; }
+  if(any) floater(P.x,P.y-140,`Mäuse-Mut: ${BINFO[k].name} −${Math.round(cut*100)} %`,'#ff8aa0');
+}
+/* in hurtPlayer nach echtem Schaden */
+function bossLogHit(fx,fy){
+  if(!BF) return; BF.hits++;
+  let best=null, bd=1e9; for(const e of enemies){ if(!isBossLike(e)||e.dying||e.downed) continue; const d=Math.hypot(e.x-fx,e.y-fy); if(d<bd){ bd=d; best=e; } }
+  if(best){ const st=best.state||''; BF.last=/idle|walk|rec|dazed|stun|guard|keep|stuck|choke/.test(st)?(best.lastAtk||st):st; }
+  if(R_.slot&&R_.slot.zap>0) BF.last='zap';
+}
+function causeOf(k,st){
+  if(st==='zap') return ['Hochspannung','Steht der Käfig unter Strom, halt Abstand.'];
+  for(const t of (BTIPS[k]||[])) if(st&&st.includes(t[0])) return [t[1],t[2]];
+  return [null,'Roll kurz vor dem Treffer: perfektes Ausweichen, dann doppelter Schaden.'];
+}
+/* beim Tod */
+function bossLogDeath(){
+  if(!BF||scene!=='room') return;
+  const k=BF.k, s=bstat(k); s.tries++;
+  let hp=0, mx=0; for(const e of enemies){ if(!isBossLike(e)||bkey(e)!==k) continue; mx+=e.max||0; hp+=e.downed||e.dying?0:Math.max(0,e.hp); }
+  const pct=mx?hp/mx:1; const prevBest=s.bestPct; s.bestPct=Math.min(s.bestPct,pct);
+  const c=causeOf(k,BF.last);
+  G.deadBoss={k,pct,best:prevBest,tries:s.tries,cause:c[0],tip:c[1],taunt:pick(BTAUNT[k]),t:BF.t,newBest:s.tries>1&&pct<prevBest-0.001,mercy:SET.mut!==false&&!RM?Math.min(20,4*s.tries):0};
+  BF=null;
+}
+/* beim Sieg (aus finalBlow) */
+function bossLogWin(e){
+  const k=bkey(e), s=bstat(k), t=BF&&BF.k===k?BF.t:0, hits=BF&&BF.k===k?BF.hits:0;
+  const newBest=t>0&&(!s.best||t<s.best); s.wins++; if(newBest) s.best=t; const noHit=hits===0&&t>0; if(noHit) s.noHit=true;
+  let bonus=0; if(noHit){ bonus+=15; } if(RM) bonus+=10+(G.region||0)*4;
+  if(bonus){ G.gold=(G.gold||0)+bonus; }
+  BRES={k,t:0,time:t,hits,tries:s.tries+1,newBest,noHit,bonus,rm:!!RM};
+  BF=null;
+  if(RM) setTimeout(()=>{ if(RM) startFade(()=>endRematch(true)); },4200);
+}
+/* ---------------- Traumkämpfe ---------------- */
+function rematchRoom(k){ const t=BINFO[k].type; for(let r=0;r<REGIONS.length;r++){ const rm=REGIONS[r].rooms.find(x=>x.type===t); if(rm) return {r,id:rm.id}; } return null; }
+function offerRematch(soul){
+  const k=soul.key; if(k==='damm'){ say([{who:'verris',text:'Der Dammbauer ruht im Wasser. Den lassen wir lieber schlafen.'}]); return; }
+  const s=bstat(k);
+  const info=`Siege ${s.wins} · Niederlagen ${s.tries}`+(s.best?` · Bestzeit ${fmtTime(s.best)}`:'')+(s.noHit?' · ohne Treffer ✓':'');
+  askChoice('Traumkampf: '+BINFO[k].name,[{label:'Kämpfen',sub:'Belohnung: Gold. Niederlage kostet nichts.'},{label:'Lieber nicht'}],i=>{ if(i===0) startRematch(k); },info);
+}
+function startRematch(k){
+  const loc=rematchRoom(k); if(!loc) return;
+  RM={k,region:G.region,id:loc.id,cleared:!!G.cleared[loc.id],flags:{arena2:G.flags.arena2,bookieDone:G.flags.bookieDone,morruk:G.flags.morruk,morrCP:G.flags.morrCP,relic:G.relic}};
+  SFX.portal(); startFade(()=>{ G.region=loc.r; delete G.cleared[loc.id]; if(k==='bookie'){ G.flags.arena2=true; G.flags.bookieDone=false; } if(k==='morruk'){ G.flags.morruk=false; G.flags.morrCP=null; }
+    enterRoomById(loc.id); banner={text:'Traumkampf',sub:BINFO[k].name+' · Eine Niederlage kostet hier nichts',t:0,small:true}; });
+}
+function endRematch(won){
+  if(!RM) return; const R=RM; RM=null;
+  G.region=R.region; if(R.cleared) G.cleared[R.id]=true; for(const f in R.flags){ if(f==='relic'){ if(R.flags.relic) G.relic=R.flags.relic; continue; } if(R.flags[f]===undefined) delete G.flags[f]; else G.flags[f]=R.flags[f]; }
+  if(R.flags.bookieDone===undefined&&R.k==='bookie') G.flags.bookieDone=true;
+  G.dead=false; G.deadBoss=null; P.hp=G.maxHp; P.lock=false; P.hidden=false; dialog=null;
+  enterHub(0); banner={text:won?'Aus dem Traum erwacht':'Zurück im Dorf',sub:won?'Die Seele leuchtet ein bisschen heller':'Der Traum verblasst',t:0,small:true};
+}
+/* ---------------- Zeichnen ---------------- */
+function drawBossDeath(){
+  const D=G.deadBoss; if(!D||G.deadT<0.6) return; const k=Math.min(1,(G.deadT-0.6)/0.4);
+  const w=520, x=W/2-w/2, y=H/2+116; ctx.save(); ctx.globalAlpha=k;
+  ctx.beginPath(); prr(x-20,y-20,w+40,D.cause?168:146,12); ctx.fillStyle='rgba(20,8,12,.88)'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle='#8a6a3e'; ctx.stroke();
+  textO(BINFO[D.k].name+' · Versuch '+D.tries,x,y,16,FB,'#f6cf5a','left',3,800);
+  const done=1-D.pct, bd=1-D.best; textO(Math.round(done*100)+' % geschafft',x+w,y,16,FB,D.newBest?'#9af06a':'#f3e7cf','right',3,800);
+  // Fortschrittsbalken wie in Cuphead: Spur vom Start zum Boss
+  const by=y+18; ctx.beginPath(); prr(x,by,w,14,7); ctx.fillStyle='#2a1218'; ctx.fill();
+  ctx.beginPath(); prr(x,by,Math.max(10,w*done*Math.min(1,(G.deadT-0.6)*1.2)),14,7); ctx.fillStyle=D.newBest?'#9af06a':'#c3283a'; ctx.fill();
+  if(D.tries>1&&bd>0){ const bx=x+w*bd; ctx.fillStyle='#f6cf5a'; ctx.fillRect(bx-1,by-4,3,22); textO('Rekord',bx,by-10,11,FB,'#f6cf5a','center',3,700); }
+  ctx.beginPath(); prr(x,by,w,14,7); ctx.lineWidth=3; ctx.strokeStyle=OUT; ctx.stroke();
+  // Maus links, Boss-Seele rechts
+  textO('🐭',x-12,by+7,16,FB,'#fff','center',0); textO('☠',x+w+12,by+7,16,FB,'#efe4cc','center',3);
+  let ly=by+40;
+  if(D.newBest) { textO('Weiter als je zuvor!',x,ly,15,FB,'#9af06a','left',3,800); ly+=22; }
+  if(D.cause){ textO('Erwischt von: '+D.cause,x,ly,15,FB,'#ff9a8a','left',3,700); ly+=22; }
+  textO('Tipp: '+D.tip,x,ly,14,FB,'#d9c8b0','left',3,600); ly+=22;
+  textO('„'+D.taunt+'“',x,ly,14,FB,'#b9a98f','left',3,500);
+  if(D.mercy) textO('Mäuse-Mut: nächster Versuch −'+D.mercy+' % Bossleben',x+w,ly,13,FB,'#ff8aa0','right',3,700);
+  if(RM) textO('Q: Traum verlassen',x+w,y-40,14,FB,'#c9b6e8','right',3,700);
+  ctx.restore();
+}
+function drawBossResult(){
+  const R=BRES; if(!R) return; if(R.t<1.2) return; const k=Math.min(1,(R.t-1.2)/0.35), out=R.t>5.4?Math.max(0,1-(R.t-5.4)/0.6):1;
+  const w=360, x=W-w-30, y=120+(1-k)*-30; ctx.save(); ctx.globalAlpha=k*out;
+  ctx.beginPath(); prr(x,y,w,R.noHit||R.newBest||R.bonus?150:116,12); ctx.fillStyle='rgba(20,8,12,.9)'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle='#f0a23a'; ctx.stroke();
+  textO(BINFO[R.k].name+' besiegt!',x+18,y+26,22,FD,'#f6cf5a','left',4,700);
+  textO('Zeit '+fmtTime(R.time)+(R.newBest?'  · Neue Bestzeit!':''),x+18,y+56,15,FB,R.newBest?'#9af06a':'#f3e7cf','left',3,700);
+  textO('Treffer kassiert: '+R.hits+'   ·   Versuche: '+R.tries,x+18,y+80,14,FB,'#d9c8b0','left',3,600);
+  let ly=y+106; if(R.noHit){ textO('OHNE TREFFER! +15 Gold',x+18,ly,16,FB,'#ffd23a','left',3,900); ly+=22; }
+  if(R.rm) textO('Traumkampf-Belohnung +'+(R.bonus-(R.noHit?15:0))+' Gold',x+18,ly,14,FB,'#c9b6e8','left',3,700);
+  ctx.restore();
+}
+/* Seele im Dorf ansprechen */
+function soulNear(){
+  const S=R_.souls; if(!S) return null; const cx=900, cy=700;
+  for(const s of S){ const sx=cx+Math.cos(s.a)*210, sy=cy+Math.sin(s.a)*70-60; if(Math.hypot(P.x-sx,P.y-(sy+120))<80) return {s,sx,sy}; } return null;
+}
+
+/* ======================================================================
    DORF-ERWEITERUNGEN
    - Rex, der Cyborg-Dealer, zieht nach dem Casino-Sieg ins Dorf (sobald
      Portal 1 geschafft ist). Blackjack um Gold, Bock und Bock stehen Wache.
@@ -6107,6 +6258,7 @@ function hubPlusInit(){
 }
 function updateHubPlus(dt){
   for(const s of (R_.souls||[])){ s.a+=dt*0.35; }
+  if(!prompt_&&!P.lock&&!dialog&&!CHOICE){ const n=soulNear(); if(n){ prompt_={x:n.sx,y:n.sy-50,label:'Traumkampf: '+n.s.name}; if(pressed.act) offerRematch(n.s); } }
   const C=R_.cas, D=R_.dealer; if(!C||!C.hub) return;
   D.t+=dt; D.moodT-=dt; if(D.moodT<=0) D.mood='idle'; D.blinkT-=dt; if(D.blinkT<-0.15) D.blinkT=rand(1.5,3.5);
   for(const g of R_.goats){ g.t+=dt; if(g.bub){ g.bub.t-=dt; if(g.bub.t<=0) g.bub=null; } g.face=P.x>g.x?1:-1; if(Math.random()<dt*0.04&&!g.bub) goatSay(g.i,['…','*knack*','Alles ruhig.','Kein Foto.','Hm.'][Math.floor(Math.random()*5)]); }
@@ -6335,7 +6487,8 @@ function hurtPlayer(n,fromX,fromY){
   const a=Math.atan2(P.y-fromY,P.x-fromX); P.vx=Math.cos(a)*320; P.vy=Math.sin(a)*320;
   puff(P.x,P.y-30,'#c3283a',8); P.mouse.alert=1; SFX.squeak();
   for(let i=0;i<6;i++) addPart({x:P.x,y:P.y-30,vx:rand(-150,150),vy:rand(-200,-40),life:.5,size:rand(3,5),color:'#e8344a',kind:'spark',g:500});
-  if(P.hp<=0){ P.hp=0; G.dead=true; G.deadT=0; }
+  bossLogHit(fromX,fromY);
+  if(P.hp<=0){ P.hp=0; G.dead=true; G.deadT=0; bossLogDeath(); }
 }
 
 /* ---------------- Spieler ---------------- */
@@ -6573,7 +6726,7 @@ function updateBossRoom(dt){
   if(P.moving&&Math.random()<dt*7) addPart({x:P.x,y:P.y,vx:0,vy:0,life:0.5,size:18,color:'rgba(200,240,240,.5)',kind:'ring'});
   if(b&&b.state==='sleep'&&R_.t>R_.introAt){ b.state='rise'; b.st=0; SFX.splashBig(); SFX.rumble(); addShake(10); P.mouse.alert=2; }
   if(b&&b.state==='intro'&&!R_.introDone){ R_.introDone=true; SFX.roar(); addShake(12);
-    say(TALK.bossIntro,()=>bossCard('damm',()=>{ b.state='idle'; b.st=0; hint='Rolle (Leertaste) durch Angriffe. Ist er betäubt, gibt es doppelten Schaden!'; setTimeout(()=>{ if(hint.startsWith('Rolle')) hint=''; },6000); })); }
+    bossIntro('damm',TALK.bossIntro,()=>bossCard('damm',()=>{ b.state='idle'; b.st=0; hint='Rolle (Leertaste) durch Angriffe. Ist er betäubt, gibt es doppelten Schaden!'; setTimeout(()=>{ if(hint.startsWith('Rolle')) hint=''; },6000); })); }
   if(envelope){
     envelope.t+=dt;
     if(!envelope.landed){ envelope.y+=(envelope.ty-envelope.y)*Math.min(1,dt*1.6); if(Math.abs(envelope.y-envelope.ty)<2){ envelope.landed=true; SFX.heart(); hearts(envelope.x,envelope.y,12); } }
@@ -6863,7 +7016,7 @@ function drawHUD(){
       ctx.globalAlpha=1; }
   }
   if(hint&&!dialog){ ctx.font=`600 18px ${FB}`; const tw=Math.min(W-80,ctx.measureText(hint).width+40); ctx.beginPath(); prr(W/2-tw/2,H-46,tw,32,16); ctx.fillStyle='rgba(20,10,14,.84)'; ctx.fill(); textO(hint,W/2,H-30,18,FB,'#f3e7cf','center',0,600); }
-  drawNagerBars(); drawBookieBar(); if(scene==='room'&&R_.slot) drawSlotHUD(); if(scene==='room'&&R_.qrit) drawQuakRitualUI(); drawQuakBar(); drawMorrukBar(); drawRelicHUD(); drawBossFxHUD();
+  drawNagerBars(); drawBookieBar(); if(scene==='room'&&R_.slot) drawSlotHUD(); if(scene==='room'&&R_.qrit) drawQuakRitualUI(); drawQuakBar(); drawMorrukBar(); drawRelicHUD(); drawBossFxHUD(); drawBossResult();
   const b=enemies.find(e=>e.boss);
   if(b&&!['sleep','rise','intro','dead'].includes(b.state)&&!dialog){
     const bw=560,bx=W/2-bw/2,by=H-78;
@@ -7201,7 +7354,7 @@ function update(dt){
   if(CHOICE){ updateChoice(dt); return; }
   if(hitstop>0){ hitstop-=dt; return; }
   if(dialog){ updateDialog(dt); if(scene==='hub') updateFollowers(dt); return; }
-  if(G.dead){ G.deadT+=dt; if(G.deadT>0.8&&(pressed.act||pressed.atk||pressed.tap||pressed.roll)){ G.dead=false; P.hp=G.maxHp; if(G.deadReset){ startFade(()=>restartPortal()); return; } if(scene==='room'){ const id=G.roomId; startFade(()=>{ R_.stakes=[]; enterRoomById(id,null); }); } else startFade(()=>enterHub(0)); } return; }
+  if(G.dead){ G.deadT+=dt; if(RM&&G.deadT>0.8&&pressed.weap){ G.dead=false; startFade(()=>endRematch(false)); return; } if(G.deadT>0.8&&(pressed.act||pressed.atk||pressed.tap||pressed.roll)){ G.dead=false; G.deadBoss=null; P.hp=G.maxHp; if(G.deadReset){ startFade(()=>restartPortal()); return; } if(scene==='room'){ const id=G.roomId; startFade(()=>{ R_.stakes=[]; enterRoomById(id,null); }); } else startFade(()=>enterHub(0)); } return; }
   if(fade.cb) return;
   { const rdt=dt; dt*=bossFxScale(rdt); updateBossFx(dt,rdt); }
   updateTufts(dt); updatePlayer(dt); updateSummons(dt); updateEnemies(dt); updateProjs(dt); updateItems(dt); updateCritters(dt);
@@ -7222,7 +7375,7 @@ const TITLE_SRC="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUE
    Animiert: Kerzenflackern, Glut, Nebel, Mondschein, sanfter Zoom.
    ====================================================================== */
 const SAVE_KEY='cotc_save_v1', SET_KEY='cotc_settings_v1';
-const SET={music:true,sound:true,shake:true,lowfx:false};
+const SET={music:true,sound:true,shake:true,lowfx:false,mut:true};
 try{ Object.assign(SET,JSON.parse(localStorage.getItem(SET_KEY)||'{}')); }catch(e){}
 function applySettings(){ MUTED=!SET.sound; REDUCED=!SET.shake||matchMedia('(prefers-reduced-motion: reduce)').matches; if(SET.lowfx){ LOWFX=true; } try{ localStorage.setItem(SET_KEY,JSON.stringify(SET)); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
@@ -7256,7 +7409,7 @@ function titleConfirm(text,yes){ const el=document.getElementById('tConfirm'); e
   el.querySelector('.yes').onclick=()=>{ el.hidden=true; yes(); }; el.querySelector('.no').onclick=()=>{ el.hidden=true; }; }
 function openSettings(){
   const el=document.getElementById('tSettings'); el.hidden=false; const list=el.querySelector('.tset-list'); list.innerHTML='';
-  const rows=[['sound','Ton'],['music','Musik'],['shake','Bildschirmwackeln'],['lowfx','Weniger Effekte (schwache Geräte)']];
+  const rows=[['sound','Ton'],['music','Musik'],['shake','Bildschirmwackeln'],['lowfx','Weniger Effekte (schwache Geräte)'],['mut','Mäuse-Mut (Bosse werden nach Niederlagen etwas leichter)']];
   for(const [k,label] of rows){ const b=document.createElement('button'); b.type='button'; b.className='tset'; const upd=()=>{ b.innerHTML=`<span>${label}</span><b class="${SET[k]?'on':''}">${SET[k]?'AN':'AUS'}</b>`; }; upd(); b.onclick=()=>{ SET[k]=!SET[k]; applySettings(); upd(); titleTick(); }; list.appendChild(b); }
   el.querySelector('.close').onclick=()=>{ el.hidden=true; };
 }
