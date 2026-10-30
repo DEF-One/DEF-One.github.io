@@ -2003,7 +2003,9 @@ function damageEnemy(e,dmg){
   if(e.type==='dummy'){ e.wob=0.6; SFX.hit(); burst(e.x,e.y-50); floater(e.x,e.y-100,Math.random()<.5?'Autsch!':'Hey!'); addShake(3); return; }
   if(enemyInvul(e)) return;
   if(e.boss&&e.state==='stun') dmg*=2;
-  if(e.type==='morruk'&&e.state==='stunned') dmg*=2;
+  if(e.type==='morruk'&&(e.state==='stunned'||e.state==='tired')) dmg*=2;
+  if(e.type==='morruk'&&e.offended>0) dmg*=1.5;
+  if(e.type==='morruk'&&morrIntercept(e)) return;
   if(e.type==='quak'&&e.state==='dazed'){ dmg*=2; floater(e.x+rand(-20,20),e.y-200*e.infl,'Schwachstelle!','#ffd23a'); }
   if(e.type==='hedge'&&e.state==='dizzy') dmg*=2;
   e.hp-=dmg; e.flash=0.12; e.sq=0.22; SFX.hit(); hitstop=e.boss?0.04:0.05; addShake(e.boss?6:4);
@@ -3364,7 +3366,7 @@ function updateHook(m,dt){
   if(h.state==='out'){ h.len=Math.min(500,h.len+1150*dt); const tx=sx+Math.cos(h.ang)*h.len, ty=sy+Math.sin(h.ang)*h.len*0.8; h.tx=tx; h.ty=ty;
     if(Math.hypot(P.x-tx,P.y-26-ty)<34&&P.rollT<=0&&P.ghostT<=0&&!G.god){ h.state='pull'; h.t=0; hurtPlayer(1,tx,ty); P.lock=true; floater(P.x,P.y-110,'Erwischt!','#ff8a5a'); SFX.chomp(); }
     else if(h.len>=500) h.state='back'; }
-  else if(h.state==='pull'){ h.t+=dt; const dx=m.x-P.x, dy=m.y+30-P.y, d=Math.hypot(dx,dy); h.tx=P.x; h.ty=P.y-26; if(d>120&&h.t<0.9){ P.x+=dx/d*560*dt; P.y+=dy/d*560*dt; } else { P.lock=false; P.vx=P.vy=0; R_.mo.hook=null; m.state='clawW'; m.st=0.35; m.ang=Math.atan2(P.y-m.y,P.x-m.x); hint='Jetzt rollen!'; setTimeout(()=>{ if(hint==='Jetzt rollen!') hint=''; },1200); } }
+  else if(h.state==='pull'){ h.t+=dt; const dx=m.x-P.x, dy=m.y+30-P.y, d=Math.hypot(dx,dy); h.tx=P.x; h.ty=P.y-26; if(d>120&&h.t<0.9){ P.x+=dx/d*560*dt; P.y+=dy/d*560*dt; } else { P.lock=false; P.vx=P.vy=0; R_.mo.hook=null; m.state='clawW'; m.st=0.35; m.delayed=false; m.ang=Math.atan2(P.y-m.y,P.x-m.x); morrTalk(null,'Gratis Lieferung!',1.4); hint='Jetzt rollen!'; setTimeout(()=>{ if(hint==='Jetzt rollen!') hint=''; },1200); } }
   else { h.len=Math.max(0,h.len-1400*dt); h.tx=sx+Math.cos(h.ang)*h.len; h.ty=sy+Math.sin(h.ang)*h.len*0.8; if(h.len<=0) R_.mo.hook=null; }
 }
 
@@ -3385,6 +3387,7 @@ function updateMorruk(m,dt){
   if(m.phase===1&&hp<=0.7){ m.phase=2; m.state='laugh'; m.st=0; M.coins=[]; mSay(MLINES.p2,3); return; }
   if(m.phase===2&&hp<=0.4){ m.phase=3; m.hp=m.max*0.4; m.state='rageF'; m.st=0; M.dark=0; for(const c of enemies) if(c.type==='mclone') killEnemy(c); mSay(MLINES.p3,2.6); G.flags.morrCP='flood'; SFX.roar(); addShake(14); return; }
   if(m.phase===3) return updateMorrukFlood(m,dt);
+  updateMorrBrain(m,dt); if(morrSpecial(m,dt)) return;
   // Phase 2: Dunkelheitszyklen
   if(m.phase===2){ M.cycle+=dt; const c=M.cycle%18; M.dark=c<13?1:0.25; M.darkR=210; }
   else if(m.phase===4){ if(M.shortDark>0){ M.shortDark-=dt; M.dark=1; M.darkR=320; } else M.dark=0; }
@@ -3398,10 +3401,16 @@ function updateMorruk(m,dt){
   switch(m.state){
     case 'laugh': m.lit=true; if(m.st>2.4){ m.lit=false; SFX.roar(); M.cycle=0; m.state='idle'; m.st=0; m.cd=1.2; for(const l of L.lights) if(l.torch) l.off=true; } break;
     case 'idle': case 'walk': {
-      face(); const want=m.phase>=4?110:150;
-      if(d>want){ moveBody(m,Math.cos(ang)*(m.phase>=4?110:62)*fast*dt,Math.sin(ang)*(m.phase>=4?110:62)*fast*dt*0.8,m.r); m.state='walk'; m.stepT=(m.stepT||0)-dt; if(m.stepT<=0){ m.stepT=0.45; noise(0.06,0.15,200); if(Math.random()<.6) morrJingle(m); } } else m.state='idle';
+      face(); let want=m.phase>=4?110:150; let mang=ang, md=d; const cl=enemies.some(e=>e.type==='mclone'&&!e.dying&&e.state!=='rise');
+      if(cl){ const av=P.aimV||{x:P.dirX||1,y:P.dirY||0}; const tx=P.x-av.x*150, ty=P.y-av.y*110; mang=Math.atan2(ty-m.y,tx-m.x); md=Math.hypot(tx-m.x,ty-m.y); want=24; if(d<170&&m.cd>0.3) m.cd=0.3; }
+      if(md>want){ moveBody(m,Math.cos(mang)*(m.phase>=4||cl?110:62)*fast*dt,Math.sin(mang)*(m.phase>=4||cl?110:62)*fast*dt*0.8,m.r); m.state='walk'; m.stepT=(m.stepT||0)-dt; if(m.stepT<=0){ m.stepT=0.45; noise(0.06,0.15,200); if(Math.random()<.6) morrJingle(m); } } else m.state='idle';
       if(m.cd<=0) morrPick(m,d); break; }
-    case 'clawW': face(); if(m.st<0.4) m.ang=leadAng(m.x,m.y,500,0.4,0); m.claw=1; if(m.st>(m.combo?0.42:0.75)/fast){ m.state='claw'; m.st=0; SFX.slash(); noise(0.15,0.3,1500); } break;
+    case 'clawW': { face(); m.claw=1;
+      if(m.delayed===undefined) m.delayed=morrProf().rolls.length>=3&&!m.combo&&Math.random()<0.7;
+      if(m.delayed){ if(P.rollT>0) m.sawRoll=true;
+        if(m.sawRoll&&P.rollT<=0){ m.ang=Math.atan2(P.y-m.y,P.x-m.x); m.state='claw'; m.st=0; m.delayed=undefined; m.sawRoll=false; morrTalk('early','Zu früh gerollt!',1.6); SFX.slash(); noise(0.15,0.3,1500); break; }
+        if(m.st<1.4){ m.ang=Math.atan2(P.y-m.y,P.x-m.x); break; } m.delayed=false; }
+      if(m.st<0.4) m.ang=morrClawAim(m); if(m.st>(m.combo?0.42:0.75)/fast){ m.state='claw'; m.st=0; m.delayed=undefined; SFX.slash(); noise(0.15,0.3,1500); } break; }
     case 'claw': { m.claw=2; if(!m.hitDone){ const dx=P.x-m.x, dy=P.y-m.y; const dd=Math.hypot(dx,dy*1.15); let da=Math.atan2(dy,dx)-m.ang; da=Math.atan2(Math.sin(da),Math.cos(da)); if(dd<190&&Math.abs(da)<0.95){ hurtPlayer(1,m.x,m.y); m.hitDone=true; } }
       if(m.st<0.12) moveBody(m,Math.cos(m.ang)*300*dt,Math.sin(m.ang)*300*dt,m.r);
       if(m.st>0.3){ m.hitDone=false; m.claw=0; splat(m.x+Math.cos(m.ang)*90,m.y+Math.sin(m.ang)*60,'#2a1810');
@@ -3412,7 +3421,7 @@ function updateMorruk(m,dt){
     case 'slamW': m.claw=1; m.sq=0.08; if(m.st>0.7/fast){ m.state='slam'; m.st=0; SFX.slam(); addShake(10); waves.push({x:m.x,y:m.y,r:40,sp:300,max:330,hit:false}); puff(m.x,m.y,'rgba(110,80,50,.9)',16); if(Math.hypot(P.x-m.x,(P.y-m.y)*1.3)<110) hurtPlayer(1,m.x,m.y); } break;
     case 'slam': m.claw=2; if(m.st>0.7){ m.claw=0; m.state='rec'; m.st=0; } break;
     case 'rec': if(m.st>(m.phase>=4?0.45:0.85)){ m.state='idle'; m.st=0; m.cd=rand(0.5,1.0)/fast; } break;
-    case 'coinsW': face(); m.claw=1; if(m.st>0.6){ m.state='rec'; m.st=0.2; m.claw=0; SFX.dice(); for(let i=0;i<3;i++){ const q=leadPt(m.x,m.y,300,0.6); const a=rand(0,TAU), r=rand(40,150); M.coins.push({sx:m.x+30,sy:m.y-60,tx:q.x+Math.cos(a)*r,ty:q.y+Math.sin(a)*r*0.7,x:m.x,y:m.y,z:0,t:-i*0.12,state:'fly'}); } } break;
+    case 'coinsW': face(); m.claw=1; if(m.st>0.6){ m.state='rec'; m.st=0.2; m.claw=0; SFX.dice(); for(let i=0;i<3;i++){ const q=leadPt(m.x,m.y,300,0.6); const a=rand(0,TAU), r=rand(40,150); M.coins.push({sx:m.x+30,sy:m.y-60,tx:q.x+Math.cos(a)*r,ty:q.y+Math.sin(a)*r*0.7,x:m.x,y:m.y,z:0,t:-i*0.12,state:'fly',fake:morrProf().returns>=2&&Math.random()<0.7}); } if(morrProf().returns>=2) morrTalk('fake','Diesmal ohne Rückgaberecht. Hehe.'); } break;
     case 'clodW': face(); m.claw=1; if(m.st>0.7){ m.claw=0; m.state='rec'; m.st=0; const q=leadPt(m.x,m.y,500,0.9); throwClod(m,q.x,q.y,false); } break;
     case 'hookW': face(); if(m.st<0.45) m.ang=leadAng(m.x,m.y,1100,0.6,0); if(m.st>0.7){ m.state='hookOut'; m.st=0; R_.mo.hook={ang:m.ang,len:0,state:'out'}; SFX.slash(); } break;
     case 'hookOut': if(!R_.mo.hook&&m.state==='hookOut'){ m.state='rec'; m.st=0; } break;
@@ -3434,8 +3443,9 @@ function morrPick(m,d){
   if(m.phase===1){ if(d<160) opts.push('clawW','clawW','clawW','coinsW'); else { opts.push('coinsW','clodW','clodW'); if(d>200) opts.push('hookW','hookW'); } }
   else if(m.phase===2){ const dark=R_.mo.dark>0.5; if(d<160) opts.push('clawW','clawW'); if(d<280) opts.push('lanternW'); if(dark) opts.push('swapOut','lanternW'); else { opts.push('coinsW','clodW'); if(d>200) opts.push('hookW'); } }
   else { if(d<160) opts.push('clawW','clawW','clawW','quakeW'); else { opts.push('quakeW','coinsW','clodW'); if(d>200) opts.push('hookW','hookW'); } if(!R_.mo.shortDark&&Math.random()<0.4) opts.push('jumpW'); }
+  const pr=morrProf(); if(pr.far>0.45&&d>200) opts.push('hookW','clodW'); if(pr.near>0.45&&d<170) opts.push('clawW'); if(P.wet) opts.push('clodW','clodW');
   let pick; let n=0; do{ pick=opts[Math.floor(Math.random()*opts.length)]; n++; }while(pick===m.last&&n<5); m.last=pick;
-  m.state=pick; m.st=0; m.cd=rand(1.0,1.6)/(m.phase>=4?1.4:1);
+  m.state=pick; m.st=0; m.cd=rand(1.0,1.6)/(m.phase>=4?1.4:1)*(m.offended>0?0.8:1);
 }
 function spawnClone(x,y,visible){ const c=spawnEnemy('mclone',x,y,{hp:1,max:1,r:40,state:'rise',st:0,face:1,vis:visible,mini:true,owner:enemies.find(e=>e.type==='morruk')}); c.pers=null; for(let i=0;i<10;i++) addPart({x:x+rand(-30,30),y:y-rand(0,80),vx:rand(-20,20),vy:rand(-80,-30),life:rand(.6,1),size:rand(8,14),color:'rgba(20,10,20,.7)',kind:'puff'}); noise(0.4,0.12,300); return c; }
 function updateClone(c,dt){
@@ -3457,8 +3467,10 @@ function updateMorrukFlood(m,dt){
     case 'dig': if(m.st>1.0){ m.state='flyUp'; m.st=0; } return;
     case 'flyUp': if(!m.sx){ m.sx=m.x; m.sy=m.y; } { const k=Math.min(1,m.st/0.9); m.x=lerp(m.sx,L.cx,k); m.y=lerp(m.sy,L.podY+4,k); m.z=Math.sin(k*Math.PI)*220; if(k>=1){ m.z=0; m.state='podium'; m.st=0; SFX.slam(); addShake(16); startFlood(); } } return;
     case 'podium': { m.face=P.x>m.x?1:-1; M.clodT=(M.clodT===undefined?2.5:M.clodT)-dt;
-      if(M.flood>=1&&M.clodT<=0&&!M.drain){ M.clodT=rand(3,5); m.claw=1; setTimeout(()=>{ m.claw=0; },400);
-        const q=leadPt(m.x,m.y,400,0.7); if(Math.random()<0.35){ throwClod(m,q.x,q.y,true); setTimeout(()=>{ if(R_.mo===M) throwClod(m,P.x+rand(-60,60),P.y+rand(-40,40),true); },450); } else throwClod(m,q.x,q.y,false); }
+      M.tiltT=(M.tiltT===undefined?6:M.tiltT)-dt; const onP=plankAt(P.x,P.y);
+      if(M.flood>=1&&!M.drain&&M.tiltT<=0&&onP&&onP!==M.planks[0]&&!M.tilt){ M.tiltT=rand(6,9); M.tilt={p:onP,t:0}; morrTalk(null,'Wackelt das Brett? Hehe.',1.6); SFX.slash(); }
+      if(M.flood>=1&&M.clodT<=0&&!M.drain){ M.clodT=M.bells.filter(b=>b.rung).length>=2?rand(2.4,3.8):rand(3,5); m.claw=1; setTimeout(()=>{ m.claw=0; },400);
+        M.tiltT=(M.tiltT===undefined?6:M.tiltT); const q=morrFloodTarget(m); if(Math.random()<0.35){ throwClod(m,q.x,q.y,true); setTimeout(()=>{ if(R_.mo===M) throwClod(m,P.x+rand(-60,60),P.y+rand(-40,40),true); },450); } else throwClod(m,q.x,q.y,false); }
       if(M.drain){ m.claw=0; if(m.st>0.4&&m.st<3.2){ m.sq=Math.sin(T*30)*0.06; if(Math.random()<dt*12) morrJingle(m); } } return; }
     case 'fall': { const k=Math.min(1,m.st/0.7); m.x=lerp(L.cx,L.cx,k); m.y=lerp(L.podY+4,L.brT+40,k); m.z=Math.sin(k*Math.PI)*120; if(k>=1){ m.z=0; m.state='stunned'; m.st=0; SFX.slam(); addShake(16); puff(m.x,m.y,'rgba(140,110,80,.9)',24); for(let i=0;i<10;i++) addPart({x:m.x+rand(-60,60),y:m.y-20,vx:rand(-220,220),vy:rand(-300,-100),life:rand(.6,1),size:rand(4,7),color:'#5a3a24',kind:'bone',g:700}); hint='Jetzt! Er ist benommen!'; } return; }
     case 'stunned': if(m.st>(M.melody?5:3.4)){ m.phase=4; m.state='rise4'; m.st=0; G.flags.morrCP='final'; if(hint.startsWith('Jetzt!')) hint=''; } return;
@@ -3485,6 +3497,8 @@ function updateFlood(m,dt){
   const M=R_.mo; if(!M.planks.length) return;
   if(!M.drain) M.flood=Math.min(1,M.flood+dt/5.5); else M.flood=Math.max(0,M.flood-dt/3);
   for(const b of M.bells){ b.rise=Math.min(1,b.rise+dt/1.5*(M.flood>0.4?1:0)); b.swing=Math.max(0,b.swing-dt*0.25); }
+  if(M.tilt){ const tl=M.tilt; tl.t+=dt; tl.p.shake=tl.t; if(tl.t>1.15){ tl.p.gone=true; tl.p.goneT=3.5; tl.p.shake=0; M.tilt=null; SFX.splash(); puff(tl.p.x,tl.p.y,'rgba(210,250,250,.8)',14); } }
+  for(const p of M.planks){ if(p.gone){ p.goneT-=dt; if(p.goneT<=0){ p.gone=false; SFX.splash(); } } }
   const on=plankAt(P.x,P.y);
   for(const p of M.planks){ const ox=p.x, oy=p.y; p.a+=dt*p.sp; p.x=p.hx+Math.sin(p.a+p.ph)*p.amp; p.y=p.hy+Math.cos(p.a*0.7+p.ph)*p.amp*0.4; p.vx=(p.x-ox)/dt; p.vy=(p.y-oy)/dt; p.mud=Math.max(0,p.mud-dt);
     if(on===p&&!P.lock&&M.flood>0.5){ P.x+=p.x-ox; P.y+=p.y-oy; } }
@@ -3509,7 +3523,7 @@ function ringBell(b){
   for(let i=0;i<14;i++) addPart({x:b.x+rand(-30,30),y:b.y-90,vx:rand(-80,80),vy:rand(-60,40),life:rand(.6,1.2),size:rand(2,4),color:'#ffd870',kind:'spark',g:300});
   M.fish=M.fish.filter(f=>Math.hypot(f.x-b.x,f.y-b.y)>320); M.fishCd=2;
   const n=M.bells.filter(q=>q.rung).length; M.dark=Math.max(0,0.62-n*0.2); M.darkR=360+n*80;
-  floater(b.x,b.y-170,['Erste Glocke!','Zweite Glocke!','Dritte Glocke!'][n-1],'#ffd870');
+  floater(b.x,b.y-170,['Erste Glocke!','Zweite Glocke!','Dritte Glocke!'][n-1],'#ffd870'); if(n<3) mSay(['Finger weg von meinen Glocken!','Hör auf damit! Die sind verpfändet!'][n-1],2.2);
   if(n===3){ M.melody=M.order.join()==='West,Süd,Ost';
     setTimeout(()=>{ if(R_.mo!==M) return; tone(196,3,'sine',0.25); tone(392,2.5,'sine',0.12); tone(587,2.5,'sine',0.08); addShake(12); for(const q of M.bells) q.swing=1;
       const m=enemies.find(e=>e.type==='morruk'); if(m){ mSay('AAAH! Meine Ohren!',2.4); m.st=0; }
@@ -3549,6 +3563,9 @@ function drawMorruk(m){
   if(m.flash>0){ ctx.globalCompositeOperation='lighter'; ctx.globalAlpha*=0.5; pxDraw(cnv,m.x+wob,m.y-z+4,2.3,{flip:m.face<0,sx:1+sq,sy:(1-sq)*(1+br)}); }
   ctx.restore();
   if(m.lit&&!m.noLantern){ const lx=m.x+(m.face<0?1:-1)*(33-7)*2.3*-1, ly=m.y-z-(82-14)*2.3+4; ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.55+Math.sin(T*9)*0.12; ctx.drawImage(fireSprite('255,140,50'),m.x-(m.face<0?-1:1)*60-30,ly-30,60,60); ctx.restore(); }
+  if(m.state==='guard'){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.45+Math.sin(T*30)*0.2; ctx.drawImage(fireSprite('255,220,120'),m.x-90,m.y-210,180,200); ctx.restore(); textO('⚠',m.x,m.y-215,22,FB,'#ffd870','center',3); }
+  if(m.offended>0){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.22+Math.sin(T*10)*0.08; ctx.drawImage(fireSprite('255,40,40'),m.x-90,m.y-200,180,180); ctx.restore(); }
+  if(m.state==='tired'){ for(let i=0;i<2;i++){ const t=(T*1.5+i*0.5)%1; ctx.fillStyle='#bfe8ff'; ctx.fillRect(Math.round(m.x+(i?40:-40)),Math.round(m.y-150+t*30),4,7); } textO('×2',m.x,m.y-200,18,FB,'#ffd870','center',3,800); }
   if(m.state==='stunned'){ for(let i=0;i<4;i++){ const a=T*5+i*1.6; textO('★',m.x+Math.cos(a)*50,m.y-200+Math.sin(a)*10,20,FB,'#f6cf5a',null,3); } }
   const M=R_.mo; if(M&&M.line){ drawBubble(m.x,m.y-z-210,M.line.txt,Math.min(1,M.line.t*3)); }
 }
@@ -3558,6 +3575,7 @@ function drawClone(c){
   pxDraw(morrukArt({lit:false,claw:c.claw||0,clone:true}),c.x+Math.sin(T*30+c.y)*(Math.random()<0.1?3:0),c.y+4,2.3,{flip:c.face<0});
   ctx.restore();
 }
+function m0(){ return enemies.find(e=>e.type==='morruk'); }
 function drawMorrukGround(){
   const M=R_.mo; if(!M) return;
   // Flutwasser
@@ -3567,12 +3585,14 @@ function drawMorrukGround(){
   // Fischschatten im ruhigen Wasser
   if(!M.flood&&!M.done){ for(let k=0;k<2;k++){ const a=T*0.35+k*3; const x=L.cx+Math.cos(a)*L.rx*0.7, y=(k?L.brB+60:L.brT-50)+Math.sin(a*2)*14; ctx.save(); ctx.globalAlpha=0.25; ctx.translate(x,y); ctx.scale(Math.cos(a)>0?-2:2,2); ctx.drawImage(fishArt(),-10,-6); ctx.restore(); } }
   // Bretter
-  for(const p of M.planks){ const a=Math.min(1,M.flood*1.4)*(M.drain?M.flood:1); if(a<=0) continue; ctx.save(); ctx.globalAlpha=a; ctx.translate(Math.round(p.x),Math.round(p.y));
+  for(const p of M.planks){ const a=Math.min(1,M.flood*1.4)*(M.drain?M.flood:1)*(p.gone?0.18:1); if(a<=0) continue; const sh=p.shake?Math.sin(T*50)*3*Math.min(1,p.shake*1.5):0; ctx.save(); ctx.globalAlpha=a; ctx.translate(Math.round(p.x+sh),Math.round(p.y)); if(p.shake) ctx.rotate(Math.sin(T*30)*0.04*p.shake);
     ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(-p.w/2+4,-p.h/2+8,p.w,p.h); ctx.fillStyle=OUT; ctx.fillRect(-p.w/2-3,-p.h/2-3,p.w+6,p.h+6);
     for(let x=-p.w/2;x<p.w/2;x+=18){ ctx.fillStyle=((x/18)|0)%2?'#6a4630':'#5a3a24'; ctx.fillRect(x,-p.h/2,Math.min(17,p.w/2-x),p.h); ctx.fillStyle='rgba(255,230,190,.12)'; ctx.fillRect(x,-p.h/2,Math.min(17,p.w/2-x),3); }
     ctx.fillStyle='#3a2414'; ctx.fillRect(-p.w/2,-4,p.w,4);
     if(p.mud>0){ ctx.globalAlpha=a*Math.min(1,p.mud); ctx.fillStyle='#4a3020'; ctx.beginPath(); ctx.ellipse(0,0,p.w*0.35,p.h*0.3,0,0,TAU); ctx.fill(); ctx.fillStyle='#6a4a2c'; ctx.fillRect(-10,-6,16,4); }
     ctx.restore(); ctx.save(); ctx.globalAlpha=0.35*a; ctx.strokeStyle='#cff6f0'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(p.x,p.y+p.h/2,p.w*0.55+Math.sin(T*3+p.ph)*4,8,0,0,TAU); ctx.stroke(); ctx.restore(); }
+  if(M.tilt&&m0()){ const mm=m0(), tp=M.tilt.p; ctx.save(); ctx.setLineDash([8,6]); ctx.lineWidth=5; ctx.strokeStyle='rgba(255,90,60,.8)'; ctx.beginPath(); ctx.moveTo(mm.x+30,mm.y-90); ctx.lineTo(tp.x,tp.y); ctx.stroke(); ctx.restore(); textO('!',tp.x,tp.y-50,26,FD,'#ff5a4a','center',4); }
+  if(M.deal&&!M.deal.done){ const D=M.deal, k=Math.min(1,D.t*3); ctx.save(); ctx.translate(D.x,D.y); ctx.scale(1,0.55); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.45+Math.sin(T*6)*0.15; ctx.drawImage(fireSprite('255,210,90'),-70,-70,140,140); ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1; ctx.beginPath(); ctx.arc(0,0,46*k,0,TAU); ctx.lineWidth=4; ctx.strokeStyle='#ffd870'; ctx.stroke(); ctx.beginPath(); ctx.arc(0,0,46*k*(1-((D.t%1))),0,TAU); ctx.lineWidth=2; ctx.stroke(); ctx.restore(); textO('♥ annehmen',D.x,D.y-40,14,FB,'#ffd870','center',3,700); textO(Math.ceil(5-D.t)+' s',D.x,D.y+30,13,FB,'#f3e7cf','center',3,700); }
   // Glockenplattformen
   for(const b of M.bells){ if(b.rise<=0) continue; ctx.save(); ctx.globalAlpha=b.rise; ctx.fillStyle=OUT; ctx.fillRect(b.x-74,b.y-24,148,62); ctx.fillStyle='#4a4450'; ctx.fillRect(b.x-70,b.y-20,140,54); ctx.fillStyle='#5a5462'; ctx.fillRect(b.x-70,b.y-20,140,6); ctx.fillStyle='#2a2430'; for(let x=b.x-64;x<b.x+70;x+=28) ctx.fillRect(x,b.y-14,2,48); ctx.restore(); }
   // Wirbel
@@ -3582,7 +3602,7 @@ function drawMorrukGround(){
   // Münzen
   for(const c of M.coins){ if(c.t<0) continue; const bl=c.state==='blink'&&Math.floor(c.t*12)%2===0; shadowE(c.x,c.y,8,3,.3); ctx.save(); ctx.translate(c.x,c.y-6-(c.z||0)); if(c.state==='gold'){ ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.4+Math.sin(T*8+c.x)*0.2; ctx.drawImage(fireSprite('255,210,90'),-18,-18,36,36); ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1; }
     if(c.state==='blink'){ ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.6; ctx.drawImage(fireSprite('255,40,40'),-24,-24,48,48); ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1; }
-    ctx.fillStyle=OUT; ctx.fillRect(-8,-6,16,12); ctx.fillStyle=bl?'#ff4040':'#e8c050'; ctx.fillRect(-6,-4,12,8); ctx.fillStyle=bl?'#ffb0b0':'#fff0a0'; ctx.fillRect(-4,-3,4,2); ctx.fillStyle='#8a6020'; ctx.fillRect(-1,-2,2,5); ctx.restore();
+    ctx.fillStyle=OUT; ctx.fillRect(-8,-6,16,12); ctx.fillStyle=bl?'#ff4040':c.fake?'#c8a040':'#e8c050'; ctx.fillRect(-6,-4,12,8); ctx.fillStyle=bl?'#ffb0b0':'#fff0a0'; ctx.fillRect(-4,-3,4,2); ctx.fillStyle=c.fake&&!bl?'#c02030':'#8a6020'; ctx.fillRect(-1,-2,2,5); if(c.fake&&!bl){ ctx.fillRect(-3,0,6,1); } ctx.restore();
     if(c.state==='blink'){ ctx.save(); ctx.translate(c.x,c.y); ctx.scale(1,0.55); ctx.beginPath(); ctx.arc(0,0,72,0,TAU); ctx.strokeStyle='rgba(255,80,80,.6)'; ctx.lineWidth=3; ctx.stroke(); ctx.restore(); } }
   // Kratzspur-Telegraph, Laternenkegel, Erdwelle
   const m=enemies.find(e=>e.type==='morruk'); const tele=[m,...enemies.filter(e=>e.type==='mclone')];
@@ -3653,8 +3673,90 @@ function drawRelicHUD(){
 /* Treffer auf Münzen und Glocken */
 function morrHitStuff(x,y,rad){
   const M=R_.mo; if(!M) return;
-  for(const c of M.coins){ if(c.state!=='gold'&&c.state!=='blink') continue; if(Math.hypot(c.x-x,(c.y-10)-y)<rad+16){ if(c.state==='gold'){ c.state='back'; c.t=0; floater(c.x,c.y-30,'Zurück!','#f6cf5a'); tone(900,0.1,'square',0.08,1500); } else { c.dead=true; puff(c.x,c.y,'rgba(200,180,120,.8)',6); floater(c.x,c.y-30,'Pling!','#f3e7cf'); } } }
+  for(const c of M.coins){ if(c.state!=='gold'&&c.state!=='blink') continue; if(Math.hypot(c.x-x,(c.y-10)-y)<rad+16){ if(c.state==='gold'&&c.fake){ c.dead=true; coinBoom(c); floater(c.x,c.y-40,'Falsche Münze!','#ff8a8a'); } else if(c.state==='gold'){ c.state='back'; c.t=0; morrProf().returns++; floater(c.x,c.y-30,'Zurück!','#f6cf5a'); tone(900,0.1,'square',0.08,1500); } else { c.dead=true; puff(c.x,c.y,'rgba(200,180,120,.8)',6); floater(c.x,c.y-30,'Pling!','#f3e7cf'); } } }
   for(const b of M.bells){ if(b.rung||b.rise<1) continue; if(Math.hypot(b.x-x,(b.y-60)-y)<rad+50) ringBell(b); }
+}
+
+/* ======================================================================
+   MORRUKS HÄNDLERGEDÄCHTNIS
+   Er beobachtet dich und passt sich an:
+   - rollst du oft, hält er die Klaue zurück und schlägt nach deiner Rolle zu
+   - rollst du immer zur selben Seite, zielt er dorthin
+   - schlägst du Münzen zurück, kommen bald falsche Münzen
+   - drischst du pausenlos auf ihn ein, wechselt er in den Konter-Griff
+   - bleibst du auf Abstand, kommen Haken und Klumpen, klebst du an ihm, Klauen
+   - er macht dir mitten im Kampf ein Angebot (annehmen, ablehnen oder ignorieren)
+   - in der Flut zielt er auf das Brett, zu dem du gerade willst, und kippt Bretter
+   - mit Klonen schleicht er sich in deinen Rücken
+   - bei wenig Leben: Ausverkauf, danach ist er erschöpft
+   ====================================================================== */
+function morrProf(){ const M=R_.mo; if(!M.prof) M.prof={rolls:[],side:0,far:0,near:0,returns:0,hits:[],said:{},sayCd:0,water:0}; return M.prof; }
+function morrTalk(key,txt,t){ const pr=morrProf(); if(pr.sayCd>0) return; if(key&&pr.said[key]) return; if(key) pr.said[key]=true; pr.sayCd=4; mSay(txt,t||2.4); }
+function updateMorrBrain(m,dt){
+  const M=R_.mo, pr=morrProf(); pr.sayCd=Math.max(0,pr.sayCd-dt);
+  // Rollen beobachten
+  if(P.rollT>0&&!pr.wasRoll){ pr.rolls.push(T); const ax=P.x-m.x, ay=P.y-m.y, cr=ax*P.rdy-ay*P.rdx; pr.side=pr.side*0.75+Math.sign(cr)*0.25; }
+  pr.wasRoll=P.rollT>0; pr.rolls=pr.rolls.filter(t=>t>T-8); pr.hits=pr.hits.filter(t=>t>T-1.8);
+  const d=Math.hypot(P.x-m.x,P.y-m.y); pr.far=pr.far*0.995+(d>280?0.005:0); pr.near=pr.near*0.995+(d<160?0.005:0);
+  pr.water=P.wet?pr.water+dt:Math.max(0,pr.water-dt*2);
+  if(pr.rolls.length>=4) morrTalk('roll','Rollen, rollen, rollen. Ich warte einfach.');
+  if(Math.abs(pr.side)>0.6&&pr.rolls.length>=2) morrTalk('side',pr.side>0?'Immer zur selben Seite, hm?':'Du rollst gern dahin. Notiert.');
+  if(pr.water>2.5&&m.phase!==3) morrTalk('water','Nasse Kunden zahlen doppelt!');
+  if(P.hp<=2&&m.phase!==3) morrTalk('lowhp','Du siehst … teuer aus.');
+  if(m.offended>0){ m.offended-=dt; if(m.offended<=0) m.offended=0; }
+  // Angebot
+  if(M.deal) updateDeal(m,dt);
+  if(!M.dealDone1&&m.phase===1&&m.hp<=m.max*0.86&&['idle','walk'].includes(m.state)){ M.dealDone1=true; startDeal(m); }
+  if(!M.dealDone4&&m.phase===4&&m.hp<=m.max*0.26&&['idle','walk'].includes(m.state)){ M.dealDone4=true; startDeal(m); }
+  // Ausverkauf
+  if(m.phase===4&&m.hp<=m.max*0.13&&!M.saleDone&&['idle','walk','rec'].includes(m.state)){ M.saleDone=true; m.state='saleW'; m.st=0; mSay('AUSVERKAUF! ALLES MUSS RAUS!',2.4); SFX.roar(); }
+}
+/* Treffer abfangen: Konter-Griff und Angebot ablehnen */
+function morrIntercept(m){
+  const M=R_.mo, pr=morrProf();
+  if(M.deal&&!M.deal.done){ M.deal.done='refuse'; m.offended=6; mSay('Schlechter Kunde! Dann eben teurer!',2.4); SFX.roar(); addShake(6); M.deal.t=99; }
+  if(m.state==='guard'){ m.state='riposte'; m.st=0; m.flash=0.1; SFX.slam(); addShake(8); floater(m.x,m.y-210,'Gegenangebot!','#ffd870'); for(let i=0;i<12;i++) addPart({x:m.x,y:m.y-90,vx:rand(-200,200),vy:rand(-200,0),life:.4,size:rand(2,4),color:'#ffd870',kind:'spark'}); hurtPlayer(1,m.x,m.y); P.vx*=1.6; P.vy*=1.6; return true; }
+  pr.hits.push(T);
+  if(m.phase!==3&&pr.hits.length>=3&&(m.guardCd||0)<=T&&['idle','walk','rec','clawW'].includes(m.state)){ m.guardCd=T+7; m.state='guard'; m.st=0; morrTalk('guard','Nicht so gierig.',1.6); }
+  return false;
+}
+/* Ein Angebot mitten im Kampf */
+function startDeal(m){
+  const M=R_.mo; const a=rand(0,TAU); let x=P.x+Math.cos(a)*150, y=P.y+Math.sin(a)*90; if(!L.walk(x,y)){ x=P.x; y=P.y+100; }
+  M.deal={x,y,t:0,done:null}; m.state='offer'; m.st=0; m.lit=true;
+  mSay('Ein Herz für dich, ein Schluck für mich. Abgemacht?',3.2); SFX.chest();
+  hint='Angebot: Geh in den goldenen Kreis (annehmen), hau ihn (ablehnen) oder warte.';
+}
+function updateDeal(m,dt){
+  const M=R_.mo, D=M.deal; D.t+=dt;
+  if(!D.done&&Math.hypot(P.x-D.x,(P.y-D.y)*1.4)<46){ D.done='accept'; P.hp=Math.min(G.maxHp,P.hp+2); hearts(P.x,P.y-60,8); SFX.heart(); m.hp=Math.min(m.max*(m.phase===1?1:0.4),m.hp+m.max*0.07); floater(m.x,m.y-210,'+7 % Leben','#9af06a'); mSay('Gutes Geschäft! Für mich.',2); D.t=99; }
+  if(!D.done&&D.t>5){ D.done='ignore'; mSay('Kein Interesse? Dann eben Münzen.',2); m.state='coinsW'; m.st=0; }
+  if(D.t>5.2||D.done&&D.t>=99){ M.deal=null; if(hint.startsWith('Angebot')) hint=''; if(m.state==='offer'){ m.state='idle'; m.st=0; m.cd=0.4; } }
+}
+/* Sonderzustände (vor dem normalen Ablauf) */
+function morrSpecial(m,dt){
+  const M=R_.mo, pr=morrProf();
+  switch(m.state){
+    case 'offer': m.face=P.x>m.x?1:-1; m.claw=0; return true;
+    case 'guard': m.face=P.x>m.x?1:-1; m.claw=1; if(m.st>0.9){ m.state='clawW'; m.st=0.3; m.ang=Math.atan2(P.y-m.y,P.x-m.x); } return true;
+    case 'riposte': m.claw=2; if(m.st>0.5){ m.claw=0; m.state='rec'; m.st=0.3; } return true;
+    case 'saleW': m.sq=Math.sin(T*40)*0.05; if(Math.random()<dt*14) morrJingle(m);
+      if(m.st>1.2&&!m.sold){ m.sold=true; SFX.dice(); for(let i=0;i<8;i++){ const a=i/8*TAU, r=rand(130,210); M.coins.push({sx:m.x,sy:m.y-80,tx:P.x+Math.cos(a)*r,ty:P.y+Math.sin(a)*r*0.75,x:m.x,y:m.y,z:0,t:-i*0.05,state:'fly',fake:true}); }
+        for(let i=0;i<3;i++) setTimeout(()=>{ if(R_.mo===M) throwClod(m,P.x+rand(-120,120),P.y+rand(-80,80),true); },i*350); }
+      if(m.st>2.4){ m.state='tired'; m.st=0; mSay('*keuch* … *keuch* …',2); } return true;
+    case 'tired': m.claw=0; m.sq=Math.sin(T*6)*0.04; if(m.st>2.6){ m.state='idle'; m.st=0; m.cd=0.5; } return true;
+  }
+  return false;
+}
+/* Klauenziel: liest deine Lieblings-Rollrichtung */
+function morrClawAim(m){ const pr=morrProf(); let a=leadAng(m.x,m.y,500,0.4,0); if(m.phase>=2&&Math.abs(pr.side)>0.5) a+=Math.sign(pr.side)*-0.32; return a; }
+/* Ziel in der Flut: das Brett auf deinem Weg zur nächsten Glocke */
+function morrFloodTarget(m){
+  const M=R_.mo; const open=M.bells.filter(b=>!b.rung); if(!open.length) return {x:P.x,y:P.y};
+  const v=Math.hypot(P.vx,P.vy)>40?{x:P.vx,y:P.vy}:null;
+  let best=open[0], bs=-1e9; for(const b of open){ const dx=b.x-P.x, dy=b.y-P.y, dd=Math.hypot(dx,dy)||1; let s=-dd*0.002; if(v) s+=(dx*v.x+dy*v.y)/(dd*Math.hypot(v.x,v.y)); if(s>bs){ bs=s; best=b; } }
+  let tp=null, ts=1e9; for(const p of M.planks){ if(p.gone||p===M.planks[0]) continue; const t=((p.x-P.x)*(best.x-P.x)+(p.y-P.y)*(best.y-P.y))/(((best.x-P.x)**2+(best.y-P.y)**2)||1); if(t<0.1||t>0.9) continue; const px=P.x+(best.x-P.x)*t, py=P.y+(best.y-P.y)*t; const off=Math.hypot(p.x-px,p.y-py)+t*200; if(off<ts){ ts=off; tp=p; } }
+  return tp?{x:tp.x,y:tp.y,plank:tp}:leadPt(m.x,m.y,400,0.8);
 }
 
 /* ======================================================================
