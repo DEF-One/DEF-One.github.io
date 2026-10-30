@@ -384,6 +384,7 @@ function mapKey(code){
     case 'Digit3':case 'Numpad3':return 'n3';
     case 'Digit4':case 'Numpad4':return 'n4';
     case 'KeyT':return 'swap';
+    case 'Tab':case 'KeyI':return 'bag';
     case 'KeyH':return 'potion';
     case 'Escape':return 'weap';
     case 'KeyE':case 'Enter':return 'act';
@@ -1002,6 +1003,7 @@ function drawDead(){
   if(G.deadT>0.5){ const DM=G.deadMsg; textO(DM?DM.title:'Umgekippt!',W/2,H/2-30,72,FD,'#f3e7cf','center',8,700);
     textO(DM?DM.sub:'Kein Problem. Die Maus hilft dir wieder auf.',W/2,H/2+30,22,FB,'#f0a23a','center',4,700);
     textO(TOUCH?'Tippe zum Weitermachen':'E oder Klick zum Weitermachen',W/2,H/2+70,18,FB,'#b9a98f','center',3,600); }
+  if(G.deadLoss&&G.deadT>0.8) textO('−'+G.deadLoss+' Gold verloren · 60 % deiner Expeditionsbeute bleiben dir',W/2,H/2+96,15,FB,'#ff9a8a','center',3,700);
   drawBossDeath();
 }
 function drawHearts(){
@@ -1526,6 +1528,7 @@ function drawDeco(o){
       else textO('Geschlossen',o.x,o.y-60,15,FB,'#b9a98f','center',3,700);
       break; }
     case 'lantern': spr(o.nm,o.x,o.y,{s:o.s,flip:o.flip}); { ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.45+Math.sin(t*7)*0.08+Math.sin(t*17)*0.05; const sz=sprSize(o.nm); ctx.drawImage(fireSprite('255,190,100'),o.x-24,o.y-(sz.h-sz.top)*o.s+4,48,48); ctx.restore(); } break;
+    case 'bstatue': drawBossStatue(o); break;
     default: spr(o.nm,o.x,o.y,{s:o.s,flip:o.flip});
   }
   if(o.wob) o.wob*=0.9;
@@ -1839,7 +1842,7 @@ function assignPers(e){
   if(Math.random()<0.55) emote(e,PERS[e.pers].hello[Math.floor(Math.random()*3)],PERS[e.pers].col,1.3);
 }
 function emote(e,txt,col,t){ e.emote={txt,col:col||'#f3e7cf',t:t||1.2,max:t||1.2}; }
-function enemyTempo(e){ let k=eliteTempo(e); if(e.desp) k*=1.2; if(e.pers) k*=PERS[e.pers].tempo; if(e.angry) k*=1.28; if(!e.boss&&!e.mini) k*=(R_.press||1); return k; }
+function enemyTempo(e){ let k=eliteTempo(e); if(e.desp) k*=1.2; if(G.charm==='glocke'&&!isBossLike(e)) k*=1.12; if(e.pers) k*=PERS[e.pers].tempo; if(e.angry) k*=1.28; if(!e.boss&&!e.mini) k*=(R_.press||1); return k; }
 /* Wenn ein Kamerad fällt */
 function onAllyDeath(dead){
   if(scene!=='room') return;
@@ -1900,7 +1903,7 @@ function cutWebs(x,y,rad){ if(!R_.webs) return; for(const w of R_.webs){ if(Math
 function updateBrains(dt){
   // Spielleiter: Druck passt sich deiner Lage an
   R_.calm=Math.max(0,(R_.calm||0)-dt); R_.noHitT=(R_.noHitT||0)+dt;
-  const hr=P.hp/Math.max(1,G.maxHp); let want=1; if(P.hp<=2) want=0.8; else if(hr<0.5) want=0.9; else if(R_.noHitT>25&&hr>=1) want=1.08;
+  const hr=P.hp/Math.max(1,G.maxHp), base=1+0.07*Math.min(3,G.region||0); let want=base; if(P.hp<=2) want=base*0.8; else if(hr<0.5) want=base*0.9; else if(R_.noHitT>14&&hr>=0.75) want=base*1.15;
   R_.press=lerp(R_.press||1,want,Math.min(1,dt*0.8));
   P.webbed=false;
   if(R_.webs){ for(const w of R_.webs){ w.t+=dt; if(Math.hypot(P.x-w.x,(P.y-w.y)*1.5)<w.r&&P.rollT<=0){ P.webbed=true; if(Math.random()<dt*4) addPart({x:P.x+rand(-12,12),y:P.y-6,vx:0,vy:-14,life:.5,size:3,color:w.kind==='web'?'#e8e8f0':'#9af06a',kind:'spark'}); } }
@@ -1944,7 +1947,7 @@ function spawnEnemy(kind,x,y,extra){
     case 'hedge': e={type:'hedge',hp:4,r:18,state:'walk',st:rand(0,1),dx:0,dy:0,spin:0}; break;
     default: e={type:kind,hp:1,r:14};
   }
-  const o=Object.assign(base,e,extra||{}); enemies.push(o); if(!extra||!extra.noElite) maybeElite(o); return o;
+  const o=Object.assign(base,e,extra||{}); enemies.push(o); scaleSpawn(o); if(!extra||!extra.noElite) maybeElite(o,extra&&extra.forceElite); return o;
 }
 function enemyInvul(e){
   if(e.dying||e.downed) return true;
@@ -1959,17 +1962,26 @@ function enemyInvul(e){
   if(e.boss&&['sleep','rise','intro','enrage','sub','subMove','dead'].includes(e.state)) return true;
   return false;
 }
+/* Wellen werden je nach Portal dichter, dazu kommt ein Hinterhalt als letzte Welle */
+const WAVE_POOL=[['cat','skel','skelR','frog','hedge'],['shroom','frog','cat','hedge','skelR'],['bat','spider','skel','skelR','cat'],['frog','shroom','spider','bat','skelR','cat']];
+function buildWaves(rm){
+  const r=Math.min(3,G.region||0), src=rm.waves; const out=src.map((w,i)=>w.map((g,j)=>({t:g.t,n:g.n+(j===0&&(i>0||r>=1)?1:0)+(j===1&&r>=3?1:0)})));
+  if(src.length>=2||r>=1){ const pool=WAVE_POOL[r], n=2+r, amb=[]; for(let k=0;k<n;k++){ const t=pool[(k*2+r+src.length)%pool.length]; const g=amb.find(q=>q.t===t); if(g) g.n++; else amb.push({t,n:1}); } if(r>=2) amb[0].elite=true; amb.ambush=true; out.push(amb); }
+  return out;
+}
 function startWave(i){
-  R_.wave=i; const w=L.rm.waves[i]; let k=0;
-  for(const g of w) for(let n=0;n<g.n;n++){ const p=spawnSpot(); summons.push({x:p[0],y:p[1],t:-0.3-k*0.28,dur:0.9,kind:g.t}); k++; }
-  if(i>0){ banner={text:`Welle ${i+1}`,sub:`von ${L.rm.waves.length}`,t:0,small:true}; SFX.summon(); }
+  if(!R_.wv) R_.wv=buildWaves(L.rm);
+  R_.wave=i; const w=R_.wv[i]; let k=0;
+  for(const g of w) for(let n=0;n<g.n;n++){ const p=spawnSpot(); summons.push({x:p[0],y:p[1],t:-0.3-k*0.22,dur:0.9,kind:g.t,elite:g.elite&&n===0}); k++; }
+  if(w.ambush){ banner={text:'Hinterhalt!',sub:'Verstärkung rückt an',t:0,small:true}; SFX.roar(); addShake(6); }
+  else if(i>0){ banner={text:`Welle ${i+1}`,sub:`von ${R_.wv.length}`,t:0,small:true}; SFX.summon(); }
 }
 function updateSummons(dt){
   for(const s of summons){
     s.t+=dt;
     if(s.t>=s.dur&&!s.done){
       s.done=true;
-      const e=spawnEnemy(s.kind,s.x,s.y,{owner:s.owner});
+      const e=spawnEnemy(s.kind,s.x,s.y,s.elite?{owner:s.owner,forceElite:true}:{owner:s.owner});
       e.born=0.35;
       puff(s.x,s.y-10,{cat:'#a07ad0',frog:'#8ad070',shroom:'#f0a050',bat:'#8a60c0',spider:'#9a80c0',hedge:'#c8a070'}[s.kind]||'#d8cfba',10);
     }
@@ -2015,13 +2027,12 @@ function updateEnemies(dt){
   if(scene!=='room') return;
   const rm=L.rm;
   if(rm.waves&&!G.cleared[roomKey()]&&R_.t>1.2){
-    const main=enemies.filter(e=>!e.owner&&!e.dying&&e.type!=='dummy').length;
-    if(main===0&&summons.length===0){
+    const main=enemies.filter(e=>!e.owner&&!e.dying&&e.type!=='dummy').length, nW=(R_.wv||rm.waves).length, last=R_.wave+1>=nW;
+    // Die nächste Welle rückt schon nach, wenn nur noch ein Gegner steht: kein Durchatmen
+    if(!last&&main<=1&&summons.length===0){ R_.waveDelay=(R_.waveDelay||0)+dt; if(R_.waveDelay>(main?0.9:0.7)){ R_.waveDelay=0; startWave(R_.wave+1); } }
+    else if(last&&main===0&&summons.length===0){
       for(const e of enemies) if(e.owner&&!e.dying) killEnemy(e);
-      if(enemies.every(e=>e.dying)){
-        if(R_.wave+1<rm.waves.length){ R_.waveDelay=(R_.waveDelay||0)+dt; if(R_.waveDelay>1.0){ R_.waveDelay=0; startWave(R_.wave+1); } }
-        else if(enemies.length===0) roomClear();
-      }
+      if(enemies.every(e=>e.dying)&&enemies.length===0) roomClear();
     }
   }
   if(rm.type==='cocoons'&&!G.cleared[roomKey()]&&R_.cocoons.length===0&&enemies.filter(e=>!e.dying).length===0&&summons.length===0) roomClear();
@@ -2980,7 +2991,7 @@ function updateQuakRoom(dt){
   // Giftpfützen
   for(const p of R_.qpud){ p.t+=dt; if(Math.random()<dt*3) addPart({x:p.x+rand(-p.r,p.r)*0.7,y:p.y+rand(-6,6),vx:0,vy:-20,life:.7,size:rand(2,4),color:'#9af06a',kind:'bubble',g:0.001,ph:rand(0,TAU)}); }
   R_.qpud=R_.qpud.filter(p=>p.t<p.life);
-  const inPud=R_.qpud.some(p=>Math.hypot(P.x-p.x,(P.y-p.y)*1.8)<p.r);
+  const inPud=!capePoison()&&R_.qpud.some(p=>Math.hypot(P.x-p.x,(P.y-p.y)*1.8)<p.r);
   R_.qdT=(R_.qdT||0)-dt; if(inPud&&R_.qdT<=0){ R_.qdT=0.9; hurtPlayer(1,P.x+rand(-5,5),P.y+10); }
   // Wasserstand (Phase 2)
   if(q.phase===2&&q.state!=='shrink'&&q.state!=='tiny') R_.water=Math.min(1,R_.water+dt/12);
@@ -3490,8 +3501,8 @@ function morrukInit(cleared){
   if(cleared){ R_.mo.done=true; R_.mo.remains={x:L.cx,y:L.cy-40}; return; }
   const cp=G.flags.morrCP;
   const m=spawnEnemy('morruk',L.cx,L.brT+30,{hp:MORR_HP,max:MORR_HP,r:46,state:'statue',st:0,mini:true,face:1,phase:1,cd:1.6,claw:0,lit:true,z:0});
-  if(cp==='flood'){ m.hp=MORR_HP*0.4; m.phase=3; m.state='flyUp'; m.st=0; R_.mo.started=true; banner={text:'Die Flut',sub:'Rücksetzpunkt: Läute die drei Glocken',t:0,small:true}; }
-  else if(cp==='final'){ m.hp=MORR_HP*0.4; m.phase=4; m.state='idle'; m.st=0; m.torn=true; m.lit=false; m.noLantern=true; R_.mo.started=true; banner={text:'Der letzte Handel',sub:'Rücksetzpunkt',t:0,small:true}; }
+  if(cp==='flood'){ m.hp=m.max*0.4; m.phase=3; m.state='flyUp'; m.st=0; R_.mo.started=true; banner={text:'Die Flut',sub:'Rücksetzpunkt: Läute die drei Glocken',t:0,small:true}; }
+  else if(cp==='final'){ m.hp=m.max*0.4; m.phase=4; m.state='idle'; m.st=0; m.torn=true; m.lit=false; m.noLantern=true; R_.mo.started=true; banner={text:'Der letzte Handel',sub:'Rücksetzpunkt',t:0,small:true}; }
   else hint='';
 }
 const MLINES={p2:'Du willst mich sehen? Dann kauf dir das Licht.',p3:'DU HAST NICHTS BEZAHLT!',p4:'Dann bezahlst du mit allem.'};
@@ -4017,12 +4028,12 @@ function updateFXA(dt){ for(const f of FXA) f.t+=dt; FXA=FXA.filter(f=>{ const A
 function drawFXA(){ for(const f of FXA){ const i=Math.floor(f.t*f.fps); spr(`${f.name}:${i}`,f.x,f.y,{s:f.s,ay:48,ax:48}); } }
 
 /* ---------------- Vampirklinge ---------------- */
-function swordName(){ return G.sword==='vampir'?'Vampirklinge':'Rosenklinge'; }
+function swordName(){ const k=G.sword||'rose'; return (WEAPONS[k]||WEAPONS.rose).n+((G.wlv&&G.wlv[k])?' +'+G.wlv[k]:''); }
 function vampHit(e){
   if(G.sword!=='vampir'||!G.weaponOn||e.type==='dummy') return;
-  G.vamp=(G.vamp||0)+1;
+  if(e.illu||e.type==='mclone') return;
   for(let i=0;i<4;i++) addPart({x:e.x+rand(-10,10),y:e.y-30,vx:(P.x-e.x)*rand(1.2,2)+rand(-60,60),vy:(P.y-60-e.y)*rand(1.2,2)-rand(40,120),life:rand(.4,.6),size:rand(3,5),color:'#d0102a',kind:'spark'});
-  if(G.vamp%5===0&&P.hp<G.maxHp){ P.hp++; hearts(P.x,P.y-70,3); floater(P.x,P.y-120,'+♥ Lebensraub','#ff4a5a'); SFX.heart(); }
+  if(P.hp<G.maxHp&&T>(G.vampCd||0)&&Math.random()<0.06){ G.vampCd=T+3; P.hp++; hearts(P.x,P.y-70,2); floater(P.x,P.y-120,'+½ ♥ Lebensraub','#ff4a5a'); SFX.heart(); }
 }
 /* ---------------- Geisterkugel ---------------- */
 function useOrb(){
@@ -4335,11 +4346,7 @@ function petInfo(k){ return PETS.find(p=>p.key===k)||PETS[0]; }
 function petScale(k,target){ const sz=sprSize(k+':rot:south'); const vis=Math.max(20,sz.h-sz.top); return Math.min((target||58)/30,(target||58)/vis); }
 
 /* ---------------- Knochen ---------------- */
-function dropBones(e){
-  if(scene!=='room'||e.type==='dummy') return; dropGold(e);
-  const n=e.type==='bookie'?6:e.type==='nager'?5:e.type==='spider'?(Math.random()<.5?1:0):1+(Math.random()<.45?1:0);
-  for(let i=0;i<n;i++){ const a=rand(0,TAU), sp=rand(80,180); R_.items.push({kind:'bone',x:e.x,y:e.y,t:0,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp*0.6,z:20,vz:rand(220,320),rot:rand(0,TAU),n:1}); }
-}
+function dropBones(e){ dropLoot(e); }
 function updateBoneItem(it,dt){
   if(it.z>0||it.vz>0){ it.vz-=900*dt; it.z+=it.vz*dt; it.rot+=dt*12; if(it.z<=0){ it.z=0; if(it.vz<-120){ it.vz=-it.vz*0.35; } else it.vz=0; } }
   const nx=it.x+it.vx*dt, ny=it.y+it.vy*dt; if(L.walk(nx,ny)){ it.x=nx; it.y=ny; } it.vx*=Math.pow(0.05,dt); it.vy*=Math.pow(0.05,dt);
@@ -4381,7 +4388,7 @@ function buildStatue(){}
 function hitPiles(x,y,rad){
   if(!R_.piles) return;
   for(const p of R_.piles){ if(p.hitBy===P.spinId) continue; if(Math.hypot(p.x-x,(p.y-20)-y)<rad+20){ p.hitBy=P.spinId; p.hp--; p.wob=0.5; SFX.hit(); burst(p.x,p.y-20,'#efe4cc');
-      if(p.hp<=0){ p.dead=true; puff(p.x,p.y-14,'#efe4cc',10); for(let i=0;i<4;i++){ const a=rand(0,TAU), sp=rand(80,170); R_.items.push({kind:'bone',x:p.x,y:p.y,t:0,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp*0.6,z:20,vz:rand(220,320),rot:rand(0,TAU),n:1}); } } } }
+      if(p.hp<=0){ p.dead=true; if(Math.random()<0.35) spawnGold(p.x,p.y,rint(1,2)*cm()); puff(p.x,p.y-14,'#efe4cc',10); for(let i=0;i<4;i++){ const a=rand(0,TAU), sp=rand(80,170); R_.items.push({kind:'bone',x:p.x,y:p.y,t:0,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp*0.6,z:20,vz:rand(220,320),rot:rand(0,TAU),n:1}); } } } }
   R_.piles=R_.piles.filter(p=>!p.dead);
 }
 function updateRitual(dt){
@@ -5753,7 +5760,7 @@ function updateMusic(dt){
    Räume, Glücksspiel im Dorf. Knochen verkauft man beim Schmied (2 = 1 Gold).
    Ein Portal bringt grob 80 bis 160 Gold, je weiter, desto mehr.
    ====================================================================== */
-function econInit(){ if(G.gold===undefined) G.gold=0; if(!G.items) G.items=G.item?[G.item]:[]; if(!G.cds) G.cds={}; if(G.swordLvl===undefined) G.swordLvl=0; if(G.cape===undefined) G.cape=0; if(G.potions===undefined) G.potions=0; }
+function econInit(){ if(G.gold===undefined) G.gold=0; if(!G.items) G.items=G.item?[G.item]:[]; if(!G.cds) G.cds={}; shopInit(); }
 function regionK(){ return (G.region||0); }
 /* ---------------- Auswahlfenster ---------------- */
 let CHOICE=null;
@@ -5788,53 +5795,6 @@ function drawChoice(){
   ctx.restore();
 }
 /* ---------------- Gold ---------------- */
-function drawGoldIcon(x,y,s){ drawCoin(x,y,0.4,s*1.1); }
-function spawnGold(x,y,n){ if(scene!=='room'||n<=0) return; let left=n; while(left>0){ const v=left>=10?5:left>=4?2:1; left-=v; const a=rand(0,TAU), sp=rand(70,170); R_.items.push({kind:'gold',v,x,y,t:0,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp*0.6,z:20,vz:rand(240,340),rot:rand(0,TAU),n:1}); } }
-const BOSS_GOLD={nager:20,bookie:30,quak:25,morruk:45};
-function dropGold(e){
-  if(scene!=='room'||e.type==='dummy'||e.illu||e.type==='mclone') return; const r=regionK();
-  if(BOSS_GOLD[e.type]!==undefined){ if(e.type==='nager'&&enemies.some(o=>o.type==='nager'&&o!==e&&!o.downed)) { spawnGold(e.x,e.y,4); return; } spawnGold(e.x,e.y,BOSS_GOLD[e.type]); return; }
-  if(e.boss){ spawnGold(e.x,e.y,50); return; }
-  if(e.elite){ spawnGold(e.x,e.y,4+2*r); return; }
-  if(Math.random()<0.4) spawnGold(e.x,e.y,1+Math.floor(Math.random()*(1+r)));
-}
-function econRoomClear(){ const rm=curRoom(); if(!rm||!enemies.length&&!rm.waves) return; spawnGold(P.x+rand(-40,40),P.y+rand(-30,30),2+regionK()*2); }
-function pickGold(it){ const v=it.v||1; G.gold=(G.gold||0)+v; tone(1500+Math.random()*300,0.05,'triangle',0.05,2000); addPart({x:P.x+20,y:P.y-100,vx:0,vy:-40,life:0.6,size:16,color:'#f6cf5a',kind:'text',txt:'+'+v}); }
-function drawGoldItem(it){ const z=it.z||0; shadowE(it.x,it.y,7,3,.35); const s=it.v>=5?1.5:it.v>=2?1.25:1.05; drawCoin(it.x,it.y-8-z,it.rot+T*3,s); if(it.v>=5){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.3; ctx.drawImage(fireSprite('255,210,90'),it.x-20,it.y-30-z,40,40); ctx.restore(); } }
-function drawGoldHUD(y){ drawGoldIcon(36,y+6,1.15); textO(`${G.gold||0} Gold`,58,y,15,FB,'#f6cf5a','left',3,700); if(G.potions>0) textO(`🧪 ${G.potions}  (H)`,150,y,14,FB,'#ff8aa0','left',3,700); }
-/* ---------------- Ausrüstung ---------------- */
-const SWORDS=[{n:'Geschliffen',mul:1.25,price:40},{n:'Mondstahl',mul:1.5,price:95},{n:'Knochenbrecher',mul:1.85,price:170}];
-const CAPES=[{n:'Wollumhang',d:'Rollen lädt 20 % schneller',price:35},{n:'Schattenumhang',d:'Längere Unverwundbarkeit beim Rollen, 6 % schneller',price:85},{n:'Kultmantel',d:'15 % Chance, Treffer einfach abzuschütteln',price:150}];
-function swordMul(){ return G.swordLvl>0?SWORDS[G.swordLvl-1].mul:1; }
-function capeSpeed(){ return 1+(G.cape>=2?0.06:0); }
-function capeRollCd(){ return G.cape>=1?0.8:1; }
-function capeDodge(){ return G.cape>=3&&Math.random()<0.15; }
-const POTION_PRICE=15, FOG_PRICE=60;
-function openShop(n){
-  econInit();
-  const sw=G.swordLvl<3?SWORDS[G.swordLvl]:null, cp=G.cape<3?CAPES[G.cape]:null;
-  const surplus=Math.max(0,(G.bones||0)-(G.pet?0:BONES_NEEDED)); const sell=Math.floor(surplus/2);
-  const opts=[
-    sw?{label:'Schwert schärfen: '+sw.n,sub:'Schaden ×'+sw.mul+' für jede Klinge',price:sw.price,dis:G.gold<sw.price,why:'Zu wenig Gold'}:{label:'Schwert: Meisterstück',sub:'Besser wird es nicht',dis:true,why:'Schon perfekt',tag:'✓'},
-    cp?{label:'Umhang: '+cp.n,sub:cp.d,price:cp.price,dis:G.gold<cp.price,why:'Zu wenig Gold'}:{label:'Umhang: Kultmantel',sub:'Du trägst schon den besten',dis:true,why:'Schon perfekt',tag:'✓'},
-    {label:'Heiltrank (max. 2)',sub:'Taste H: füllt alle Herzen',price:POTION_PRICE,dis:G.gold<POTION_PRICE||G.potions>=2,why:G.potions>=2?'Tasche voll':'Zu wenig Gold'},
-    {label:sell>0?`Knochen verkaufen (${sell*2} gegen ${sell} Gold)`:'Knochen verkaufen',sub:G.pet?'Grimbart kauft alles, was du nicht brauchst':`${BONES_NEEDED} behältst du fürs Ritual`,dis:sell<=0,why:'Keine überflüssigen Knochen',tag:sell>0?'+'+sell:''},
-    {label:'Tschüss'} ];
-  if(!G.fog&&G.flags.fogShop!==G.region) opts.splice(3,0,{label:'Nebelherz',sub:'Ein Extra-Herz, das nicht nachwächst (1× pro Portal)',price:FOG_PRICE,dis:G.gold<FOG_PRICE,why:'Zu wenig Gold'});
-  askChoice('Grimbarts Schmiede',opts,i=>{
-    const o=opts[i]; if(o.label==='Tschüss'){ say([{who:'schmied',text:['Komm wieder, wenn die Taschen klimpern.','Pass auf deine Klinge auf. Und auf die Maus.','*KLONG* Ja ja, tschüss.'][Math.floor(Math.random()*3)]}]); return; }
-    if(o.price&&G.gold<o.price) return;
-    if(o.label.startsWith('Schwert schärfen')){ G.gold-=o.price; G.swordLvl++; banner={text:'Klinge geschärft!',sub:SWORDS[G.swordLvl-1].n+' · Schaden ×'+SWORDS[G.swordLvl-1].mul,t:0,small:true}; smithFx(); }
-    else if(o.label.startsWith('Umhang')){ G.gold-=o.price; G.cape++; banner={text:CAPES[G.cape-1].n,sub:CAPES[G.cape-1].d,t:0,small:true}; smithFx(); }
-    else if(o.label.startsWith('Heiltrank')){ G.gold-=o.price; G.potions++; SFX.chest(); floater(P.x,P.y-120,'+1 Heiltrank','#ff8aa0'); }
-    else if(o.label==='Nebelherz'){ G.gold-=o.price; G.flags.fogShop=G.region; G.fog=2; SFX.heart(); floater(P.x,P.y-120,'+1 Nebelherz','#c9b6e8'); }
-    else if(o.label.startsWith('Knochen')){ G.bones-=sell*2; G.gold+=sell; SFX.chest(); floater(P.x,P.y-120,'+'+sell+' Gold','#f6cf5a'); }
-    setTimeout(()=>openShop(n),60);
-  },'Gold: '+(G.gold||0)+' · Knochen: '+(G.bones||0));
-  CHOICE.shop=true;
-}
-function smithFx(){ SFX.chest(); addShake(6); fxAnim('fx_poof',P.x,P.y-40,1.1); for(let i=0;i<14;i++) addPart({x:SMITH.x-40,y:SMITH.y+20,vx:rand(-200,200),vy:rand(-300,-80),life:rand(.4,.8),size:rand(2,4),color:'#ffb050',kind:'spark',g:600}); }
-function usePotion(){ if(!(G.potions>0)) { floater(P.x,P.y-110,'Kein Heiltrank','#b9a98f'); return; } if(P.hp>=G.maxHp){ floater(P.x,P.y-110,'Schon gesund','#b9a98f'); return; } G.potions--; P.hp=G.maxHp; SFX.heart(); hearts(P.x,P.y-60,8); floater(P.x,P.y-120,'Gluck gluck!','#ff8aa0'); }
 /* ---------------- Gegenstände wechseln, Steinschleuder ---------------- */
 function addItem(k){ econInit(); if(!G.items.includes(k)) G.items.push(k); G.cds[G.item]=G.itemCd; G.item=k; G.itemCd=G.cds[k]||0; }
 function cycleItem(){ econInit(); if(G.items.length<2){ if(G.item) floater(P.x,P.y-110,'Nur ein Gegenstand','#b9a98f'); return; } G.cds[G.item]=G.itemCd; const i=G.items.indexOf(G.item); G.item=G.items[(i+1)%G.items.length]; G.itemCd=G.cds[G.item]||0; const R=itemDef(G.item); floater(P.x,P.y-120,R.name,'#f6cf5a'); tone(800,0.06,'square',0.04); }
@@ -5845,7 +5805,7 @@ function fireSling(ax,ay){ STONES.push({x:P.x+ax*24,y:P.y-30+ay*18,vx:ax*980,vy:
 function updateStones(dt){
   for(const s of STONES){ s.life-=dt; s.rot+=dt*20; s.x+=s.vx*dt; s.y+=s.vy*dt;
     for(const e of enemies){ if(e.dying||e.downed) continue; const ey=e.boss?e.y-100:(e.type==='morruk'?e.y-80:e.type==='quak'?e.y-80*(e.infl||1):e.y-24-(e.z||0)); const er=e.boss?80:e.type==='morruk'?56:e.type==='quak'?46*(e.infl||1):(e.r||16)+8;
-      if(Math.hypot(s.x-e.x,s.y-ey)<er){ s.life=0; if(e.type==='dummy'){ damageEnemy(e,1); } else if(enemyInvul(e)){ burst(e.x,ey,'#c8c0b0'); floater(e.x,ey-30,'Pling!','#c8c0b0'); } else { damageEnemy(e,3*swordMul()); const a=Math.atan2(s.vy,s.vx); e.kx=(e.kx||0)+Math.cos(a)*200; e.ky=(e.ky||0)+Math.sin(a)*200; floater(e.x,ey-40,'Zack!','#d8c8a8'); } break; } }
+      if(Math.hypot(s.x-e.x,s.y-ey)<er){ s.life=0; if(e.type==='dummy'){ damageEnemy(e,1); } else if(enemyInvul(e)){ burst(e.x,ey,'#c8c0b0'); floater(e.x,ey-30,'Pling!','#c8c0b0'); } else { damageEnemy(e,3*weaponMul()); const a=Math.atan2(s.vy,s.vx); e.kx=(e.kx||0)+Math.cos(a)*200; e.ky=(e.ky||0)+Math.sin(a)*200; floater(e.x,ey-40,'Zack!','#d8c8a8'); } break; } }
     if(scene==='room'&&!L.walk(s.x,s.y+30)) s.life=0;
     if(s.life<=0&&!s.done){ s.done=true; puff(s.x,s.y,'rgba(170,160,150,.8)',6); noise(0.05,0.12,1200); } }
   STONES=STONES.filter(s=>s.life>0);
@@ -5921,10 +5881,10 @@ function honorWon(){
 }
 /* ---------------- Elite-Gegner: seltener, gefährlicher, reicher ---------------- */
 const ELITE_MODS=[{k:'flink',n:'Flink',col:'120,220,255'},{k:'zaeh',n:'Zäh',col:'255,190,90'},{k:'wild',n:'Wütend',col:'255,80,60'},{k:'schild',n:'Gepanzert',col:'200,200,230'}];
-function maybeElite(e){
+function maybeElite(e,force){
   if(scene!=='room'||e.mini||e.boss||['dummy','thug','tadpole','mclone','bookie','quak','morruk','nager'].includes(e.type)) return;
   const rm=curRoom(); if(!rm||G.cleared[rm.id]) return;
-  if(Math.random()>0.08+0.04*regionK()) return;
+  if(!force&&Math.random()>0.1+0.05*regionK()) return;
   const m=ELITE_MODS[Math.floor(Math.random()*ELITE_MODS.length)];
   e.elite=m; e.hp=Math.ceil(e.hp*(m.k==='zaeh'?2.6:1.7)); e.max=e.hp;
   if(m.k==='wild') e.angry=true; if(m.k==='schild') e.eShield=3;
@@ -5965,7 +5925,7 @@ function bossHead(e){ const t=e.type; return e.y-(t==='quak'?175*(e.infl||1):t==
 function perfectDodge(fx,fy){
   if(scene!=='room'||G.dead) return false; const age=P.rollDur-P.rollT; if(age>0.22||P.pdRoll===P.rollStart) return false;
   if(Math.hypot(P.x-fx,P.y-fy)>900) return false;
-  P.pdRoll=P.rollStart; P.critN=2; P.critT=4; P.iframes=Math.max(P.iframes,0.5);
+  P.pdRoll=P.rollStart; P.critN=2+(G.charm==='dorn'?1:0)+(cape().pd?1:0); P.critT=4; P.iframes=Math.max(P.iframes,0.5);
   slowmo(0.55,0.28); SFX.place(); tone(1320,0.25,'triangle',0.08,2200); tone(660,0.4,'sine',0.06,null,0.05);
   addPart({x:P.x,y:P.y-30,vx:0,vy:0,life:0.5,size:110,color:'rgba(160,220,255,.9)',kind:'ring'});
   for(let i=0;i<14;i++){ const a=i/14*TAU; addPart({x:P.x,y:P.y-30,vx:Math.cos(a)*260,vy:Math.sin(a)*180,life:.4,size:rand(2,4),color:'#bfe8ff',kind:'spark'}); }
@@ -6163,9 +6123,11 @@ function bossLogDeath(){
 function bossLogWin(e){
   const k=bkey(e), s=bstat(k), t=BF&&BF.k===k?BF.t:0, hits=BF&&BF.k===k?BF.hits:0;
   const newBest=t>0&&(!s.best||t<s.best); s.wins++; if(newBest) s.best=t; const noHit=hits===0&&t>0; if(noHit) s.noHit=true;
-  let bonus=0; if(noHit){ bonus+=15; } if(RM) bonus+=10+(G.region||0)*4;
-  if(bonus){ G.gold=(G.gold||0)+bonus; }
-  BRES={k,t:0,time:t,hits,tries:s.tries+1,newBest,noHit,bonus,rm:!!RM};
+  let bonus=0, dream=0, dreamMat=false; if(noHit){ bonus+=Math.round(10*cm()); }
+  if(RM){ G.dreamWins[k]=(G.dreamWins[k]||0)+1; if(G.dreamWins[k]<=3){ dream=Math.round(rint(8,18)*cm()); bonus+=dream; } else { dreamMat=true; addMat('seele',1); } }
+  if(bonus){ G.gold=(G.gold||0)+Math.round(bonus*goldK()); }
+  if(k==='damm'&&!RM) bossLoot('damm',e.x,e.y);
+  BRES={k,t:0,time:t,hits,tries:s.tries+1,newBest,noHit,bonus,rm:!!RM,dream,dreamMat};
   BF=null;
   if(RM) setTimeout(()=>{ if(RM) startFade(()=>endRematch(true)); },4200);
 }
@@ -6175,7 +6137,7 @@ function offerRematch(soul){
   const k=soul.key; if(k==='damm'){ say([{who:'verris',text:'Der Dammbauer ruht im Wasser. Den lassen wir lieber schlafen.'}]); return; }
   const s=bstat(k);
   const info=`Siege ${s.wins} · Niederlagen ${s.tries}`+(s.best?` · Bestzeit ${fmtTime(s.best)}`:'')+(s.noHit?' · ohne Treffer ✓':'');
-  askChoice('Traumkampf: '+BINFO[k].name,[{label:'Kämpfen',sub:'Belohnung: Gold. Niederlage kostet nichts.'},{label:'Lieber nicht'}],i=>{ if(i===0) startRematch(k); },info);
+  askChoice('Traumkampf: '+BINFO[k].name,[{label:'Kämpfen',sub:(G.dreamWins&&G.dreamWins[k]>=3)?'Belohnung: Seelensplitter. Niederlage kostet nichts.':'Belohnung: Gold (noch '+(3-((G.dreamWins||{})[k]||0))+'×). Niederlage kostet nichts.'},{label:'Lieber nicht'}],i=>{ if(i===0) startRematch(k); },info);
 }
 function startRematch(k){
   const loc=rematchRoom(k); if(!loc) return;
@@ -6220,14 +6182,362 @@ function drawBossResult(){
   textO(BINFO[R.k].name+' besiegt!',x+18,y+26,22,FD,'#f6cf5a','left',4,700);
   textO('Zeit '+fmtTime(R.time)+(R.newBest?'  · Neue Bestzeit!':''),x+18,y+56,15,FB,R.newBest?'#9af06a':'#f3e7cf','left',3,700);
   textO('Treffer kassiert: '+R.hits+'   ·   Versuche: '+R.tries,x+18,y+80,14,FB,'#d9c8b0','left',3,600);
-  let ly=y+106; if(R.noHit){ textO('OHNE TREFFER! +15 Gold',x+18,ly,16,FB,'#ffd23a','left',3,900); ly+=22; }
-  if(R.rm) textO('Traumkampf-Belohnung +'+(R.bonus-(R.noHit?15:0))+' Gold',x+18,ly,14,FB,'#c9b6e8','left',3,700);
+  let ly=y+106; if(R.noHit){ textO('OHNE TREFFER! +'+Math.round(10*cm())+' Gold',x+18,ly,16,FB,'#ffd23a','left',3,900); ly+=22; }
+  if(R.rm) textO(R.dreamMat?'Traumkampf: +1 Seelensplitter (Gold gibt es nur für die ersten drei Siege)':'Traumkampf-Belohnung +'+R.dream+' Gold',x+18,ly,R.dreamMat?11:14,FB,'#c9b6e8','left',3,700);
   ctx.restore();
 }
 /* Seele im Dorf ansprechen */
 function soulNear(){
   const S=R_.souls; if(!S) return null; const cx=900, cy=700;
   for(const s of S){ const sx=cx+Math.cos(s.a)*210, sy=cy+Math.sin(s.a)*70-60; if(Math.hypot(P.x-sx,P.y-(sy+120))<80) return {s,sx,sy}; } return null;
+}
+
+/* ======================================================================
+   WIRTSCHAFT: GOLD, MATERIALIEN, SCHMIED, HÄNDLER, SCHWARZMARKT, DORFSCHMUCK
+   Umsetzung des Wirtschaftskonzepts, angepasst an Herzen statt Lebenspunkte
+   und an unsere vier Portale (= vier Kapitel, je eine Expedition):
+   - Kapitel-Multiplikator 1 / 1,8 / 3,2 / 5,6 auf alle Goldfunde
+   - Kaufen kostet nur Gold, Verbessern kostet Gold + Materialien
+   - Gegner: 65 % Chance auf 1–3 Gold, Elite 8–14, Truhe 20–35,
+     Miniboss 35–55, Endboss 90–140, Haufen 35 % auf 1–2 (alles × Kapitel)
+   - Gold und Materialien werden getrennt ausgewürfelt
+   - Beim Tod bleiben 60 % des Expeditionsgoldes, im Dorf ist Gold sicher
+   - Neue Ausrüstungsränge schalten sich über den Fortschritt frei
+   - Alte Ausrüstung: 40 % Rückkauf + 50 % der bezahlten Verbesserungen
+   - Händler verkauft Material zum 3,5-fachen Ankaufspreis
+   ====================================================================== */
+const CHAPTER_MULT=[1,1.8,3.2,5.6];
+function cm(){ return CHAPTER_MULT[Math.max(0,Math.min(3,G.region||0))]; }
+function rint(a,b){ return a+Math.floor(Math.random()*(b-a+1)); }
+function goldK(){ return G.charm==='glocke'?1.4:1; }
+const MATS={
+  knochen:{n:'Knochen',sell:2,col:'#efe4cc'}, schaedel:{n:'Alter Schädel',sell:12,col:'#d8ccb0'},
+  stoff:{n:'Stofffetzen',sell:4,col:'#c3283a'}, leder:{n:'Lederreste',sell:5,col:'#9a6a42'},
+  eisen:{n:'Eisenschrott',sell:7,col:'#9a9aa8'}, pilz:{n:'Leuchtpilz',sell:5,col:'#7af0c8'},
+  seele:{n:'Seelensplitter',sell:16,col:'#c9a0ff'}, glocke:{n:'Glockenfragment',sell:30,col:'#e8b04a'} };
+const MAT_ORDER=['knochen','schaedel','stoff','leder','eisen','pilz','seele','glocke'];
+function matN(k){ return k==='knochen'?(G.bones||0):((G.mats||{})[k]||0); }
+function addMat(k,n){ if(k==='knochen') G.bones=Math.max(0,(G.bones||0)+n); else { G.mats=G.mats||{}; G.mats[k]=Math.max(0,(G.mats[k]||0)+n); } }
+/* ---------------- Ausrüstung ---------------- */
+const WEAPONS={
+  rose:{n:'Rosenklinge',dmg:10,price:0,tier:1,d:'Dein treues Startschwert'},
+  vampir:{n:'Vampirklinge',dmg:12,price:0,tier:2,d:'6 % Chance je Treffer auf ½ Herz Lebensraub',special:true},
+  rost:{n:'Rostklinge',dmg:13,price:200,tier:1,unlock:0,d:'Schwer, ehrlich, ein bisschen rostig'},
+  moos:{n:'Moosspalter',dmg:17,price:440,tier:2,unlock:1,d:'Aus dem Pilzhain, riecht nach Regen'},
+  grab:{n:'Grabzahnsäbel',dmg:22,price:830,tier:3,unlock:2,d:'Aus Spinnentempel-Stahl'},
+  verdammt:{n:'Klinge der Verdammten',dmg:28,price:1550,tier:4,unlock:3,d:'Längere Reichweite. Flüstert nachts.'},
+  pfand:{n:'Pfandklinge',dmg:24,price:650,bells:2,tier:3,black:true,d:'Verflucht: jeder kassierte Treffer kostet 5 Gold'} };
+const CAPES={
+  kult:{n:'Einfacher Kultumhang',price:0,tier:1,shield:0,d:'Nichts Besonderes'},
+  wander:{n:'Umhang des Wanderers',price:140,tier:1,unlock:0,shield:1,d:'1 Schutzpunkt pro Raum'},
+  sumpf:{n:'Sumpfgewand',price:320,tier:2,unlock:1,shield:1,poison:true,d:'1 Schutzpunkt, Gift, Netze und Schlamm bremsen kaum'},
+  schatten:{n:'Schattenmantel',price:600,tier:3,unlock:2,shield:2,roll:true,d:'2 Schutzpunkte, schnellere Rolle mit längerem Schutz'},
+  verdammt:{n:'Gewand der Verdammten',price:1150,tier:4,unlock:3,shield:2,pd:true,d:'2 Schutzpunkte, perfektes Ausweichen gibt 3 Volltreffer'} };
+const CHARMS={
+  glocke:{n:'Gierige Glocke',price:300,bells:1,d:'+40 % Gold, aber Gegner sind 12 % schneller'},
+  dorn:{n:'Dornenpfand',price:280,bells:1,d:'Perfektes Ausweichen: +1 Volltreffer, Tränke heilen halb'},
+  schuld:{n:'Schuldschein',price:250,bells:0,d:'Beim Tod kein Goldverlust, aber Räume starten ohne Schutzpunkte'} };
+const TIERK=[0,1,1.8,3.2,5.6];
+function shopInit(){
+  if(!G.mats) G.mats={}; if(!G.wown) G.wown=['rose']; if(!G.wlv) G.wlv={}; if(!G.cown) G.cown=['kult']; if(!G.clv) G.clv={};
+  if(!G.capeK) G.capeK='kult'; if(!G.chown) G.chown=[]; if(G.potS===undefined) G.potS=0; if(G.potL===undefined) G.potL=0;
+  if(!G.deco) G.deco={}; if(G.expGold===undefined) G.expGold=0; if(!G.dreamWins) G.dreamWins={};
+  if(G.sword&&!G.wown.includes(G.sword)) G.wown.push(G.sword);
+  // alte Spielstände: Schärfen/Umhänge/Tränke aus der Vorversion übernehmen
+  if(typeof G.cape==='number'&&G.cape>0){ const map=['kult','wander','sumpf','schatten']; for(let i=1;i<=G.cape;i++) if(!G.cown.includes(map[i])) G.cown.push(map[i]); G.capeK=map[G.cape]; G.cape=undefined; }
+  if(G.swordLvl>0){ G.wlv[G.sword||'rose']=Math.min(2,G.swordLvl); G.swordLvl=0; }
+  if(G.potions>0){ G.potS=Math.min(2,G.potions); G.potions=0; }
+}
+function weaponMul(){ const w=WEAPONS[G.sword]||WEAPONS.rose; return w.dmg/10*(1+0.08*(G.wlv[G.sword]||0)); }
+function weaponRange(){ return G.sword==='verdammt'?1.12:1; }
+function weaponDmgShown(k){ const w=WEAPONS[k]; return Math.round(w.dmg*(1+0.08*(G.wlv[k]||0))*10)/10; }
+function cape(){ return CAPES[G.capeK]||CAPES.kult; }
+function shieldMax(){ if(G.charm==='schuld') return 0; const c=cape(), lv=G.clv[G.capeK]||0; return c.shield+(lv>=2?1:0); }
+function shieldRecharge(){ const lv=G.clv[G.capeK]||0; return lv>=2?18:lv>=1?30:0; }
+function capeSpeed(){ return cape().roll?1.05:1; }
+function capeRollCd(){ return cape().roll?0.75:1; }
+function capeDodge(){ return false; }
+function capePoison(){ return !!cape().poison; }
+/* Gegner werden mit deiner Ausrüstung etwas zäher: Upgrades lohnen sich, Bosse werden aber nie zu Schwämmen */
+function gearHpK(){ return 1+0.5*(weaponMul()-1); }
+const REGION_HP=[1,1.2,1.45,1.7];
+function scaleSpawn(o){
+  if(scene!=='room'||!(o.hp>0)) return;
+  if(isBossLike(o)){ const k=gearHpK(); o.hp=Math.round(o.hp*k); if(o.max) o.max=Math.round(o.max*k); if(o.maxhp) o.maxhp=o.hp; return; }
+  if(o.type==='dummy'||o.type==='mclone') return; const k=REGION_HP[Math.min(3,G.region||0)]*gearHpK(); o.hp=Math.max(1,Math.round(o.hp*k)); if(o.max) o.max=o.hp;
+}
+/* ---------------- Beute ---------------- */
+const DROPS={
+  skel:[['knochen',1,1,2],['schaedel',0.08,1,1]], skelR:[['knochen',1,1,2],['schaedel',0.2,1,1],['eisen',0.15,1,1]],
+  cat:[['stoff',0.4,1,1],['seele',0.12,1,1],['knochen',0.3,1,1]], frog:[['leder',0.3,1,1],['knochen',0.45,1,1]],
+  hedge:[['leder',0.4,1,1],['knochen',0.45,1,1]], shroom:[['pilz',0.6,1,2]], bat:[['leder',0.35,1,1],['knochen',0.4,1,1]],
+  spider:[['stoff',0.3,1,1],['seele',0.06,1,1],['knochen',0.3,1,1]], thug:[['eisen',0.3,1,1],['stoff',0.3,1,1]],
+  nager:[['leder',1,1,1],['knochen',1,1,2]] };
+const BOSS_LOOT={nager:{g:[35,55],m:[['eisen',3],['leder',3],['knochen',6]]},quak:{g:[35,55],m:[['pilz',5],['seele',2],['leder',2]]},
+  bookie:{g:[35,55],m:[['eisen',4],['stoff',4],['glocke',1]]},morruk:{g:[35,55],m:[['glocke',3],['seele',3],['eisen',2]]},damm:{g:[90,140],m:[['seele',5],['glocke',2]]}};
+function spawnMat(x,y,k,n){ if(scene!=='room') return; for(let i=0;i<n;i++){ const a=rand(0,TAU), sp=rand(80,180); R_.items.push(k==='knochen'?{kind:'bone',x,y,t:0,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp*0.6,z:20,vz:rand(220,320),rot:rand(0,TAU),n:1}:{kind:'mat',m:k,x,y,t:0,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp*0.6,z:20,vz:rand(220,320),rot:rand(0,TAU)}); } }
+function spawnGold(x,y,n){ if(scene!=='room'||n<=0) return; n=Math.round(n*goldK()); let left=n; while(left>0){ const v=left>=40?20:left>=10?5:left>=4?2:1; left-=v; const a=rand(0,TAU), sp=rand(70,170); R_.items.push({kind:'gold',v,x,y,t:0,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp*0.6,z:20,vz:rand(240,340),rot:rand(0,TAU),n:1}); } }
+/* aufgerufen statt der alten Knochen-Beute (dropBones) */
+function dropLoot(e){
+  if(scene!=='room'||e.type==='dummy'||e.illu||e.type==='mclone'||e.type==='tadpole') return;
+  const m=cm();
+  if(isBossLike(e)){
+    if(e.type==='nager'){ for(const d of DROPS.nager){ if(Math.random()<d[1]) spawnMat(e.x,e.y,d[0],rint(d[2],d[3])); } if(enemies.some(o=>o.type==='nager'&&o!==e&&!o.downed&&!o.dying)) return; }
+    bossLoot(bkey(e),e.x,e.y); return; }
+  // Gold und Material getrennt auswürfeln
+  if(e.elite){ spawnGold(e.x,e.y,rint(8,14)*m); spawnMat(e.x,e.y,'seele',1); if(Math.random()<0.5) spawnMat(e.x,e.y,'eisen',1); }
+  else if(Math.random()<0.65) spawnGold(e.x,e.y,rint(1,3)*m);
+  for(const d of (DROPS[e.type]||[])) if(Math.random()<d[1]) spawnMat(e.x,e.y,d[0],rint(d[2],d[3]));
+  if((G.region||0)>=2&&Math.random()<0.03) spawnMat(e.x,e.y,'glocke',1);
+}
+function bossLoot(k,x,y){
+  const L0=BOSS_LOOT[k]; if(!L0) return; if(RM) return; // Traumkämpfe belohnen separat
+  if(G.flags['loot_'+k]) return; G.flags['loot_'+k]=true;
+  const g=Math.round(rint(L0.g[0],L0.g[1])*cm());
+  if(scene==='room'&&k!=='damm') spawnGold(x,y,g); else { G.gold+=Math.round(g*goldK()); }
+  for(const q of L0.m){ if(scene==='room'&&k!=='damm') spawnMat(x,y,q[0],q[1]); else addMat(q[0],q[1]); }
+  floater(x,y-180,'Erstsieg-Beute!','#ffd23a');
+}
+function lootChest(c){
+  SFX.chest(); addShake(5); hearts(c.x,c.y-40,3); const m=cm();
+  spawnGold(c.x,c.y,rint(20,35)*m); spawnMat(c.x,c.y,'eisen',rint(1,3));
+  const extra=pick(['stoff','leder','knochen','pilz']); spawnMat(c.x,c.y,extra,rint(1,2)); if(Math.random()<0.25) spawnMat(c.x,c.y,'seele',1);
+  for(let i=0;i<16;i++) addPart({x:c.x,y:c.y-40,vx:rand(-200,200),vy:rand(-360,-140),life:rand(.8,1.3),size:rand(3,5),color:Math.random()<.6?'#e8c050':'#efe4cc',kind:'spark',g:600});
+}
+function pickGold(it){ const v=it.v||1; G.gold=(G.gold||0)+v; G.expGold=(G.expGold||0)+v; tone(1500+Math.random()*300,0.05,'triangle',0.05,2000); addPart({x:P.x+20,y:P.y-100,vx:0,vy:-40,life:0.6,size:16,color:'#f6cf5a',kind:'text',txt:'+'+v}); }
+function pickMat(it){ addMat(it.m,1); const M=MATS[it.m]; tone(1100,0.06,'square',0.04,1500); addPart({x:P.x+20,y:P.y-100,vx:0,vy:-40,life:0.8,size:14,color:M.col,kind:'text',txt:'+1 '+M.n}); }
+/* Tod: 60 % der Expeditionsbeute bleiben */
+function applyDeathLoss(){
+  G.deadLoss=0; if(scene!=='room'||RM||G.charm==='schuld') return;
+  const loss=Math.floor((G.expGold||0)*0.4); if(loss<=0) return; G.gold=Math.max(0,G.gold-loss); G.expGold-=loss; G.deadLoss=loss;
+}
+/* ---------------- Zeichnen: Gold, Material ---------------- */
+function drawGoldIcon(x,y,s){ drawCoin(x,y,0.4,s*1.1); }
+function drawGoldItem(it){ const z=it.z||0; shadowE(it.x,it.y,7,3,.35); const s=it.v>=20?1.9:it.v>=5?1.5:it.v>=2?1.25:1.05; drawCoin(it.x,it.y-8-z,it.rot+T*3,s); if(it.v>=5){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.3; ctx.drawImage(fireSprite('255,210,90'),it.x-20,it.y-30-z,40,40); ctx.restore(); } }
+function drawMatIcon(k,x,y,s){
+  if(k==='knochen'){ drawBoneItem(null,x,y+6,s); return; }
+  ctx.save(); ctx.translate(Math.round(x),Math.round(y)); ctx.scale(s,s); const c=MATS[k].col;
+  const box=(w,h,col)=>{ ctx.fillStyle=OUT; ctx.fillRect(-w/2-1,-h/2-1,w+2,h+2); ctx.fillStyle=col; ctx.fillRect(-w/2,-h/2,w,h); };
+  if(k==='schaedel'){ box(12,10,'#e8dcc0'); ctx.fillStyle=OUT; ctx.fillRect(-4,-2,3,3); ctx.fillRect(1,-2,3,3); ctx.fillRect(-2,3,4,2); }
+  else if(k==='stoff'){ ctx.rotate(0.2); box(13,9,c); ctx.fillStyle='#ff7a8a'; ctx.fillRect(-6,-4,4,2); ctx.fillStyle='#7a1622'; ctx.fillRect(1,2,6,2); }
+  else if(k==='leder'){ ctx.rotate(-0.2); box(13,10,c); ctx.fillStyle='#c8946a'; ctx.fillRect(-5,-4,5,2); ctx.fillStyle='#5a3a24'; ctx.fillRect(-1,1,5,1); }
+  else if(k==='eisen'){ box(12,8,c); ctx.fillStyle='#d8d8e8'; ctx.fillRect(-5,-3,6,2); ctx.fillStyle='#5a5a68'; ctx.fillRect(1,1,4,2); }
+  else if(k==='pilz'){ ctx.fillStyle=OUT; ctx.fillRect(-2,-1,4,8); ctx.fillStyle='#efe4cc'; ctx.fillRect(-1,0,2,6); ctx.fillStyle=OUT; ctx.beginPath(); ctx.ellipse(0,-2,8,5,0,Math.PI,TAU); ctx.fill(); ctx.fillStyle=c; ctx.beginPath(); ctx.ellipse(0,-2,6.5,3.8,0,Math.PI,TAU); ctx.fill(); }
+  else if(k==='seele'){ ctx.fillStyle=OUT; ctx.beginPath(); ctx.moveTo(0,-9); ctx.lineTo(6,0); ctx.lineTo(0,9); ctx.lineTo(-6,0); ctx.closePath(); ctx.fill(); ctx.fillStyle=c; ctx.beginPath(); ctx.moveTo(0,-7); ctx.lineTo(4,0); ctx.lineTo(0,7); ctx.lineTo(-4,0); ctx.closePath(); ctx.fill(); ctx.fillStyle='#fff'; ctx.fillRect(-1,-4,2,3); }
+  else if(k==='glocke'){ ctx.fillStyle=OUT; ctx.beginPath(); ctx.moveTo(-7,4); ctx.quadraticCurveTo(-6,-8,0,-8); ctx.quadraticCurveTo(6,-8,7,4); ctx.closePath(); ctx.fill(); ctx.fillStyle=c; ctx.beginPath(); ctx.moveTo(-5,3); ctx.quadraticCurveTo(-4,-6,0,-6); ctx.quadraticCurveTo(4,-6,5,3); ctx.closePath(); ctx.fill(); ctx.fillStyle=OUT; ctx.fillRect(-2,-1,7,2); }
+  ctx.restore();
+}
+function drawMatItem(it){ const z=it.z||0; shadowE(it.x,it.y,7,3,.35); ctx.save(); ctx.translate(it.x,it.y-8-z); ctx.rotate(z>0?it.rot:0); drawMatIcon(it.m,0,0,1.1); ctx.restore();
+  if(it.m==='seele'||it.m==='glocke'){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.3+Math.sin(T*5)*0.1; ctx.drawImage(fireSprite(it.m==='seele'?'200,150,255':'255,200,90'),it.x-18,it.y-28-z,36,36); ctx.restore(); } }
+function drawGoldHUD(y){ drawGoldIcon(36,y+6,1.15); textO(`${G.gold||0} Gold`,58,y,15,FB,'#f6cf5a','left',3,700);
+  const pots=(G.potS||0)+(G.potL||0); if(pots>0) textO(`🧪 ${pots} (H)`,150,y,14,FB,'#ff8aa0','left',3,700);
+  textO('Tab: Beutel',58,y+18,11,FB,'#8a7a6a','left',3,600); }
+/* ---------------- Schutzpunkte (Umhänge) ---------------- */
+function resetShield(){ P.shield=shieldMax(); P.shT=0; }
+function shieldAbsorb(){ if(!(P.shield>0)) return false; P.shield--; P.shT=0; P.iframes=0.7; SFX.place(); noise(0.1,0.25,3000); addShake(4);
+  floater(P.x,P.y-120,'Schutz!','#9fd8ff'); for(let i=0;i<12;i++){ const a=i/12*TAU; addPart({x:P.x,y:P.y-30,vx:Math.cos(a)*200,vy:Math.sin(a)*140,life:.4,size:rand(2,4),color:'#bfe8ff',kind:'spark'}); } return true; }
+function updateShield(dt){ const mx=shieldMax(), rc=shieldRecharge(); if(P.shield===undefined) resetShield(); if(P.shield>mx) P.shield=mx;
+  if(rc&&P.shield<mx){ P.shT=(P.shT||0)+dt; if(P.shT>rc){ P.shT=0; P.shield++; floater(P.x,P.y-110,'Schutz geladen','#9fd8ff'); tone(880,0.12,'triangle',0.05); } } }
+function drawShieldHUD(){ const mx=shieldMax(); if(!mx) return; for(let i=0;i<mx;i++){ const x=40+i*24, y=62, on=i<(P.shield||0);
+  ctx.beginPath(); ctx.moveTo(x,y-9); ctx.lineTo(x+8,y-6); ctx.lineTo(x+7,y+3); ctx.lineTo(x,y+9); ctx.lineTo(x-7,y+3); ctx.lineTo(x-8,y-6); ctx.closePath(); ctx.fillStyle=on?'#6ab8ff':'#2a3040'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle=OUT; ctx.stroke();
+  if(on){ ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fillRect(x-4,y-5,3,4); } }
+  const rc=shieldRecharge(); if(rc&&(P.shield||0)<mx){ const k=(P.shT||0)/rc; ctx.fillStyle='#6ab8ff'; ctx.fillRect(32,74,Math.round(mx*24*k),3); } }
+/* ---------------- Heiltränke ---------------- */
+function usePotion(){
+  const miss=G.maxHp-P.hp; if(miss<=0){ floater(P.x,P.y-110,'Schon gesund','#b9a98f'); return; }
+  let big=G.potL>0&&(miss>=3||G.potS<=0); if(!big&&G.potS<=0){ floater(P.x,P.y-110,'Kein Heiltrank','#b9a98f'); return; }
+  let heal=big?4:2; if(G.charm==='dorn') heal=Math.ceil(heal/2); if(big) G.potL--; else G.potS--;
+  P.hp=Math.min(G.maxHp,P.hp+heal); SFX.heart(); hearts(P.x,P.y-60,big?10:6); floater(P.x,P.y-120,big?'Großer Heiltrank!':'Gluck gluck!','#ff8aa0');
+}
+/* ---------------- Kosten, Freischaltung ---------------- */
+function unlocked(item){ return item.unlock===undefined||!!(G.regionDone&&G.regionDone[item.unlock]); }
+function wUpCost(k,lv){ const t=TIERK[WEAPONS[k].tier]; const base=lv===0?{g:80,knochen:8,eisen:3}:{g:180,knochen:14,eisen:6}; const c={g:Math.round(base.g*t),knochen:Math.round(base.knochen*Math.min(t,2)),eisen:Math.round(base.eisen*Math.min(t,2))}; if(WEAPONS[k].tier>=3) c.seele=lv===0?2:4; if(k==='vampir') c.schaedel=lv===0?1:2; return c; }
+function cUpCost(k,lv){ const t=TIERK[CAPES[k].tier]; const base=lv===0?{g:65,stoff:6,leder:3}:{g:145,stoff:12,leder:7}; const c={g:Math.round(base.g*t),stoff:Math.round(base.stoff*Math.min(t,2)),leder:Math.round(base.leder*Math.min(t,2))}; if(CAPES[k].tier>=3) c.seele=lv===0?1:3; return c; }
+function canPay(c){ if((G.gold||0)<(c.g||0)) return false; for(const k in c) if(k!=='g'&&matN(k)<c[k]) return false; return true; }
+function pay(c){ G.gold-=c.g||0; for(const k in c) if(k!=='g') addMat(k,-c[k]); }
+function costTxt(c){ const p=[]; for(const k in c) if(k!=='g') p.push(c[k]+' '+MATS[k].n+(matN(k)<c[k]?' ✗':'')); return p.join(', '); }
+function upGoldPaid(lv,costFn,k){ let s=0; for(let i=0;i<lv;i++) s+=costFn(k,i).g; return s; }
+/* ---------------- Grimbarts Schmiede ---------------- */
+function smithFx(){ SFX.chest(); addShake(6); fxAnim('fx_poof',P.x,P.y-40,1.1); for(let i=0;i<14;i++) addPart({x:SMITH.x-40,y:SMITH.y+20,vx:rand(-200,200),vy:rand(-300,-80),life:rand(.4,.8),size:rand(2,4),color:'#ffb050',kind:'spark',g:600}); }
+function openShop(){ econInit(); openSmith(); }
+function openSmith(){
+  askChoice('Grimbarts Schmiede',[{label:'Waffen kaufen',sub:'Neue Ränge mit jedem geschafften Portal'},{label:'Umhänge kaufen',sub:'Umhänge geben Schutzpunkte und Eigenschaften'},{label:'Verbessern',sub:'Gold + Material, zwei Stufen pro Teil'},{label:'Ausrüsten / Verkaufen',sub:'Wechseln, alte Teile zurückgeben'},{label:'Tschüss'}],i=>{
+    if(i===0) smithBuy('w'); else if(i===1) smithBuy('c'); else if(i===2) smithUpgrade(); else if(i===3) smithGear();
+    else say([{who:'schmied',text:pick(['Komm wieder, wenn die Taschen klimpern.','Pass auf deine Klinge auf. Und auf die Maus.','*KLONG* Ja ja, tschüss.'])}]); },`Gold: ${G.gold} · Waffe: ${WEAPONS[G.sword||'rose'].n} · Umhang: ${cape().n}`);
+  CHOICE.shop=true;
+}
+function smithBuy(kind){
+  const T0=kind==='w'?WEAPONS:CAPES, own=kind==='w'?G.wown:G.cown; const keys=Object.keys(T0).filter(k=>T0[k].price>0&&!T0[k].black);
+  const opts=keys.map(k=>{ const it=T0[k], has=own.includes(k), ok=unlocked(it);
+    return {label:it.n+(kind==='w'?` · Schaden ${it.dmg}`:''),sub:ok?it.d:`Gesperrt: erst nach Portal ${it.unlock+1}`,price:has?undefined:it.price,tag:has?'✓ besitzt':'',dis:has||!ok||G.gold<it.price,why:has?'Hast du schon':!ok?'Noch nicht freigeschaltet':'Zu wenig Gold',k}; });
+  opts.push({label:'Zurück'});
+  askChoice(kind==='w'?'Waffen':'Umhänge',opts,i=>{ const o=opts[i]; if(!o.k){ openSmith(); return; }
+    const it=T0[o.k]; G.gold-=it.price; own.push(o.k); if(kind==='w') G.sword=o.k; else { G.capeK=o.k; resetShield(); }
+    smithFx(); banner={text:it.n+'!',sub:(kind==='w'?'Schaden '+it.dmg+' · ':'')+it.d,t:0,small:true}; setTimeout(()=>smithBuy(kind),60); },`Gold: ${G.gold}`);
+  CHOICE.shop=true;
+}
+function smithUpgrade(){
+  const wk=G.sword||'rose', ck=G.capeK, wl=G.wlv[wk]||0, cl=G.clv[ck]||0;
+  const wc=wl<2?wUpCost(wk,wl):null, cc=cl<2?cUpCost(ck,cl):null;
+  const opts=[
+    wc?{label:`${WEAPONS[wk].n} +${wl+1}`,sub:`Schaden ${weaponDmgShown(wk)} → ${Math.round(WEAPONS[wk].dmg*(1+0.08*(wl+1))*10)/10} · ${costTxt(wc)}`,price:wc.g,dis:!canPay(wc),why:'Gold oder Material fehlt',up:'w',c:wc}:{label:`${WEAPONS[wk].n} +2`,sub:'Voll verbessert',dis:true,tag:'✓',why:'Schon perfekt'},
+    cc?{label:`${cape().n} +${cl+1}`,sub:(cl===0?'Schutzpunkt lädt nach 30 s wieder auf':'+1 Schutzpunkt, lädt nach 18 s')+' · '+costTxt(cc),price:cc.g,dis:!canPay(cc),why:'Gold oder Material fehlt',up:'c',c:cc}:{label:`${cape().n} +2`,sub:'Voll verbessert',dis:true,tag:'✓',why:'Schon perfekt'},
+    {label:'Zurück'}];
+  askChoice('Verbessern',opts,i=>{ const o=opts[i]; if(!o.up){ openSmith(); return; } if(!canPay(o.c)) return; pay(o.c);
+    if(o.up==='w'){ G.wlv[wk]=(G.wlv[wk]||0)+1; banner={text:WEAPONS[wk].n+' +'+G.wlv[wk],sub:'Schaden '+weaponDmgShown(wk),t:0,small:true}; } else { G.clv[ck]=(G.clv[ck]||0)+1; resetShield(); banner={text:cape().n+' +'+G.clv[ck],sub:G.clv[ck]>=2?'+1 Schutzpunkt':'Schutz lädt sich auf',t:0,small:true}; }
+    smithFx(); setTimeout(smithUpgrade,60); },matLine(['knochen','eisen','stoff','leder','seele']));
+  CHOICE.shop=true;
+}
+function matLine(keys){ return 'Gold '+G.gold+' · '+keys.map(k=>MATS[k].n+' '+matN(k)).join(' · '); }
+function smithGear(){
+  const opts=[];
+  for(const k of G.wown){ const w=WEAPONS[k]; const eq=G.sword===k; opts.push({label:(eq?'▶ ':'')+w.n+((G.wlv[k]||0)?' +'+G.wlv[k]:''),sub:`Schaden ${weaponDmgShown(k)} · ${w.d}`,tag:eq?'angelegt':'',t:'w',k}); }
+  for(const k of G.cown){ const c=CAPES[k]; const eq=G.capeK===k; opts.push({label:(eq?'▶ ':'')+c.n+((G.clv[k]||0)?' +'+G.clv[k]:''),sub:c.d,tag:eq?'angelegt':'',t:'c',k}); }
+  opts.push({label:'Alte Ausrüstung verkaufen'}); opts.push({label:'Zurück'});
+  askChoice('Ausrüsten',opts,i=>{ const o=opts[i]; if(o.label==='Zurück'){ openSmith(); return; } if(o.label.startsWith('Alte')){ smithSell(); return; }
+    if(o.t==='w'){ G.sword=o.k; G.weaponOn=true; } else { G.capeK=o.k; resetShield(); } SFX.place(); setTimeout(smithGear,60); },'Klick wählt aus, was du trägst');
+  CHOICE.shop=true;
+}
+function sellValue(t,k){ const it=t==='w'?WEAPONS[k]:CAPES[k]; const lv=t==='w'?(G.wlv[k]||0):(G.clv[k]||0); return Math.floor(it.price*0.4)+Math.floor(upGoldPaid(lv,t==='w'?wUpCost:cUpCost,k)*0.5); }
+function smithSell(){
+  const opts=[];
+  for(const k of G.wown){ if(k===G.sword||k==='rose'||k==='vampir') continue; opts.push({label:WEAPONS[k].n,sub:'40 % des Preises + die Hälfte der Verbesserungen',tag:'+'+sellValue('w',k)+' Gold',t:'w',k}); }
+  for(const k of G.cown){ if(k===G.capeK||k==='kult') continue; opts.push({label:CAPES[k].n,sub:'40 % des Preises + die Hälfte der Verbesserungen',tag:'+'+sellValue('c',k)+' Gold',t:'c',k}); }
+  if(!opts.length) opts.push({label:'Nichts zu verkaufen',sub:'Angelegtes, Startsachen und Sonderstücke behältst du',dis:true,why:'Nichts da'});
+  opts.push({label:'Zurück'});
+  askChoice('Ausrüstung verkaufen',opts,i=>{ const o=opts[i]; if(!o.k){ smithGear(); return; } const v=sellValue(o.t,o.k); G.gold+=v;
+    if(o.t==='w'){ G.wown=G.wown.filter(x=>x!==o.k); delete G.wlv[o.k]; } else { G.cown=G.cown.filter(x=>x!==o.k); delete G.clv[o.k]; }
+    SFX.chest(); floater(P.x,P.y-120,'+'+v+' Gold','#f6cf5a'); setTimeout(smithSell,60); },'Gold: '+G.gold);
+  CHOICE.shop=true;
+}
+/* ---------------- Tortuga, der reisende Händler ---------------- */
+const STOCK=[['knochen','stoff','leder','eisen'],['eisen','pilz','seele','schaedel']];
+function stockSet(){ const done=(G.regionDone||[]).filter(Boolean).length; return STOCK[Math.floor(done/2)%2]; }
+function potPrice(big){ const k=1+0.35*Math.min(3,G.region||0); return Math.round((big?65:35)*k); }
+/* behält automatisch, was für die nächste Verbesserung von Waffe und Umhang gebraucht wird (+ Ritual-Knochen) */
+function reserveOf(k){
+  let r=0; const wk=G.sword||'rose', ck=G.capeK; const wl=G.wlv[wk]||0, cl=G.clv[ck]||0;
+  if(wl<2){ const c=wUpCost(wk,wl); r=Math.max(r,c[k]||0); } if(cl<2){ const c=cUpCost(ck,cl); r=Math.max(r,c[k]||0); }
+  if(k==='knochen'&&!G.pet) r=Math.max(r,BONES_NEEDED); if(k==='glocke') r=Math.max(r,2);
+  return r;
+}
+function openMerchant(){
+  econInit(); const first=!G.talked.tortugaShop; G.talked.tortugaShop=true;
+  const go=()=>{ askChoice('Tortugas Wanderladen',[{label:'Verkaufen',sub:'Material, Schädel, Pilze und mehr'},{label:'Kaufen',sub:'Heiltränke und Material (Sortiment wechselt alle zwei Portale)'},{label:'Dorfschmuck',sub:'Zäune, Kerzen, Statuen für deinen Kult'},{label:'Tschüss'}],i=>{
+      if(i===0) merchSell(); else if(i===1) merchBuy(); else if(i===2) merchDeco(); else say([{who:'tortuga',text:pick(['Langsam, aber sicher. Wie ich.','Beehren Sie mich bald wieder. Ich bin dann noch hier. Bestimmt.','Gute Reise! Ich schleiche hinterher.'])}]); },'Gold: '+G.gold); CHOICE.shop=true; };
+  if(first) say([{who:'tortuga',text:'Na, sieh an! Ich bin jetzt reisender Händler. Ich kaufe, was du in den Portalen findest, und verkaufe Tränke und Material.'},{who:'tortuga',text:'Keine Sorge: Was du für deine nächste Verbesserung brauchst, kauf ich dir beim Großverkauf nicht weg. Ich bin ehrlich. Langsam, aber ehrlich.'}],go); else go();
+}
+function merchSell(){
+  const opts=[]; let total=0;
+  for(const k of MAT_ORDER){ const n=matN(k); if(n<=0) continue; const sur=Math.max(0,n-reserveOf(k)); total+=sur*MATS[k].sell;
+    opts.push({label:`${MATS[k].n} × ${n}`,sub:`${MATS[k].sell} Gold pro Stück`+(reserveOf(k)?` · Reserve ${Math.min(n,reserveOf(k))}`:''),tag:'1 für +'+MATS[k].sell,k}); }
+  opts.unshift({label:'Überschuss verkaufen',sub:'Behält, was du für die nächste Verbesserung brauchst',tag:'+'+total+' Gold',all:true,dis:total<=0,why:'Kein Überschuss'});
+  opts.push({label:'Zurück'});
+  askChoice('Verkaufen',opts.slice(0,8).concat(opts.length>8?[opts[opts.length-1]]:[]),i=>{ const list=opts.slice(0,8).concat(opts.length>8?[opts[opts.length-1]]:[]); const o=list[i];
+    if(o.label==='Zurück'){ openMerchant(); return; }
+    if(o.all){ let g=0; for(const k of MAT_ORDER){ const sur=Math.max(0,matN(k)-reserveOf(k)); if(sur>0){ g+=sur*MATS[k].sell; addMat(k,-sur); } } G.gold+=g; SFX.chest(); floater(P.x,P.y-120,'+'+g+' Gold','#f6cf5a'); }
+    else { addMat(o.k,-1); G.gold+=MATS[o.k].sell; tone(1300,0.06,'triangle',0.05); }
+    setTimeout(merchSell,60); },'Gold: '+G.gold);
+  CHOICE.shop=true;
+}
+function merchBuy(){
+  const pots=(G.potS||0)+(G.potL||0), full=pots>=2;
+  const opts=[{label:'Kleiner Heiltrank',sub:'Heilt 1 Herz · Taste H · höchstens 2 Tränke dabei',price:potPrice(false),dis:full||G.gold<potPrice(false),why:full?'Tasche voll':'Zu wenig Gold',p:'s'},
+              {label:'Großer Heiltrank',sub:'Heilt 2 Herzen',price:potPrice(true),dis:full||G.gold<potPrice(true),why:full?'Tasche voll':'Zu wenig Gold',p:'l'}];
+  for(const k of stockSet()){ const pr=Math.ceil(MATS[k].sell*3.5); opts.push({label:MATS[k].n,sub:'Du hast '+matN(k),price:pr,dis:G.gold<pr,why:'Zu wenig Gold',k}); }
+  opts.push({label:'Zurück'});
+  askChoice('Kaufen',opts,i=>{ const o=opts[i]; if(o.label==='Zurück'){ openMerchant(); return; }
+    G.gold-=o.price; if(o.p==='s') G.potS++; else if(o.p==='l') G.potL++; else addMat(o.k,1); SFX.chest(); setTimeout(merchBuy,60); },'Gold: '+G.gold);
+  CHOICE.shop=true;
+}
+/* ---------------- Dorfschmuck ---------------- */
+const DECOS={
+  zaun:{n:'Einfacher Kultzaun',price:25,d:'Knochenzaun am Feld'},
+  kerzen:{n:'Rituelle Kerzen',price:45,d:'Drei Schädelkerzen am Feuer'},
+  statue:{n:'Kleine Statue',price:90,d:'Ein steinerner Kultist'},
+  altar:{n:'Großer Altar',price:240,d:'Ein Schrein mit ewigem Licht'},
+  plan:{n:'Seltener Bauplan',price:350,d:'Schaltet Boss-Statuen frei'},
+  boss:{n:'Boss-Statue',price:600,d:'Ein besiegter Boss, in Stein gehauen'} };
+function merchDeco(){
+  const opts=[];
+  for(const k of ['zaun','kerzen','statue','altar','plan']){ const D=DECOS[k], has=!!G.deco[k]; opts.push({label:D.n,sub:D.d,price:has?undefined:D.price,tag:has?'✓ steht':'',dis:has||G.gold<D.price,why:has?'Steht schon':'Zu wenig Gold',k}); }
+  if(G.deco.plan){ const free=hubSouls().map(s=>s.key).filter(k=>!(G.deco.statues||[]).includes(k)&&BOSS_STATUE[k]); opts.push({label:'Boss-Statue',sub:free.length?'Wähle einen besiegten Boss':'Erst einen weiteren Boss besiegen',price:DECOS.boss.price,dis:!free.length||G.gold<DECOS.boss.price,why:free.length?'Zu wenig Gold':'Kein Boss verfügbar',k:'boss'}); }
+  opts.push({label:'Zurück'});
+  askChoice('Dorfschmuck',opts,i=>{ const o=opts[i]; if(o.label==='Zurück'){ openMerchant(); return; }
+    if(o.k==='boss'){ const free=hubSouls().filter(s=>!(G.deco.statues||[]).includes(s.key)&&BOSS_STATUE[s.key]); askChoice('Welcher Boss?',free.map(s=>({label:s.name})).concat([{label:'Zurück'}]),j=>{ if(j>=free.length){ merchDeco(); return; } G.gold-=DECOS.boss.price; G.deco.statues=(G.deco.statues||[]).concat([free[j].key]); placeHubDecos(); SFX.chest(); banner={text:'Boss-Statue: '+free[j].name,sub:'Steht jetzt in deinem Dorf',t:0,small:true}; setTimeout(merchDeco,60); }); return; }
+    G.gold-=DECOS[o.k].price; G.deco[o.k]=true; placeHubDecos(); SFX.chest(); if(o.k!=='plan') banner={text:DECOS[o.k].n,sub:'Steht jetzt in deinem Dorf',t:0,small:true}; setTimeout(merchDeco,60); },'Gold: '+G.gold);
+  CHOICE.shop=true;
+}
+const DECO_SPOTS={zaun:[[300,1140],[372,1162]],kerzen:[[812,1185],[988,1185],[745,1175]],statue:[[1420,862]],altar:[[545,500]]};
+const BOSS_STATUE={nager:{x:780,y:540},quak:{x:1020,y:540},bookie:{x:760,y:430},morruk:{x:1040,y:430}};
+function placeHubDecos(){
+  if(!HUB) return; const O=HUB.objs, S=HUB.solids, Li=HUB.lights;
+  for(let i=O.length-1;i>=0;i--) if(O[i].shopDeco) O.splice(i,1);
+  for(let i=S.length-1;i>=0;i--) if(S[i].shopDeco) S.splice(i,1);
+  for(let i=Li.length-1;i>=0;i--) if(Li[i].shopDeco) Li.splice(i,1);
+  const add=(nm,x,y,s,r,light,kind)=>{ O.push({nm,x,y,s,ph:Math.random()*TAU,flip:false,kind:kind||'static',wob:0,shopDeco:true}); if(r) S.push({x,y:y-4,r,shopDeco:true}); if(light) Li.push(Object.assign({x,y:y-40,shopDeco:true},light)); };
+  if(G.regionDone&&G.regionDone[0]){ add('stand',TORT.x,TORT.y,1.2,0); S.push({x:TORT.x-34,y:TORT.y-8,r:30,shopDeco:true},{x:TORT.x+20,y:TORT.y-8,r:32,shopDeco:true}); Li.push({x:TORT.x,y:TORT.y-60,r:150,i:.6,c:'rgba(255,190,110,.3)',shopDeco:true}); }
+  if(blackMarketHere()){ S.push({x:MORR_SPOT.x,y:MORR_SPOT.y-8,r:40,shopDeco:true}); Li.push({x:MORR_SPOT.x,y:MORR_SPOT.y-60,r:160,i:.7,c:'rgba(255,60,50,.35)',flick:1,shopDeco:true}); }
+  if(G.deco.zaun) for(const p of DECO_SPOTS.zaun) add('knochenzaun',p[0],p[1],0.9,0);
+  if(G.deco.kerzen) for(const p of DECO_SPOTS.kerzen) add('schaedelkerze',p[0],p[1],1.0,10,{r:110,i:.7,c:'rgba(255,110,60,.32)',flick:1},'skullc');
+  if(G.deco.statue) add('statue2',DECO_SPOTS.statue[0][0],DECO_SPOTS.statue[0][1],0.42,22,{r:120,i:.4,c:'rgba(200,190,255,.2)'});
+  if(G.deco.altar) add('schrein2',DECO_SPOTS.altar[0][0],DECO_SPOTS.altar[0][1],0.75,40,{r:180,i:.8,c:'rgba(255,120,200,.3)',flick:1});
+  for(const k of (G.deco.statues||[])){ const p=BOSS_STATUE[k]; if(!p) continue; O.push({nm:'saeule',x:p.x,y:p.y,s:1,ph:0,kind:'bstatue',boss:k,shopDeco:true}); S.push({x:p.x,y:p.y-4,r:26,shopDeco:true}); }
+}
+function drawBossStatue(o){
+  const x=o.x, y=o.y; shadowE(x,y,34,9,.45);
+  ctx.fillStyle=OUT; ctx.fillRect(x-30,y-26,60,28); ctx.fillStyle='#5a5464'; ctx.fillRect(x-28,y-24,56,24); ctx.fillStyle='#7a7484'; ctx.fillRect(x-28,y-24,56,5);
+  const ov={overlay:'#8a8494',overlayA:0.85};
+  if(o.boss==='quak') drawChar('quakbert','rot','south',0,x,y-24,Object.assign({s:1.25},ov));
+  else if(o.boss==='bookie') drawChar('buchmacher','rot','south',0,x,y-24,Object.assign({s:1.05},ov));
+  else if(o.boss==='nager') drawChar('anf','rot','south',0,x,y-24,Object.assign({s:1.0},ov));
+  else if(o.boss==='morruk'){ ctx.save(); ctx.filter='grayscale(1) brightness(0.9)'; pxDraw(morrukArt({lit:false,claw:0}),x,y-24,2.1); ctx.restore(); }
+  textO(BINFO[o.boss].name,x,y+14,11,FB,'#c8c0d0','center',3,700);
+}
+/* ---------------- Morruks Schwarzmarkt ---------------- */
+function blackMarketHere(){ return !!G.flags.morruk; }
+function openBlackMarket(){
+  econInit(); const first=!G.talked.blackMarket; G.talked.blackMarket=true;
+  const go=()=>{
+    const opts=[];
+    const pw=WEAPONS.pfand; const hasW=G.wown.includes('pfand');
+    opts.push({label:pw.n+' · Schaden '+pw.dmg,sub:pw.d+` · ${pw.bells} Glockenfragmente`,price:hasW?undefined:pw.price,tag:hasW?'✓ besitzt':'',dis:hasW||G.gold<pw.price||matN('glocke')<pw.bells,why:hasW?'Hast du schon':'Gold oder Glockenfragmente fehlen',w:'pfand'});
+    for(const k in CHARMS){ const c=CHARMS[k], has=G.chown.includes(k); opts.push({label:'Talisman: '+c.n,sub:c.d+(c.bells?` · ${c.bells} Glockenfragment`:''),price:has?undefined:c.price,tag:has?(G.charm===k?'angelegt':'✓ besitzt'):'',dis:has?false:(G.gold<c.price||matN('glocke')<c.bells),why:'Gold oder Glockenfragmente fehlen',c:k,has}); }
+    opts.push({label:G.charm?'Talisman ablegen':'Kein Talisman angelegt',dis:!G.charm,why:'Nichts angelegt',off:true});
+    opts.push({label:'Gehen'});
+    askChoice('Morruks Schwarzmarkt',opts,i=>{ const o=opts[i];
+      if(o.label==='Gehen'){ say([{who:'morruk',text:pick(['Alles hat seinen Preis. Komm wieder, wenn du ihn zahlen kannst.','Erzähl niemandem von mir. Das kostet extra.','Heh. Gute Geschäfte.'])}]); return; }
+      if(o.off){ G.charm=null; resetShield(); SFX.place(); setTimeout(openBlackMarket,60); return; }
+      if(o.w){ G.gold-=pw.price; addMat('glocke',-pw.bells); G.wown.push('pfand'); G.sword='pfand'; G.weaponOn=true; SFX.roar(); banner={text:'Pfandklinge',sub:pw.d,t:0,small:true}; }
+      if(o.c){ if(o.has){ G.charm=o.c; } else { const c=CHARMS[o.c]; G.gold-=c.price; addMat('glocke',-c.bells); G.chown.push(o.c); G.charm=o.c; SFX.roar(); banner={text:c.n,sub:c.d,t:0,small:true}; } resetShield(); }
+      setTimeout(openBlackMarket,60); },`Gold: ${G.gold} · Glockenfragmente: ${matN('glocke')}`+(G.charm?' · Talisman: '+CHARMS[G.charm].n:''));
+    CHOICE.shop=true; };
+  if(first) say([{who:'morruk',text:'Pssst. Hier drüben. Ja, ich. Tot? Ich? Ein Händler stirbt nicht, er macht Pause.'},{who:'morruk',text:'Ich verkaufe Dinge, die andere nicht verkaufen. Jedes hat einen Vorteil. Und einen Haken. Bezahlt wird mit Gold und Glockenfragmenten.'}],go); else go();
+}
+const MORR_SPOT={x:620,y:1000}, TORT={x:1250,y:950};
+function drawBlackMarket(){ const x=MORR_SPOT.x, y=MORR_SPOT.y;
+  shadowE(x,y,46,11,.5);
+  ctx.save(); ctx.globalAlpha=0.95; pxDraw(morrukArt({lit:Math.sin(T*2)>0.6,claw:0}),x+6,y-30,1.05); ctx.restore();
+  spr('stand',x,y+6,{s:1.0,overlay:'#2a0612',overlayA:0.55});
+  for(let i=0;i<3;i++){ drawCoin(x-22+i*20,y-50,T*2+i,0.8); }
+  drawMatIcon('glocke',x+30,y-52,1); drawMatIcon('seele',x-34,y-54,0.9);
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.25+Math.sin(T*3)*0.08; ctx.drawImage(fireSprite('255,80,60'),x-50,y-150,100,100); ctx.restore();
+  if(Math.hypot(P.x-x,P.y-y)<200) textO('Schwarzmarkt',x,y-150,13,FB,'#ff8a6a','center',3,800);
+}
+/* ---------------- Beutel (Tab) ---------------- */
+function drawBag(){
+  if(!keys.bag||mode!=='play'||dialog||CHOICE) return; econInit();
+  const w=520, h=330, x=W/2-w/2, y=H/2-h/2;
+  ctx.save(); ctx.fillStyle='rgba(8,3,6,.5)'; ctx.fillRect(0,0,W,H);
+  ctx.beginPath(); prr(x,y,w,h,14); ctx.fillStyle='#1a0e13'; ctx.fill(); ctx.lineWidth=4; ctx.strokeStyle=OUT; ctx.stroke(); ctx.lineWidth=2; ctx.strokeStyle='#8a6a3e'; ctx.stroke();
+  textO('Beutel',x+24,y+34,26,FD,'#f6cf5a','left',4,700); drawGoldIcon(x+w-120,y+30,1); textO(G.gold+' Gold',x+w-104,y+30,16,FB,'#f6cf5a','left',3,800);
+  if(G.expGold>0&&scene==='room') textO('davon auf dieser Expedition: '+G.expGold,x+w-24,y+52,11,FB,'#b9a98f','right',3,600);
+  MAT_ORDER.forEach((k,i)=>{ const cx=x+40+(i%4)*120, cy=y+90+Math.floor(i/4)*56; drawMatIcon(k,cx,cy,1.6); textO(matN(k)+'',cx+18,cy-6,17,FB,matN(k)?'#f3e7cf':'#5a4a4a','left',3,800); textO(MATS[k].n,cx+18,cy+12,11,FB,'#b9a98f','left',3,600); });
+  const wk=G.sword||'rose'; textO('Waffe: '+WEAPONS[wk].n+((G.wlv[wk]||0)?' +'+G.wlv[wk]:'')+' · Schaden '+weaponDmgShown(wk),x+24,y+222,15,FB,'#f3e7cf','left',3,700);
+  textO('Umhang: '+cape().n+((G.clv[G.capeK]||0)?' +'+G.clv[G.capeK]:'')+(shieldMax()?' · '+shieldMax()+' Schutzpunkte':''),x+24,y+246,15,FB,'#f3e7cf','left',3,700);
+  textO('Talisman: '+(G.charm?CHARMS[G.charm].n:'keiner')+' · Heiltränke: '+(G.potS||0)+' klein, '+(G.potL||0)+' groß',x+24,y+270,14,FB,'#d9c8b0','left',3,600);
+  textO('Schmied: Waffen & Umhänge · Tortuga: Handel & Dorfschmuck'+(blackMarketHere()?' · Morruk: Schwarzmarkt':''),x+24,y+300,12,FB,'#8a7a6a','left',3,600);
+  ctx.restore();
 }
 
 /* ======================================================================
@@ -6261,6 +6571,7 @@ function hubPlusInit(){
 }
 function updateHubPlus(dt){
   for(const s of (R_.souls||[])){ s.a+=dt*0.35; }
+  if(!prompt_&&!P.lock&&!dialog&&!CHOICE&&blackMarketHere()&&Math.hypot(P.x-MORR_SPOT.x,P.y-(MORR_SPOT.y+40))<90){ prompt_={x:MORR_SPOT.x,y:MORR_SPOT.y-170,label:'Schwarzmarkt'}; if(pressed.act) openBlackMarket(); }
   if(!prompt_&&!P.lock&&!dialog&&!CHOICE){ const n=soulNear(); if(n){ prompt_={x:n.sx,y:n.sy-50,label:'Traumkampf: '+n.s.name}; if(pressed.act) offerRematch(n.s); } }
   const C=R_.cas, D=R_.dealer; if(!C||!C.hub) return;
   D.t+=dt; D.moodT-=dt; if(D.moodT<=0) D.mood='idle'; D.blinkT-=dt; if(D.blinkT<-0.15) D.blinkT=rand(1.5,3.5);
@@ -6350,11 +6661,12 @@ function enterHub(back){
   L.followers=makeFollowers();
   resetEntities();
   L.npcs=[{sp:'verris',speaker:'verris',x:770,y:820,ph:0,s:1,label:'Verris',exclaim:!G.tutorialDone,hop:0}];
+  if(G.regionDone[0]) L.npcs.push({sp:'kroeteH',speaker:'tortuga',talk:'tortuga',x:TORT.x-6,y:TORT.y+62,ph:2,label:'Tortuga',exclaim:!G.talked.tortugaShop,hop:0,front:'south'});
   if(G.regionDone[0]) L.npcs.push({sp:'schmied',speaker:'schmied',talk:'schmied',x:SMITH.x-70,y:SMITH.y+40,ph:0,label:'Grimbart',anim:'hammer',exclaim:G.sword!=='vampir',hop:0});
   enemies.push({type:'dummy',x:1060,y:860,hp:1e9,wob:0,r:20,flash:0,t:0,face:1,hitBy:-1});
   if(back){ placePlayer(PORTALS[back-1].x,PORTALS[back-1].y+70,'south'); P.hp=G.maxHp; }
   else placePlayer(820,900,'south');
-  R_={t:0,type:'hub',back}; hubPlusInit(); if(G.tutorialDone) saveGame();
+  R_={t:0,type:'hub',back}; econInit(); G.expGold=0; resetShield(); placeHubDecos(); hubPlusInit(); if(G.tutorialDone) saveGame();
   makeCritters('hub',7,6); makePet();
   banner={text:'Die Lichtung',sub:'Das Zuhause der Capybara-Gemeinde',t:0};
   hint=G.tutorialDone?'Das leuchtende Portal im Norden wartet.':'';
@@ -6376,7 +6688,7 @@ function enterRoomById(id,fromDir){
   else placePlayer(L.cx-L.rx*0.55,L.cy+20,'east');
   P.hp=Math.max(P.hp,1);
   const cleared=!!G.cleared[id];
-  R_={t:0,type:rm.type,npcs:[],items:[]};
+  R_={t:0,type:rm.type,npcs:[],items:[]}; resetShield();
   hint='';
   if(!G.visited['_b_'+id]){ G.visited['_b_'+id]=true; banner={text:rm.name,sub:reg.name+' · '+rm.sub,t:0}; }
   else banner={text:rm.name,sub:reg.name,t:0,small:true};
@@ -6423,7 +6735,7 @@ function enterRoomById(id,fromDir){
   if(rm.type==='exit'){ R_.gate={x:L.cx,y:L.ex.N?L.cy+L.ry*0.35:L.cy-L.ry*0.35}; L.solids=L.solids.filter(s=>!s.gate); for(const s2 of [[-52,0,18],[52,0,18]]) L.solids.push({x:R_.gate.x+s2[0],y:R_.gate.y+s2[1],r:s2[2],gate:true}); hint='Der Wegstein bringt dich zurück ins Dorf.'; }
   R_.stakes=[]; R_.bands=[];
   { const nF=rm.type==='boss'||rm.type==='boss3'||rm.type==='mini'?0:rm.type==='town'?5:4, nB=rm.type==='boss'||rm.type==='mini'||reg.key==='spinne'?0:rm.type==='town'?6:3; makeCritters(rm.type==='town'?'stadt':reg.key,nF,nB); }
-  if(rm.type==='boss'&&!G.won){ spawnEnemy('damm',L.cx,L.cy-40,{boss:true,hp:72,max:72,r:70,state:'sleep',phase:1,sink:1,mouth:0,arms:0,ang:0,face:1}); R_.introAt=1.0; hint=''; }
+  if(rm.type==='boss'&&!G.won){ spawnEnemy('damm',L.cx,L.cy-40,{boss:true,hp:90,max:90,r:70,state:'sleep',phase:1,sink:1,mouth:0,arms:0,ang:0,face:1}); R_.introAt=1.0; hint=''; }
   makePet();
   snapCam();
 }
@@ -6434,7 +6746,8 @@ function sealFlag(d){ const rm=curRoom(); return !!(rm&&rm.seal&&rm.seal[d]&&!G.
 function exitOpen(d){ if(scene!=='room') return false; return !roomLocked()&&!sealFlag(d); }
 function roomClear(){
   const rm=curRoom(); if(!rm||G.cleared[rm.id]) return;
-  G.cleared[rm.id]=true; SFX.win(); econRoomClear();
+  G.cleared[rm.id]=true; SFX.win();
+  if(rm.waves&&rm.waves.length>=2&&!R_.chest&&!RM) setTimeout(()=>{ if(scene==='room'&&curRoom()===rm&&!R_.chest){ spawnChest(false,{loot:true}); SFX.chest(); } },900);
   if(rm.flag) G.flags[rm.flag]=true;
   banner={text:'Raum geschafft!',sub:rm.flag?'Irgendwo hat sich ein Siegel gelöst …':'Die Wege sind frei',t:0,small:true};
   hint='';
@@ -6483,10 +6796,11 @@ function hurtPlayer(n,fromX,fromY){
   if(P.rollT>0&&!P.lock&&perfectDodge(fromX,fromY)) return;
   if(P.iframes>0||P.rollT>0||G.dead||P.ghostT>0||P.lock) return;
   if(G.god){ floater(P.x,P.y-110,'Unverwundbar','#9fe0ff'); P.iframes=0.4; return; }
-  if(capeDodge()){ floater(P.x,P.y-110,'Abgeschüttelt!','#c9b6e8'); P.iframes=0.5; SFX.place(); return; }
+  if(shieldAbsorb()) return;
   if(G.fog>0){ const f=Math.min(G.fog,n); G.fog-=f; n-=f; fogPuff(); if(G.fog<=0){ floater(P.x,P.y-130,'Das Nebelherz verweht …','#c9b6e8'); } }
   if(scene==='room'){ R_.calm=0.85; R_.noHitT=0; }
-  COMBO.n=0; P.hp-=n; P.iframes=1.0; P.flash=0.15; SFX.hurt(); addShake(9); hitstop=0.06;
+  COMBO.n=0; if(G.sword==='pfand'&&G.weaponOn&&n>0&&G.gold>0){ const l=Math.min(G.gold,5); G.gold-=l; floater(P.x+30,P.y-90,'-'+l+' Gold (Pfand)','#ff8a6a'); }
+  P.hp-=n; P.iframes=1.0; P.flash=0.15; SFX.hurt(); addShake(9); hitstop=0.06;
   const a=Math.atan2(P.y-fromY,P.x-fromX); P.vx=Math.cos(a)*320; P.vy=Math.sin(a)*320;
   puff(P.x,P.y-30,'#c3283a',8); P.mouse.alert=1; SFX.squeak();
   for(let i=0;i<6;i++) addPart({x:P.x,y:P.y-30,vx:rand(-150,150),vy:rand(-200,-40),life:.5,size:rand(3,5),color:'#e8344a',kind:'spark',g:500});
@@ -6522,11 +6836,11 @@ function updatePlayer(dt){
     if(P.rollT<=0){ P.squash=0.18; puff(P.x+P.rdx*10,P.y,'rgba(170,150,120,.55)',4); }
   } else {
     const slow=(P.spinT>0?0.7:1)*(P.atkT>0?0.35:1);
-    const sp=225*slow*(P.wet?0.6:1)*(P.webbed?0.55:1)*capeSpeed();
+    const sp=225*slow*(P.wet?0.6:1)*(P.webbed&&!capePoison()?0.55:1)*capeSpeed();
     P.vx+=(mx*sp-P.vx)*Math.min(1,dt*12); P.vy+=(my*sp-P.vy)*Math.min(1,dt*12);
     if(pressed.roll&&P.rollCd<=0&&P.bathT<=0){
       let dx=mx,dy=my; if(Math.hypot(dx,dy)<0.2){ dx=AV?AV.x:(P.dirX||1); dy=AV?AV.y:(P.dirY||0); } const d=Math.hypot(dx,dy); P.rdx=dx/d; P.rdy=dy/d; P.dir8=dir8(P.rdx,P.rdy);
-      P.rollT=P.rollDur; P.rollStart=T; P.rollCd=0.5*capeRollCd(); P.rollWet=!!P.wet; P.iframes=Math.max(P.iframes,G.cape>=2?0.48:0.36); SFX.roll(); P.atkT=0; P.squash=0.2; P.trail=[];
+      P.rollT=P.rollDur; P.rollStart=T; P.rollCd=0.5*capeRollCd(); P.rollWet=!!P.wet; P.iframes=Math.max(P.iframes,cape().roll?0.5:0.36); SFX.roll(); P.atkT=0; P.squash=0.2; P.trail=[];
       for(let i=0;i<6;i++) addPart({x:P.x,y:P.y,vx:-P.rdx*rand(60,160)+rand(-40,40),vy:-P.rdy*rand(40,100)+rand(-40,0),life:rand(.3,.5),size:rand(6,10),color:'rgba(170,150,120,.6)',kind:'puff'});
     }
     if(pressed.atk&&P.bathT<=0&&!dialog){
@@ -6555,7 +6869,7 @@ function updatePlayer(dt){
     const range=P.atkStep===2?118:96;
     const cx=P.x+Math.cos(P.atkAng)*22, cy=P.y-26+Math.sin(P.atkAng)*14;
     const prog=1-P.atkT/P.atkDur;
-    if(prog>0.12&&prog<0.62) hitArea(cx,cy,range*(G.swordLvl>=3?1.12:1),P.atkStep===2?null:P.atkAng,((P.atkStep===2?2:1)+(G.sword==='vampir'&&P.atkStep===2?1:0))*swordMul());
+    if(prog>0.12&&prog<0.62) hitArea(cx,cy,range*weaponRange(),P.atkStep===2?null:P.atkAng,(P.atkStep===2?2:1)*weaponMul());
     if(P.atkT<=0) P.comboT=0.38;
   }
 }
@@ -6609,7 +6923,7 @@ function talkTo(n){
       else say(TALK.schmiedOffer,()=>{ G.sword='vampir'; G.weaponOn=true; n.exclaim=false; SFX.chest(); addShake(6); banner={text:'Vampirklinge geschmiedet!',sub:'Jeder fünfte Treffer heilt dich',t:0}; addPart({x:P.x,y:P.y-60,vx:0,vy:-30,life:1.6,size:1,color:'',kind:'swordshow'}); fxAnim('fx_poof',P.x,P.y-40,1.2); hearts(P.x,P.y-60,6); }); return; }
   if(t==='buchi'){ talkBuchi(n); return; }
   if(t==='hilde'){ say(G.talked.hilde?TALK.hilde2:TALK.hilde); G.talked.hilde=true; return; }
-  if(t==='tortuga'){ say(G.talked.tortuga?TALK.tortuga2:TALK.tortuga); G.talked.tortuga=true; return; }
+  if(t==='tortuga'){ if(!G.talked.tortuga){ G.talked.tortuga=true; say(TALK.tortuga,openMerchant); } else openMerchant(); return; }
   if(t==='hoppel'){ say(TALK.hoppel,()=>{ G.rescued.hoppel=true; G.talked.hoppel=true; n.leaving=true; SFX.heart(); hearts(n.x,n.y-60,6); }); return; }
   if(t==='fenno'){ if(!G.talked.fenno){ say(TALK.fenno,()=>{ G.talked.fenno=true; const r=gainHeart(1); if(r.got) floater(P.x,P.y-110,'+1 Herz','#f08cae'); }); } else say(TALK.fennoAgain); return; }
   if(t==='brumm'){ say(TALK.brumm,()=>{ G.talked.brumm=true; G.rescued.brumm=true; const it=mkPage(curRoom().page); it.x=n.x+50; it.y=n.y+20; if(!G.pages.includes(it.idx)&&!R_.items.some(q=>q.kind==='page'&&q.idx===it.idx)) R_.items.push(it); SFX.heart(); }); return; }
@@ -6661,8 +6975,8 @@ function updateRoom(dt){
   R_.npcs=R_.npcs.filter(n=>!n.leaving||n.alpha>0);
   updateNPCs(dt,R_.npcs.filter(n=>!n.leaving));
   // Gegenstände
-  for(const it of R_.items){ it.t+=dt; if(it.drop){ it.drop=Math.max(0,it.drop-dt*600); } if(it.kind==='bone'||it.kind==='gold') updateBoneItem(it,dt);
-    if(!it.drop&&((it.kind!=='bone'&&it.kind!=='gold')||it.t>0.45)&&Math.hypot(P.x-it.x,P.y-it.y)<(it.kind==='bone'||it.kind==='gold'?30:44)) pickItem(it); }
+  for(const it of R_.items){ it.t+=dt; if(it.drop){ it.drop=Math.max(0,it.drop-dt*600); } if(it.kind==='bone'||it.kind==='gold'||it.kind==='mat') updateBoneItem(it,dt);
+    if(!it.drop&&((it.kind!=='bone'&&it.kind!=='gold'&&it.kind!=='mat')||it.t>0.45)&&Math.hypot(P.x-it.x,P.y-it.y)<(it.kind==='bone'||it.kind==='gold'||it.kind==='mat'?30:44)) pickItem(it); }
   R_.items=R_.items.filter(it=>!it.taken);
   // Truhe
   if(R_.chest){
@@ -6672,6 +6986,7 @@ function updateRoom(dt){
     if(c.landed&&!c.open&&Math.hypot(P.x-c.x,P.y-c.y)<74){ prompt_={x:c.x,y:c.y-90,label:'Öffnen'};
       if(pressed.act&&c.genie){ c.open=true; genieStart(c); }
       else if(pressed.act&&c.morr){ c.open=true; SFX.chest(); addShake(4); G.bones=(G.bones||0)+40; floater(c.x,c.y-110,'+40 Knochen','#efe4cc'); for(let i=0;i<20;i++) addPart({x:c.x,y:c.y-40,vx:rand(-200,200),vy:rand(-360,-140),life:rand(.8,1.3),size:rand(3,5),color:Math.random()<.6?'#e8c050':'#efe4cc',kind:'spark',g:700}); R_.items.push({kind:'heartc',x:c.x+70,y:c.y+20,t:0,drop:240}); banner={text:'Morruks Warenlager',sub:'Knochen, Münzen und ein Herz',t:0,small:true}; }
+      else if(pressed.act&&c.loot){ c.open=true; lootChest(c); }
       else if(pressed.act){ c.open=true; SFX.chest(); addShake(4); hearts(c.x,c.y-40,6);
         G.hasWeapon=true; G.weaponOn=true; P.mouse.cheer=2;
         addPart({x:c.x,y:c.y-60,vx:0,vy:-30,life:1.6,size:1,color:'',kind:'swordshow'});
@@ -6700,7 +7015,7 @@ function updateRoom(dt){
   if(rm.type==='spring') updateSpring(dt);
   if(rm.type==='cocoons'){ for(const c of R_.cocoons) c.wob=Math.max(0,c.wob-dt); }
   if(rm.type==='exit'){ const gt=R_.gate; if(Math.random()<.15) addPart({x:gt.x+rand(-26,26),y:gt.y-rand(20,150),vx:0,vy:-30,life:1.2,size:3,color:`rgba(${PORTAL_COL[G.region]},.9)`,kind:'spark'});
-    if(R_.t>1&&Math.hypot(P.x-gt.x,P.y-(gt.y+16))<46){ SFX.portal(); const done=G.region; G.regionDone[done]=true; startFade(()=>{ G.region=done+1; enterHub(done+1); }); return; } }
+    if(R_.t>1&&Math.hypot(P.x-gt.x,P.y-(gt.y+16))<46){ SFX.portal(); const done=G.region; if(!G.regionDone[done]){ const bn=Math.round(40*CHAPTER_MULT[done]*goldK()); G.gold+=bn; setTimeout(()=>{ banner={text:'Expedition geschafft!',sub:'Erstabschluss-Bonus +'+bn+' Gold',t:0,small:true}; SFX.chest(); },1600); } G.regionDone[done]=true; startFade(()=>{ G.region=done+1; enterHub(done+1); }); return; } }
   if(rm.type==='boss') updateBossRoom(dt);
   // Ausgänge
   for(const d in L.ex){ const e=L.ex[d]; if(!exitOpen(d)) continue;
@@ -6712,6 +7027,7 @@ function pickItem(it){
   it.taken=true;
   if(it.kind==='page'&&G.pages.includes(it.idx)) return;
   if(it.kind==='gold'){ pickGold(it); return; }
+  if(it.kind==='mat'){ pickMat(it); return; }
   if(it.kind==='bone'){ G.bones=(G.bones||0)+(it.n||1); tone(rand(900,1200),0.06,'square',0.04,rand(1300,1600)); addPart({x:P.x+20,y:P.y-90,vx:0,vy:-40,life:0.6,size:16,color:'#efe4cc',kind:'text',txt:'+'+(it.n||1)}); return; }
   if(it.kind==='page'){ G.pages.push(it.idx); SFX.chest(); hearts(P.x,P.y-60,6); P.mouse.love=2;
     say([{who:'page',text:`Seite ${it.idx+1} von 4: „${CONFIG.pages[it.idx]}“`},{who:'verris',text:['Oh! Meine Notiz! Lies sie ruhig. Ich werde rot, aber Kuckucke können nicht rot werden. Glaube ich.','Noch eine Seite! Du findest wirklich alles.','Diese Seite war im Netz?! Ich schreibe einen Beschwerdebrief an die Spinnen.','Die letzte Seite! Jetzt fehlt nur noch der Brief.'][it.idx]||'Notiert.'}]); }
@@ -6814,6 +7130,7 @@ function render(){
     for(const o of L.objs) if(vis(o.x,o.y)&&o.kind!=='flat') list.push({y:o.y,d:o.kind==='portal'?()=>drawPortalObj(o):()=>drawDeco(o)});
     for(const f of L.followers) if(vis(f.x,f.y)) list.push({y:f.y,d:()=>drawFollower(f)});
     for(const n of L.npcs) list.push({y:n.y,d:()=>drawNPC(n)});
+    if(blackMarketHere()) list.push({y:MORR_SPOT.y,d:drawBlackMarket});
     if(R_.souls&&R_.souls.length){ list.push({y:640,d:()=>drawSouls(false)}); list.push({y:800,d:()=>drawSouls(true)}); }
     if(R_.goats) for(const g of R_.goats) list.push({y:g.y,d:()=>drawGoat(g)});
     if(R_.table){ list.push({y:R_.table.y,d:drawTable}); list.push({y:R_.table.y-2,d:drawDealer}); }
@@ -6979,6 +7296,7 @@ function drawChestSpr(c){ shadowE(c.x,c.y,30*(1-c.z/400),9); const sq=c.sq||0;
 function drawItem(it){
   if(it.kind==='bone'){ drawBoneItem(it); return; }
   if(it.kind==='gold'){ drawGoldItem(it); return; }
+  if(it.kind==='mat'){ drawMatItem(it); return; }
   const bob=Math.sin(it.t*3)*5-(it.drop||0);
   glow(it.x,it.y-28+bob,40,'rgba(255,230,160,.5)');
   shadowE(it.x,it.y,14,4,.3);
@@ -6994,7 +7312,7 @@ function drawHUD(){
   ctx.beginPath(); diamond(wx,wy,20); ctx.lineWidth=2; ctx.strokeStyle=G.weaponOn?'#e8b84a':'#f08cae'; ctx.stroke();
   if(G.weaponOn){ drawSwordAt(wx-11,wy+12,-Math.PI/4,0.62); }
   else { ctx.fillStyle='#a86a3e'; ctx.fillRect(wx-9,wy-2,8,8); ctx.fillRect(wx+1,wy-2,8,8); ctx.fillStyle=OUT; ctx.fillRect(wx-1,wy-2,2,8); }
-  textO(G.weaponOn?swordName():'Popo-Kick',wx+32,wy,15,FB,G.sword==='vampir'&&G.weaponOn?'#ff8a96':'#f3e7cf','left',3,700);
+  textO(G.weaponOn?swordName():'Popo-Kick',wx+32,wy,15,FB,G.weaponOn&&(G.sword==='vampir'||G.sword==='pfand')?'#ff8a96':'#f3e7cf','left',3,700);
   if(G.hasWeapon) textO('Q wechseln',wx+32,wy+17,12,FB,'#b9a98f','left',3,600);
   // Seiten
   spr('notiz',36,140,{s:1});
@@ -7019,7 +7337,7 @@ function drawHUD(){
       ctx.globalAlpha=1; }
   }
   if(hint&&!dialog){ ctx.font=`600 18px ${FB}`; const tw=Math.min(W-80,ctx.measureText(hint).width+40); ctx.beginPath(); prr(W/2-tw/2,H-46,tw,32,16); ctx.fillStyle='rgba(20,10,14,.84)'; ctx.fill(); textO(hint,W/2,H-30,18,FB,'#f3e7cf','center',0,600); }
-  drawNagerBars(); drawBookieBar(); if(scene==='room'&&R_.slot) drawSlotHUD(); if(scene==='room'&&R_.qrit) drawQuakRitualUI(); drawQuakBar(); drawMorrukBar(); drawRelicHUD(); drawBossFxHUD(); drawBossResult();
+  drawNagerBars(); drawBookieBar(); if(scene==='room'&&R_.slot) drawSlotHUD(); if(scene==='room'&&R_.qrit) drawQuakRitualUI(); drawQuakBar(); drawMorrukBar(); drawRelicHUD(); drawBossFxHUD(); drawBossResult(); if(mode==='play'&&scene!=='map') drawShieldHUD(); drawBag();
   const b=enemies.find(e=>e.boss);
   if(b&&!['sleep','rise','intro','dead'].includes(b.state)&&!dialog){
     const bw=560,bx=W/2-bw/2,by=H-78;
@@ -7357,10 +7675,10 @@ function update(dt){
   if(CHOICE){ updateChoice(dt); return; }
   if(hitstop>0){ hitstop-=dt; return; }
   if(dialog){ updateDialog(dt); if(scene==='hub') updateFollowers(dt); return; }
-  if(G.dead){ G.deadT+=dt; if(RM&&G.deadT>0.8&&pressed.weap){ G.dead=false; startFade(()=>endRematch(false)); return; } if(G.deadT>0.8&&(pressed.act||pressed.atk||pressed.tap||pressed.roll)){ G.dead=false; G.deadBoss=null; P.hp=G.maxHp; if(G.deadReset){ startFade(()=>restartPortal()); return; } if(scene==='room'){ const id=G.roomId; startFade(()=>{ R_.stakes=[]; enterRoomById(id,null); }); } else startFade(()=>enterHub(0)); } return; }
+  if(G.dead){ if(!G.deadT) applyDeathLoss(); G.deadT+=dt; if(RM&&G.deadT>0.8&&pressed.weap){ G.dead=false; startFade(()=>endRematch(false)); return; } if(G.deadT>0.8&&(pressed.act||pressed.atk||pressed.tap||pressed.roll)){ G.dead=false; G.deadBoss=null; P.hp=G.maxHp; if(G.deadReset){ startFade(()=>restartPortal()); return; } if(scene==='room'){ const id=G.roomId; startFade(()=>{ R_.stakes=[]; enterRoomById(id,null); }); } else startFade(()=>enterHub(0)); } return; }
   if(fade.cb) return;
   { const rdt=dt; dt*=bossFxScale(rdt); updateBossFx(dt,rdt); }
-  updateTufts(dt); updatePlayer(dt); updateSummons(dt); updateEnemies(dt); updateProjs(dt); updateItems(dt); updateCritters(dt);
+  updateTufts(dt); updatePlayer(dt); updateShield(dt); updateSummons(dt); updateEnemies(dt); updateProjs(dt); updateItems(dt); updateCritters(dt);
   if(scene==='hub') updateHub(dt); else updateRoom(dt);
   const t=camTarget(); if(scene==='room'&&R_.fight){ cam.x=t[0]; cam.y=t[1]; } else { cam.x+=(t[0]-cam.x)*Math.min(1,dt*6); cam.y+=(t[1]-cam.y)*Math.min(1,dt*6); }
 }
