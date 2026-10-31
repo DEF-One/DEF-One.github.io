@@ -523,6 +523,7 @@ function mapKey(code){
     case 'KeyF':case 'KeyL':return 'orb';
     case 'KeyM':return 'mute';
     case 'KeyP':return 'god';
+    case 'BracketLeft':return 'clearroom'; // Ü auf deutscher Tastatur: Testmodus, Raum sofort schaffen
   }
   return null;
 }
@@ -9002,6 +9003,28 @@ function padMenuMap(){
     if(d) MOUSE.on=false; if(d<0) pressed.up=true; if(d>0) pressed.down=true; if(pE(i,14)) pressed.left=true; if(pE(i,15)) pressed.right=true; }
   PADMN-=1/60;
 }
+/* Testmodus: Ü schafft den aktuellen Dungeon-Raum sofort (Gegner, Wellen, Bosse). Im Dorf ohne Wirkung. */
+const BOSSROOMS=['boss','boss3','mini','mini2','casino'];
+function debugClearRoom(){
+  if(scene!=='room'||!R_||G.dead){ floater(P.x,P.y-120,'Ü wirkt nur in Dungeon-Räumen','#b9a98f'); return; }
+  const rm=curRoom(); if(!rm) return;
+  dialog=null; if(BC){ const cb=BC.cb; BC=null; for(const k in keys) keys[k]=false; cb&&cb(true); } if(LOCKP) LOCKP=null;
+  summons=[]; projs=[]; waves=[];
+  if(R_.cocoons&&R_.cocoons.length){ R_.cocoons.slice().forEach(c=>popCocoon(c)); R_.cocoons=[]; }
+  if(R_.wv) R_.wave=R_.wv.length-1;
+  let n=0;
+  for(const e of enemies.slice()){ if(e.type==='dummy'||e.dying||e.dead) continue; if(e.type==='nager'){ if(e.downed) continue; e.noRevive=true; } if(e.type==='morruk'&&e.state==='dying') continue; if(e.type==='morruk') e.state='idle'; if(e.boss&&e.state==='dead') continue; killEnemy(e); n++; }
+  for(const e of enemies) if(e.type==='nager') e.noRevive=true;
+  if(R_.fight){ const F=R_.fight; if(F.phase!=='end'&&F.phase!=='zoomout'){ F.phase='fight'; F.foe.hp=0; } }
+  if(rm.type==='mouse'&&R_.mg){ R_.mg.phase='done'; R_.mm=null; P.mouseAway=false; P.lock=false; }
+  if(rm.type==='spring'){ R_.bath=null; P.lock=false; P.bathT=0; }
+  if(rm.type==='casino'&&!G.flags.casino&&!enemies.some(e=>e.type==='bookie')) G.flags.casino=true;
+  if(rm.type==='dice'&&!G.cleared[rm.id]&&typeof kbWon==='function'){ try{ kbWon(); }catch(e){} }
+  const boss=BOSSROOMS.includes(rm.type);
+  if(!boss) setTimeout(()=>{ if(scene==='room'&&curRoom()===rm) roomClear(); },350);
+  setTimeout(()=>{ if(scene==='room'&&curRoom()===rm&&rm.type!=='boss'&&roomLocked()) roomClear(); },boss?4500:1500);
+  banner={text:'Test: Raum geschafft',sub:n?`${n} Gegner besiegt (Ü)`:'Raum freigeschaltet (Ü)',t:0,small:true}; SFX.win(); addShake(6);
+}
 /* ---------------- Hauptschleife ---------------- */
 let last=performance.now(), FPSE=60, LOWFX=false, lowT=0;
 function frame(now){
@@ -9024,6 +9047,7 @@ function update(dt){
   for(const m of motes){ m.x+=m.vx*dt; m.y+=m.vy*dt; if(m.y<-5){ m.y=H+5; m.x=Math.random()*W; } if(m.x<-5) m.x=W+5; if(m.x>W+5) m.x=-5; }
   if(mode!=='play') return;
   if(pressed.god){ G.god=!G.god; banner={text:G.god?'Testmodus an':'Testmodus aus',sub:G.god?'Du bist unverwundbar (P zum Ausschalten)':'Du kannst wieder Schaden nehmen',t:0,small:true}; SFX.place(); }
+  if(pressed.clearroom) debugClearRoom();
   if(scene==='map'||BC||CUT||CHOICE||MG||LOCKP||dialog||G.dead) padMenuMap();
   if(scene==='map'){ updateMap(dt); return; }
   if(BC){ updateBossCard(dt); return; }
