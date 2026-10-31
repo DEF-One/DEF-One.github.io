@@ -2099,15 +2099,17 @@ function enemyInvul(e){
 /* Wellen werden je nach Portal dichter, dazu kommt ein Hinterhalt als letzte Welle */
 const WAVE_POOL=[['cat','skel','skelR','frog','hedge'],['shroom','frog','cat','hedge','skelR'],['bat','spider','skel','skelR','cat'],['frog','shroom','spider','bat','skelR','cat']];
 function buildWaves(rm){
-  const r=Math.min(3,G.region||0), src=rm.waves; const out=src.map((w,i)=>w.map((g,j)=>({t:g.t,n:g.n+(j===0&&(i>0||r>=1)?1:0)+(j===1&&r>=3?1:0)})));
-  if(src.length>=2||r>=1){ const pool=WAVE_POOL[r], n=2+r, amb=[]; for(let k=0;k<n;k++){ const t=pool[(k*2+r+src.length)%pool.length]; const g=amb.find(q=>q.t===t); if(g) g.n++; else amb.push({t,n:1}); } if(r>=2) amb[0].elite=true; amb.ambush=true; out.push(amb); }
+  const r=Math.min(3,G.region||0), src=rm.waves; const out=src.map((w,i)=>w.map((g,j)=>({t:g.t,n:g.n+(j===0&&(i>0||r>=1)?1:0)+(j===1&&r>=3?1:0),elite:g.elite,extra:g.extra})));
+  if(!rm.noAmbush&&(src.length>=2||r>=1)){ const pool=WAVE_POOL[r], n=2+r, amb=[]; for(let k=0;k<n;k++){ const t=pool[(k*2+r+src.length)%pool.length]; const g=amb.find(q=>q.t===t); if(g) g.n++; else amb.push({t,n:1}); } if(r>=2) amb[0].elite=true; amb.ambush=true; out.push(amb); }
   return out;
 }
 function startWave(i){
   if(!R_.wv) R_.wv=buildWaves(L.rm);
   R_.wave=i; const w=R_.wv[i]; let k=0;
-  for(const g of w) for(let n=0;n<g.n;n++){ const p=spawnSpot(); summons.push({x:p[0],y:p[1],t:-0.3-k*0.22,dur:0.9,kind:g.t,elite:g.elite&&n===0}); k++; }
+  for(const g of w) for(let n=0;n<g.n;n++){ const p=spawnSpot(); summons.push({x:p[0],y:p[1],t:-0.3-k*0.22,dur:0.9,kind:g.t,elite:g.elite&&n===0,extra:g.extra&&n===0?g.extra:null}); k++; }
+  const nm=L.rm.waveNames&&L.rm.waveNames[i];
   if(w.ambush){ banner={text:'Hinterhalt!',sub:'Verstärkung rückt an',t:0,small:true}; SFX.roar(); addShake(6); }
+  else if(nm){ banner={text:nm[0],sub:nm[1]||`Welle ${i+1} von ${R_.wv.length}`,t:0,small:!!(i===0)}; SFX.summon(); }
   else if(i>0){ banner={text:`Welle ${i+1}`,sub:`von ${R_.wv.length}`,t:0,small:true}; SFX.summon(); }
 }
 function updateSummons(dt){
@@ -2115,7 +2117,7 @@ function updateSummons(dt){
     s.t+=dt;
     if(s.t>=s.dur&&!s.done){
       s.done=true;
-      const e=spawnEnemy(s.kind,s.x,s.y,s.elite?{owner:s.owner,forceElite:true}:{owner:s.owner});
+      const e=spawnEnemy(s.kind,s.x,s.y,Object.assign({owner:s.owner},s.elite?{forceElite:true}:{},s.extra||{}));
       e.born=0.35;
       puff(s.x,s.y-10,{cat:'#a07ad0',frog:'#8ad070',shroom:'#f0a050',bat:'#8a60c0',spider:'#9a80c0',hedge:'#c8a070'}[s.kind]||'#d8cfba',10);
     }
@@ -2162,8 +2164,13 @@ function updateEnemies(dt){
   const rm=L.rm;
   if(rm.waves&&!G.cleared[roomKey()]&&R_.t>1.2){
     const main=enemies.filter(e=>!e.owner&&!e.dying&&e.type!=='dummy').length, nW=(R_.wv||rm.waves).length, last=R_.wave+1>=nW;
-    // Die nächste Welle rückt schon nach, wenn nur noch ein Gegner steht: kein Durchatmen
-    if(!last&&main<=1&&summons.length===0){ R_.waveDelay=(R_.waveDelay||0)+dt; if(R_.waveDelay>(main?0.9:0.7)){ R_.waveDelay=0; startWave(R_.wave+1); } }
+    // Die nächste Welle kommt erst, wenn ALLE Gegner der Welle davor besiegt sind (Bosskämpfe haben keine Wellen).
+    // Diener ohne Meister zerfallen, danach ein kurzer Atemzug.
+    if(main>0) R_.waveDelay=0;
+    if(!last&&main===0&&summons.length===0){
+      for(const e of enemies) if(e.owner&&!e.dying&&e.type!=='dummy') killEnemy(e);
+      if(enemies.every(e=>e.dying||e.type==='dummy')){ R_.waveDelay=(R_.waveDelay||0)+dt; if(R_.waveDelay>1.4){ R_.waveDelay=0; startWave(R_.wave+1); } }
+    }
     else if(last&&main===0&&summons.length===0){
       for(const e of enemies) if(e.owner&&!e.dying) killEnemy(e);
       if(enemies.every(e=>e.dying)&&enemies.length===0) roomClear();
@@ -6439,6 +6446,7 @@ function lootChest(c){
   SFX.chest(); addShake(5); hearts(c.x,c.y-40,3); const m=cm();
   spawnGold(c.x,c.y,rint(20,35)*m); spawnMat(c.x,c.y,'eisen',rint(1,3));
   if(c.pzLoot){ spawnMat(c.x,c.y,'seele',1); if(c.pzLoot==='glocken') spawnMat(c.x,c.y,'glocke',1); }
+  if(c.cageKey){ G.flags.cageKey=true; banner={text:'Käfigschlüssel gefunden!',sub:'Er passt in die Kurbel am Galgen',t:0}; floater(c.x,c.y-130,'+ Käfigschlüssel','#ffd870'); setTimeout(()=>esseShout('Der Schlüssel! Schnell, die Kurbel am Galgen!'),900); }
   const extra=pick(['stoff','leder','knochen','pilz']); spawnMat(c.x,c.y,extra,rint(1,2)); if(Math.random()<0.25) spawnMat(c.x,c.y,'seele',1);
   for(let i=0;i<16;i++) addPart({x:c.x,y:c.y-40,vx:rand(-200,200),vy:rand(-360,-140),life:rand(.8,1.3),size:rand(3,5),color:Math.random()<.6?'#e8c050':'#efe4cc',kind:'spark',g:600});
 }
@@ -7253,26 +7261,20 @@ function moEnterHub(){ P.down=false; MO.fly=null; MO.tunnel=null; MO.platform=nu
    ====================================================================== */
 (function addPuzzleRooms(){
   const add=(ri,room,link)=>{ const R=REGIONS[ri]; if(R.byId[room.id]) return; R.rooms.push(room); R.byId[room.id]=room; room.region=R; R.links.push(link); };
-  add(0,{id:'w10',gx:3,gy:1,type:'puzzle',pz:'esse',name:'Die verfallene Esse',sub:'Jemand hämmert gegen Gitterstäbe',size:[1500,920],waves:[[{t:'cat',n:1},{t:'skel',n:2}],[{t:'skelR',n:1},{t:'hedge',n:2}]]},['w5','w10']);
+  add(0,{id:'w10',gx:3,gy:1,type:'puzzle',pz:'esse',name:'Die verfallene Esse',sub:'Jemand hämmert gegen Gitterstäbe',size:[1500,920],noAmbush:true,
+    waves:[[{t:'skel',n:2},{t:'skelR',n:1}],[{t:'hedge',n:1},{t:'cat',n:1}],[{t:'skel',n:1},{t:'thug',n:1,extra:{hp:9,max:9,jailer:true,r:18}}]],
+    waveNames:[null,['Die Käfigwärter','Welle 2 von 3 · Die Katze ruft Skelette, erst sie erledigen'],['Der Kerkermeister','Welle 3 von 3 · Lock ihn vor die Esse!']]},['w5','w10']);
   add(1,{id:'p8',gx:-1,gy:0,type:'puzzle',pz:'hinweis',name:'Der geteilte Hinweisraum',sub:'Was die Maus sieht, braucht das Capybara',size:[1400,880]},['p0','p8']);
   add(2,{id:'s7',gx:0,gy:-1,type:'puzzle',pz:'glocken',name:'Die Glockenkammer',sub:'Eine Melodie für zwei',size:[1500,920]},['s0','s7']);
 })();
 const PZ_SYM=['☾','✦','☠','◆','♥','⚑'];
 function pzSolved(){ return !!G.puzzles[curRoom().pz]; }
 function puzzleInit(rm,cleared){
-  vInit(); const cx=L.cx, cy=L.cy, rx=L.rx, ry=L.ry; const done=!!G.puzzles[rm.pz];
+  vInit(); L.solids=L.solids.filter(s=>!s.pzFence&&!s.pzCage&&!s.esse); const cx=L.cx, cy=L.cy, rx=L.rx, ry=L.ry; const done=!!G.puzzles[rm.pz];
   const Z=R_.pz={kind:rm.pz,plates:[],levers:[],tunnels:[],fences:[],plats:[],dials:[],bells:[],t:0,mist:0,done,fx:[]};
   // Gitter mit Ritzen trennt den hinteren Bereich ab: nur die Maus passt durch
   const fence=(x0,y0,x1,y1)=>{ const n=Math.ceil(Math.hypot(x1-x0,y1-y0)/34); for(let i=0;i<=n;i++){ const x=lerp(x0,x1,i/n), y=lerp(y0,y1,i/n); L.solids.push({x,y,r:17,mouseOk:true,pzFence:true}); Z.fences.push({x,y}); } };
-  if(rm.pz==='esse'){
-    const fx=cx+rx*0.28; fence(fx,cy-ry*0.95,fx,cy+ry*0.95);
-    Z.plates.push({x:cx-rx*0.35,y:cy+ry*0.25,r:48,heavy:true,on:false});
-    Z.tunnels.push({a:{x:cx-rx*0.05,y:cy-ry*0.55},b:{x:fx+70,y:cy-ry*0.55}});
-    Z.levers.push({x:cx+rx*0.62,y:cy+ry*0.15,small:true,on:done,need:0});
-    Z.cage={x:cx+rx*0.6,y:cy-ry*0.35,open:done};
-    if(!done) L.solids.push({x:Z.cage.x,y:Z.cage.y,r:46,pzCage:true});
-    if(!G.rescued.grimbart) R_.npcs.push({sp:'schmied',speaker:'schmied',talk:'pz_grimbart',x:Z.cage.x,y:Z.cage.y+4,ph:0,label:'Grimbart',exclaim:true,hop:0,caged:!done});
-  }
+  if(rm.pz==='esse') esseInit(rm,Z);
   if(rm.pz==='hinweis'){
     const fy=cy-ry*0.25; fence(cx-rx*0.95,fy,cx+rx*0.95,fy);
     Z.tunnels.push({a:{x:cx-rx*0.7,y:cy+ry*0.15},b:{x:cx-rx*0.7,y:fy-70}});
@@ -7290,7 +7292,7 @@ function puzzleInit(rm,cleared){
     Z.levers.push({x:cx+rx*0.05,y:cy-ry*0.6,small:false,on:done,latch:true,big:true},{x:cx-rx*0.75,y:cy+ry*0.3,small:true,on:done,latch:true});
   }
   if(cleared&&rm.waves) {}
-  if(!done&&!G.talked.pzHint){ G.talked.pzHint=true; setTimeout(()=>{ if(curRoom()===rm){ hint=TOUCH?'Rätselraum! Maus-Knopf: Maus steuern':'Rätselraum! Tab: Maus steuern · V: Maus wartet · C: Mauskanone'; setTimeout(()=>{ if(hint.startsWith('Rätselraum')) hint=''; },9000); } },1200); }
+  if(!done&&!G.talked.pzHint&&rm.pz!=='esse'){ G.talked.pzHint=true; setTimeout(()=>{ if(curRoom()===rm){ hint=TOUCH?'Rätselraum! Maus-Knopf: Maus steuern':'Rätselraum! Tab: Maus steuern · V: Maus wartet · C: Mauskanone'; setTimeout(()=>{ if(hint.startsWith('Rätselraum')) hint=''; },9000); } },1200); }
 }
 function puzzleFighting(){ return enemies.some(e=>!e.dying&&e.type!=='dummy')||summons.length>0||(curRoom().waves&&!G.cleared[curRoom().id]); }
 function puzzleNear(o){ const Z=R_.pz; if(!Z) return false; return Z.levers.some(l=>Math.hypot(o.x-l.x,o.y-l.y)<46)||Z.tunnels.some(t=>Math.hypot(o.x-t.a.x,o.y-t.a.y)<40||Math.hypot(o.x-t.b.x,o.y-t.b.y)<40)||Z.bells.some(b=>Math.hypot(o.x-b.x,o.y-b.y)<50); }
@@ -7299,6 +7301,7 @@ function pzActCapy(){ return pressed.act; }
 function updatePuzzle(dt){
   const Z=R_.pz; if(!Z) return; Z.t+=dt; const rm=curRoom();
   const fighting=puzzleFighting();
+  if(Z.kind==='esse'){ updateEsse(dt,Z,fighting); return; }
   // Platten
   for(const p of Z.plates){ const was=p.on; p.on=!P.down&&Math.hypot(P.x-p.x,(P.y-p.y)*1.3)<p.r; if(p.on&&!was){ SFX.place(); noise(0.1,0.2,300); } if(p.on){ p.held=(p.held||0)+dt; if(p.held>9&&!p.quip){ p.quip=true; npcQuip('Du bist ein hervorragender Briefbeschwerer.'); } } else p.held=0; }
   // Tunnel: Maus läuft hinein
@@ -7307,11 +7310,6 @@ function updatePuzzle(dt){
   for(const t of Z.tunnels) if(Math.hypot(P.x-t.a.x,P.y-t.a.y)<40&&!prompt_&&!moSolo()) prompt_={x:t.a.x,y:t.a.y-60,label:'Zu klein fürs Capybara'};
   if(Z.done){ return; }
   if(fighting) return;
-  if(Z.kind==='esse'){
-    const lv=Z.levers[0], pl=Z.plates[0];
-    if(mouseAt(lv,40)&&!lv.on){ if(!prompt_) prompt_={x:lv.x,y:lv.y-60,label:'Hebel ziehen (Maus)'}; if(MOIN.act){ if(pl.on){ lv.on=true; pzSolve('esse',pl.on&&COOP.on); } else { Z.mist++; floater(lv.x,lv.y-70,'Klick … nichts. Die große Platte muss gedrückt sein!','#f3e7cf'); noise(0.05,0.15,800); } } }
-    if(capyAt(lv,50)&&!prompt_&&!moSolo()) prompt_={x:lv.x,y:lv.y-60,label:'Viel zu klein für Capybara-Pfoten'};
-  }
   if(Z.kind==='hinweis'){
     if(mouseAt(Z.wall,70)&&!Z.seen){ if(!prompt_) prompt_={x:Z.wall.x,y:Z.wall.y-80,label:'Symbole merken (Maus)'}; if(MOIN.act){ Z.seen=true; SFX.chest(); floater(Z.wall.x,Z.wall.y-90,'Notiert: '+Z.code.map(i=>PZ_SYM[i]).join(' '),'#ffd870'); } }
     for(const d of Z.dials){ d.spin=Math.max(0,d.spin-dt*4); if(capyAt(d,50)&&!moSolo()){ if(!prompt_) prompt_={x:d.x,y:d.y-70,label:'Scheibe drehen'}; if(pressed.act){ d.v=(d.v+1)%PZ_SYM.length; d.spin=1; tone(600+d.v*60,0.06,'square',0.04); } } }
@@ -7340,9 +7338,7 @@ function pzSolve(k,together){
   L.solids=L.solids.filter(s=>!s.pzFence||k==='esse'); if(k!=='esse') Z.fences.length=0;
 }
 function grimbartCageTalk(n){
-  const Z=R_.pz;
-  if(!Z||!Z.cage.open){ say([{who:'schmied',text:'He! Du da! Hol mich hier raus! Die Kultkatzen haben mich eingesperrt, weil ich ihnen keine Krallen schärfen wollte.'},{who:'schmied',text:'Der Hebel ist da hinten, hinter dem Gitter. Viel zu klein für meine Pranken. Und für deine auch. Aber die Maus …'}]); return; }
-  say([{who:'schmied',text:'Frei! Endlich! Grimbart, Dorfschmied ohne Dorf. Bis jetzt.'},{who:'schmied',text:'Du hast eine Lichtung? Dann zieh ich zu dir. Bau mir am Bauplan-Pult eine Esse, und ich schmiede dir alles, was du brauchst.'}],()=>{ G.rescued.grimbart=true; n.leaving=true; SFX.heart(); hearts(n.x,n.y-60,8); banner={text:'Grimbart zieht in die Lichtung',sub:'Bauprojekt freigeschaltet: Grimbarts Schmiede',t:0,small:true}; });
+  say([{who:'schmied',text:'Frei! Endlich! Und meine Knie sind noch dran. Grimbart, Dorfschmied ohne Dorf. Bis jetzt.'},{who:'schmied',text:'Und die Maus erst! Ein Schloss, an dem ich mir drei Jahre die Zähne ausgebissen hätte. Klick, klick, klick, offen.'},{who:'schmied',text:'Du hast eine Lichtung? Dann zieh ich zu dir. Bau mir am Bauplan-Pult eine Esse, und ich schmiede dir alles, was du brauchst.'}],()=>{ G.rescued.grimbart=true; n.leaving=true; SFX.heart(); hearts(n.x,n.y-60,8); if(R_.pz&&R_.pz.es) R_.pz.es.st='free'; banner={text:'Grimbart zieht in die Lichtung',sub:'Bauprojekt freigeschaltet: Grimbarts Schmiede',t:0,small:true}; });
 }
 /* ---------------- Zeichnen ---------------- */
 function drawPuzzleGround(){
@@ -7353,6 +7349,7 @@ function drawPuzzleGround(){
 }
 function drawPuzzleObj(list){
   const Z=R_.pz; if(!Z) return;
+  if(Z.es){ drawEsseObj(list); return; }
   for(const f of Z.fences) list.push({y:f.y,d:()=>{ ctx.fillStyle=OUT; ctx.fillRect(f.x-3,f.y-60,6,62); ctx.fillStyle='#5a5464'; ctx.fillRect(f.x-2,f.y-58,4,58); ctx.fillStyle='#7a7484'; ctx.fillRect(f.x-2,f.y-58,1,58); ctx.fillStyle=OUT; ctx.fillRect(f.x-18,f.y-50,36,4); ctx.fillStyle='#4a4450'; ctx.fillRect(f.x-17,f.y-49,34,2); }});
   for(const l of Z.levers) list.push({y:l.y,d:()=>{ const s=l.small?0.6:1.1; ctx.save(); ctx.translate(l.x,l.y); ctx.scale(s,s); ctx.fillStyle=OUT; ctx.fillRect(-14,-16,28,18); ctx.fillStyle='#5a5464'; ctx.fillRect(-12,-14,24,14); ctx.rotate(l.on?0.7:-0.7); ctx.fillStyle=OUT; ctx.fillRect(-3,-56,6,44); ctx.fillStyle='#c8c0b0'; ctx.fillRect(-1,-54,2,40); ctx.beginPath(); ctx.arc(0,-58,8,0,TAU); ctx.fillStyle=OUT; ctx.fill(); ctx.beginPath(); ctx.arc(0,-58,5.5,0,TAU); ctx.fillStyle=l.on?'#9af06a':'#c3283a'; ctx.fill(); ctx.restore(); textO(l.small?'🐭':'🐹',l.x,l.y+14,11,FB,'#fff','center',0); }});
   if(Z.cage){ const c=Z.cage; list.push({y:c.y+30,d:()=>{ if(!c.open){ for(let i=-3;i<=3;i++){ ctx.fillStyle=OUT; ctx.fillRect(c.x+i*14-3,c.y-120,6,124); ctx.fillStyle='#6a6474'; ctx.fillRect(c.x+i*14-2,c.y-118,3,120); } ctx.fillStyle=OUT; ctx.fillRect(c.x-50,c.y-126,100,8); ctx.fillRect(c.x-50,c.y-4,100,8); ctx.fillStyle='#5a5464'; ctx.fillRect(c.x-48,c.y-124,96,4); }
@@ -7365,8 +7362,241 @@ function drawPuzzleObj(list){
   if(Z.wall){ const w=Z.wall; list.push({y:w.y,d:()=>{ ctx.fillStyle=OUT; ctx.fillRect(w.x-70,w.y-90,140,92); ctx.fillStyle='#3a3640'; ctx.fillRect(w.x-67,w.y-87,134,86); const rd=Z.seen||Z.done||mouseAt(w,150); Z.code.forEach((c,i)=>textO(rd?PZ_SYM[c]:'?',w.x-40+i*40,w.y-44,26,FB,'#9fd8ff','center',3,900)); textO('nur von hinten lesbar',w.x,w.y+10,10,FB,'#8a7a6a','center',2,600); }}); }
 }
 function drawPuzzleHUD(){ const Z=R_&&R_.pz; if(!Z||scene!=='room') return;
+  if(Z.es) drawEsseHUD(Z.es);
   if(Z.kind==='hinweis'&&Z.seen&&!Z.done) { ctx.save(); ctx.beginPath(); prr(W-230,250,200,58,10); ctx.fillStyle='rgba(20,8,12,.85)'; ctx.fill(); textO('Notizbuch',W-130,268,12,FB,'#b9a98f','center',3,700); textO(Z.code.map(i=>PZ_SYM[i]).join('   '),W-130,292,22,FB,'#ffd870','center',3,900); ctx.restore(); }
   if(Z.kind==='glocken'&&!Z.done){ ctx.save(); ctx.beginPath(); prr(W-250,250,220,58,10); ctx.fillStyle='rgba(20,8,12,.85)'; ctx.fill(); textO('Melodie an der Wand',W-140,268,12,FB,'#b9a98f','center',3,700); textO(Z.order.map((o,i)=>(i<Z.prog?'✓':'')+(o+1)).join('  →  '),W-140,292,18,FB,'#ffd870','center',3,900); ctx.restore(); } }
+
+/* ======================================================================
+   DIE VERFALLENE ESSE (Dunkelwald, Raum w10): Grimbart retten
+   1. Kampf in drei Wellen (die nächste erst, wenn alle besiegt sind):
+      Wachen · Käfigwärter (Katze ruft Skelette) · der Kerkermeister.
+      Hilfe im Raum: der Blasebalg an der alten Esse faucht einen Feuerstoß
+      auf alles davor, Grimbart wirft aus dem Käfig ab und zu seinen Hammer.
+   2. Die Truhe danach enthält den Käfigschlüssel.
+   3. Mit dem Schlüssel die Kurbel am Galgen lösen: der Käfig fährt herunter.
+   4. Das Türschloss ist verrostet: die Maus knackt es (Feingefühl-Minispiel).
+   ====================================================================== */
+let LOCKP=null;
+function esseState(){ if(G.rescued.grimbart) return 'free'; if(G.puzzles.esse) return 'open'; if(G.flags.cageDown) return 'down'; return 'hang'; }
+const ESSE_H=150;
+function esseInit(rm,Z){
+  const cx=L.cx, cy=L.cy, rx=L.rx, ry=L.ry;
+  const E=Z.es={forge:{x:cx-rx*0.50,y:cy-ry*0.34},cage:{x:cx+rx*0.24,y:cy+ry*0.22},t:0,hammerCd:7,ham:null,blast:null,bellCd:0,shout:null,shoutT:4,crank:0,rattle:0};
+  E.bel={x:E.forge.x+118,y:E.forge.y+36}; E.fire={x:E.forge.x+150,y:E.forge.y+118};
+  E.post={x:E.cage.x+165,y:E.cage.y-26}; E.lock={x:E.cage.x,y:E.cage.y+40}; E.top=E.cage.y-ESSE_H-176;
+  E.st=esseState(); E.h=E.st==='hang'?ESSE_H:0; E.door=(E.st==='open'||E.st==='free')?1:0;
+  const spots=[E.forge,E.cage,E.post,E.bel,E.fire];
+  for(const o of L.props) if(spots.some(p=>Math.hypot(o.x-p.x,o.y-p.y)<120)) o.hide=true;
+  L.solids=L.solids.filter(s=>!(s.cover&&spots.some(p=>Math.hypot(s.x-p.x,s.y-p.y)<120)));
+  L.solids.push({x:E.forge.x-46,y:E.forge.y-24,r:46,esse:true},{x:E.forge.x+36,y:E.forge.y-26,r:46,esse:true},{x:E.post.x,y:E.post.y,r:18,esse:true});
+  if(E.h<=0) L.solids.push({x:E.cage.x,y:E.cage.y-6,r:44,esse:true});
+  L.lights=L.lights.filter(l=>!l.esse); L.lights.push({x:E.forge.x+10,y:E.forge.y-40,r:230,i:0.85,c:'rgba(255,140,60,.38)',flick:true,esse:true});
+  if(E.st==='open') esseNpc(E);
+  if(G.cleared[rm.id]&&!G.flags.cageKey&&E.st==='hang') spawnChest(true,{loot:true,cageKey:true,x:cx-rx*0.14,y:cy+ry*0.32});
+  if(E.st==='hang') setTimeout(()=>{ if(R_.pz&&R_.pz.es===E) esseShout(G.cleared[rm.id]?'Die Truhe! Da ist der Schlüssel drin!':'He! Hier oben! Lasst mich runter!'); },1100);
+  if(E.st==='hang'&&!G.cleared[rm.id]&&!G.talked.esseTip){ G.talked.esseTip=true; setTimeout(()=>{ if(R_.pz&&R_.pz.es===E){ hint='Tipp: Tritt auf den Blasebalg der alten Esse (E). Der Feuerstoß trifft alles, was davor steht.'; setTimeout(()=>{ if(hint.startsWith('Tipp: Tritt')) hint=''; },9000); } },2600); }
+}
+function esseNpc(E){ if(R_.npcs.some(n=>n.talk==='pz_grimbart')) return; R_.npcs.push({sp:'schmied',speaker:'schmied',talk:'pz_grimbart',x:E.cage.x-92,y:E.cage.y+46,ph:0,label:'Grimbart',exclaim:true,hop:0,front:'south-east'}); }
+function esseShout(t){ const E=R_&&R_.pz&&R_.pz.es; if(!E) return; E.shout={t:0,txt:t}; }
+const ESSE_FIGHT=['Links! Da kommt einer!','Gib’s ihnen!','Die Esse! Lock sie vor die Esse!','Ha! Das hat gesessen!','Pass auf deinen Rücken auf!','Nicht so zaghaft, Kleine!'];
+function updateEsse(dt,Z,fighting){
+  const E=Z.es; E.t+=dt; E.bellCd=Math.max(0,E.bellCd-dt);
+  if(E.shout){ E.shout.t+=dt; if(E.shout.t>2.8) E.shout=null; }
+  if(E.blast){ E.blast.t+=dt; if(E.blast.t>1.0) E.blast=null; }
+  // Käfig fährt herunter
+  if(E.st==='lower'){
+    E.crank+=dt*9; E.h=Math.max(0,E.h-dt*(70+(ESSE_H-E.h)*0.9)); E.rattle-=dt;
+    if(E.rattle<=0){ E.rattle=0.09; tone(rand(180,260),0.05,'square',0.03); }
+    if(E.h<=0){ E.st='down'; G.flags.cageDown=true; addShake(12); SFX.slam(); for(let i=0;i<16;i++) addPart({x:E.cage.x+rand(-50,50),y:E.cage.y+rand(-6,12),vx:rand(-140,140),vy:rand(-80,-10),life:rand(.5,.9),size:rand(6,11),color:'rgba(170,150,120,.6)',kind:'puff'});
+      L.solids.push({x:E.cage.x,y:E.cage.y-6,r:44,esse:true});
+      setTimeout(()=>esseShout('Uff! Meine Knie. Das Schloss ist hinüber, aber deine Maus passt da rein!'),500);
+      hint=TOUCH?'Geh vor die Käfigtür: die Maus knackt das Schloss.':'Vor die Käfigtür stellen und E drücken: die Maus knackt das Schloss.'; setTimeout(()=>{ if(hint.startsWith('Vor die')||hint.startsWith('Geh vor')) hint=''; },9000); }
+  }
+  if(E.st==='open'||E.st==='free') E.door=Math.min(1,E.door+dt*1.6);
+  // Blasebalg: Feuerstoß (auch mitten im Kampf)
+  if(E.st!=='lower'&&capyAt(E.bel,62)&&!prompt_){ prompt_={x:E.bel.x,y:E.bel.y-86,label:E.bellCd>0?'Blasebalg lädt …':'Blasebalg treten'}; if(pressed.act&&E.bellCd<=0) esseBlast(E); }
+  // Grimbart wirft aus dem Käfig seinen Hammer
+  if(E.ham){ const H=E.ham; H.t+=dt; if(H.t>=H.dur){ const e=H.tgt; if(e&&!e.dying&&enemies.includes(e)){ damageEnemy(e,2); const a=Math.atan2(e.y-H.sy,e.x-H.sx); e.kx=Math.cos(a)*360; e.ky=Math.sin(a)*360; floater(e.x,e.y-90,pick(['Bonk!','Klonk!','Volltreffer!']),'#ffd870'); addShake(6); for(let i=0;i<10;i++) addPart({x:e.x,y:e.y-30,vx:rand(-200,200),vy:rand(-260,-80),life:rand(.3,.6),size:rand(2,4),color:Math.random()<.5?'#ffd070':'#ff8a3a',kind:'spark',g:600}); } E.ham=null; } }
+  if(fighting&&E.st==='hang'&&!E.ham){ E.hammerCd-=dt; if(E.hammerCd<=0){ const t=essePickTarget(E); if(t){ E.hammerCd=rand(9,12.5); const sx=E.cage.x, sy=E.cage.y-E.h-40; E.ham={sx,sy,tgt:t,t:0,dur:0.75}; esseShout(pick(['Fang, du Flohsack!','Nimm das!','Hammerzeit!'])); tone(300,0.2,'sawtooth',0.05,120); } else E.hammerCd=1.2; } }
+  // Rufe aus dem Käfig
+  E.shoutT-=dt;
+  if(E.shoutT<=0&&E.st==='hang'&&!E.shout){ E.shoutT=rand(8,12);
+    if(fighting) esseShout(pick(ESSE_FIGHT));
+    else if(!G.flags.cageKey) esseShout(R_.chest&&!R_.chest.open?'Die Truhe! Da ist der Schlüssel drin!':'Der Schlüssel muss hier irgendwo sein!');
+    else esseShout('Die Kurbel am Galgen! Schließ sie auf! Aber LANGSAM!'); }
+  if(fighting) return;
+  // Kurbel am Galgen
+  if(E.st==='hang'&&capyAt(E.post,74)&&!prompt_){
+    if(G.flags.cageKey){ prompt_={x:E.post.x,y:E.post.y-150,label:'Käfig herunterlassen'}; if(pressed.act){ E.st='lower'; SFX.door(); esseShout('Langsam! LANGSAM! … Ich sagte langsam!'); hint=''; } }
+    else { prompt_={x:E.post.x,y:E.post.y-150,label:'Kurbel ist abgeschlossen'}; if(pressed.act){ SFX.wrong(); esseShout(R_.chest&&!R_.chest.open?'Erst die Truhe aufmachen! Da ist der Schlüssel drin.':'Ohne Schlüssel bewegt sich die Kurbel keinen Zahn.'); } } }
+  // Schloss knacken
+  if(E.st==='down'&&!prompt_){ const nc=capyAt(E.lock,78), nm=moActive()&&mouseAt(E.lock,70);
+    if(nc||nm){ prompt_={x:E.lock.x,y:E.lock.y-150,label:'Schloss knacken (Maus)'}; if((nc&&pressed.act)||(nm&&MOIN.act)||(moSolo()&&MOIN.act)) startLockpick(E); } }
+  // Unter dem hängenden Käfig: rufen
+  if(E.st==='hang'&&!prompt_&&Math.hypot(P.x-E.cage.x,(P.y-E.cage.y)*1.3)<90){ prompt_={x:E.cage.x,y:E.cage.y-E.h-150,label:'Grimbart rufen'}; if(pressed.act) say(G.flags.cageKey?[{who:'schmied',text:'Du hast den Schlüssel! Der passt in die Kurbel am Galgen, gleich da rechts. Dreh, und ich komm runter.'}]:[{who:'schmied',text:'Grimbart, Schmied. Die Kultkatzen haben mich hier aufgehängt, weil ich ihnen keine Krallen schärfen wollte.'},{who:'schmied',text:R_.chest?'Den Schlüssel haben sie in die Truhe gesperrt. Mach sie auf!':'Den Schlüssel haben sie weggesperrt. Mach erst die Wachen platt, dann sehen wir weiter.'}]); }
+}
+function essePickTarget(E){ let best=null, bd=1e9; for(const e of enemies){ if(e.dying||e.type==='dummy'||e.owner&&e.illu) continue; const d=Math.hypot(e.x-P.x,e.y-P.y)+(e.jailer?-120:0); if(d<bd&&Math.hypot(e.x-E.cage.x,e.y-E.cage.y)<760){ bd=d; best=e; } } return best; }
+function esseBlast(E){
+  E.bellCd=7; E.blast={t:0}; SFX.roar&&SFX.roar(); noise(0.4,0.25,500); addShake(8);
+  const c=E.fire; let n=0;
+  for(const e of enemies){ if(e.dying||e.type==='dummy') continue; if(Math.hypot(e.x-c.x,(e.y-c.y)*1.25)<175){ damageEnemy(e,3); const a=Math.atan2(e.y-E.forge.y,e.x-E.forge.x); e.kx=Math.cos(a)*420; e.ky=Math.sin(a)*420; floater(e.x,e.y-80,'Feuer!','#ff9a3a'); n++; } }
+  for(let i=0;i<46;i++){ const a=rand(-0.2,1.3), sp=rand(160,520); addPart({x:E.forge.x+40,y:E.forge.y-10,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp*0.7-40,life:rand(.4,.9),size:rand(4,9),color:Math.random()<.5?'#ff7a2a':'#ffd060',kind:'spark',g:-60}); }
+  for(let i=0;i<10;i++) addPart({x:c.x+rand(-90,90),y:c.y+rand(-50,50),vx:rand(-30,30),vy:rand(-90,-40),life:rand(.7,1.2),size:rand(8,14),color:'rgba(90,70,70,.5)',kind:'puff'});
+  if(n>=2) esseShout(pick(['HA! Gut durch!','Knusprig!','So heizt man eine Esse!']));
+}
+/* ---------------- Schloss-Minispiel: die Maus setzt die Stifte ---------------- */
+function startLockpick(E){
+  if(LOCKP) return; for(const k in keys) keys[k]=false;
+  LOCKP={E,t:0,cur:0,tension:0,slow:1,jam:0,msg:'Drück genau dann, wenn der Spalt die goldene Linie trifft.',msgT:9,fails:0,done:0,
+    pins:[{w:2*Math.PI/1.9,ph:0.3,tol:0.085,set:0,pos:0},{w:2*Math.PI/1.45,ph:1.9,tol:0.068,set:0,pos:0},{w:2*Math.PI/1.15,ph:4.1,tol:0.055,set:0,pos:0}],fx:[],shake:0};
+  SFX.squeak&&SFX.squeak(); tone(900,0.08,'triangle',0.05);
+}
+const LP_SHEAR=0.74;
+function lpPos(p,t,slow){ const w=p.w*slow; return 0.5+0.5*Math.sin(w*t+p.ph+0.55*Math.sin(w*t*0.83+p.ph)); }
+function updateLockpick(dt){
+  const S=LOCKP; S.t+=dt; S.msgT-=dt; S.jam=Math.max(0,S.jam-dt); S.shake=Math.max(0,S.shake-dt*3);
+  pollPad(); const p2=!!(PR2.act||PR2.atk); for(const k in PR2) PR2[k]=false;
+  for(const f of S.fx){ f.t+=dt; } S.fx=S.fx.filter(f=>f.t<0.8);
+  for(const p of S.pins){ if(p.set) p.pos+=(LP_SHEAR-p.pos)*Math.min(1,dt*14); else p.pos=lpPos(p,S.t,S.slow); }
+  if(S.done){ S.done+=dt; if(S.done>1.6){ lockpickWin(); } return; }
+  if(pressed.weap){ LOCKP=null; floater(P.x,P.y-120,'Später nochmal','#b9a98f'); return; }
+  const press=(pressed.act||pressed.atk||pressed.click||pressed.tap||pressed.roll||p2)&&S.t>0.35;
+  if(!press||S.jam>0) return;
+  const p=S.pins[S.cur]; const d=p.pos-LP_SHEAR;
+  if(Math.abs(d)<=p.tol){ p.set=1; S.cur++; S.fx.push({t:0,i:S.cur-1}); tone(1300+S.cur*180,0.07,'triangle',0.07); tone(2400,0.04,'square',0.02); S.msg=['Klick! Einer sitzt.','Klick! Noch einer.','Klick!'][S.cur-1]; S.msgT=1.4;
+    if(S.cur>=S.pins.length){ S.done=0.001; S.msg='Das Schloss gibt nach …'; S.msgT=3; SFX.chest(); } return; }
+  S.tension++; S.fails++; S.jam=0.45; S.shake=1; SFX.wrong(); tone(150,0.12,'square',0.05);
+  const goingUp=lpPos(p,S.t+0.02,S.slow)>p.pos;
+  S.msg=Math.abs(d)>0.3?'Viel zu fest!':(d<0?(goingUp?'Zu früh!':'Zu spät!'):(goingUp?'Zu spät!':'Zu früh!')); S.msgT=1.2;
+  if(S.tension>=3){ for(const q of S.pins) q.set=0; S.cur=0; S.tension=0; S.slow=Math.max(0.7,S.slow*0.9); S.msg='Klack … alle Stifte fallen zurück. Ganz behutsam!'; S.msgT=2.4; S.jam=0.9; SFX.squeak&&SFX.squeak(); }
+}
+function lockpickWin(){
+  const S=LOCKP; const E=S.E; LOCKP=null;
+  G.puzzles.esse=true; E.st='open'; coopStat('puzzles',1); if(!S.fails) coopAchieve('ohneFehler'); if(COOP.on) coopAchieve('doppelt');
+  SFX.win(); addShake(8); banner={text:'Das Schloss springt auf!',sub:'Grimbart ist frei',t:0,small:true};
+  for(let i=0;i<30;i++) addPart({x:E.lock.x+rand(-30,30),y:E.lock.y-60+rand(-30,30),vx:rand(-160,160),vy:rand(-260,-60),life:rand(.6,1.1),size:rand(3,5),color:['#ffd870','#9fd8ff','#ff9ac0'][i%3],kind:'spark',g:300});
+  setTimeout(()=>{ if(R_.pz&&R_.pz.es===E){ esseNpc(E); hearts(E.cage.x-92,E.cage.y-20,6); esseShout(null); } },600);
+  MO.bubble={txt:'Piep!',t:1.6};
+}
+function drawLockpick(){
+  const S=LOCKP; if(!S) return; const k=Math.min(1,S.t/0.3);
+  ctx.save(); ctx.globalAlpha=k; ctx.fillStyle='rgba(8,4,6,.82)'; ctx.fillRect(0,0,W,H);
+  const sx=S.shake>0?Math.sin(S.t*80)*6*S.shake:0;
+  ctx.translate(sx,0);
+  textO('Das verrostete Schloss',W/2,74,40,FD,'#f6cf5a','center',5,700);
+  textO('Die Maus kriecht hinein und setzt die Stifte. Ganz behutsam!',W/2,108,16,FB,'#d9c8b0','center',3,600);
+  // Schlosskörper
+  const bx=W/2-260, by=170, bw=520, bh=330;
+  ctx.beginPath(); prr(bx-6,by-6,bw+12,bh+12,26); ctx.fillStyle=OUT; ctx.fill();
+  let gr=ctx.createLinearGradient(0,by,0,by+bh); gr.addColorStop(0,'#b8863e'); gr.addColorStop(1,'#6e4a1e'); ctx.beginPath(); prr(bx,by,bw,bh,22); ctx.fillStyle=gr; ctx.fill();
+  for(let i=0;i<14;i++){ ctx.fillStyle=`rgba(90,40,20,${0.12+((i*37)%5)*0.03})`; ctx.beginPath(); ctx.ellipse(bx+30+((i*97)%460),by+20+((i*53)%290),10+(i%4)*6,6+(i%3)*4,0,0,TAU); ctx.fill(); }
+  // Zylinder (unten) und Gehäuse (oben), Scherlinie dazwischen
+  const shearY=by+150, cylTop=shearY, chanTop=by+34, chanBot=by+262;
+  ctx.fillStyle='rgba(30,16,8,.55)'; ctx.fillRect(bx+40,shearY,bw-80,112);
+  const xs=[W/2-120,W/2,W/2+120];
+  const lineY0=chanBot-20-LP_SHEAR*((chanBot-20)-(chanTop+40)), span=(chanBot-20)-(chanTop+40);
+  if(!S.done&&S.cur<3){ const p=S.pins[S.cur], x=xs[S.cur], bh2=p.tol*span; ctx.fillStyle=`rgba(255,210,80,${0.28+0.12*Math.sin(S.t*5)})`; ctx.fillRect(x-34,lineY0-bh2,68,bh2*2); ctx.fillStyle='#ffd23a'; ctx.fillRect(x-34,lineY0-bh2,68,2); ctx.fillRect(x-34,lineY0+bh2-2,68,2); }
+  S.pins.forEach((p,i)=>{ const x=xs[i];
+    ctx.fillStyle='#1a0e08'; ctx.fillRect(x-22,chanTop,44,chanBot-chanTop);
+    // Stiftposition: pos 0 = unten, 1 = oben. Der Spalt zwischen Kern- und Gehäusestift wandert mit.
+    const gapY=chanBot-20-p.pos*((chanBot-20)-(chanTop+40));
+    const inWin=!p.set&&i===S.cur&&Math.abs(p.pos-LP_SHEAR)<=p.tol;
+    // Feder
+    ctx.strokeStyle='#8a8a90'; ctx.lineWidth=2; ctx.beginPath(); for(let s=0;s<=10;s++){ const yy=chanTop+4+s*((gapY-60-chanTop-4)/10); ctx.lineTo(x+(s%2?-9:9),yy); } ctx.stroke();
+    // Gehäusestift (oben, silbern)
+    ctx.fillStyle=OUT; ctx.fillRect(x-15,gapY-60,30,58); ctx.fillStyle='#c9ccd4'; ctx.fillRect(x-12,gapY-58,24,54); ctx.fillStyle='rgba(255,255,255,.35)'; ctx.fillRect(x-12,gapY-58,5,54);
+    // Kernstift (unten, Messing)
+    ctx.fillStyle=OUT; ctx.fillRect(x-15,gapY+2,30,62); ctx.fillStyle=p.set?'#ffd870':'#d8a24a'; ctx.fillRect(x-12,gapY+4,24,56); ctx.beginPath(); ctx.moveTo(x-12,gapY+60); ctx.lineTo(x,gapY+74); ctx.lineTo(x+12,gapY+60); ctx.fill();
+    // Spalt
+    ctx.fillStyle=OUT; ctx.fillRect(x-14,gapY-3,28,6); ctx.fillStyle=inWin?'#fff3b0':p.set?'#9af06a':'#6a3a18'; ctx.fillRect(x-12,gapY-1,24,2);
+    if(!p.set){ ctx.fillStyle=i===S.cur?'#9fd8ff':'#8a7a6a'; ctx.beginPath(); ctx.moveTo(x-24,gapY); ctx.lineTo(x-32,gapY-6); ctx.lineTo(x-32,gapY+6); ctx.fill(); ctx.beginPath(); ctx.moveTo(x+24,gapY); ctx.lineTo(x+32,gapY-6); ctx.lineTo(x+32,gapY+6); ctx.fill(); }
+    if(inWin){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.7; ctx.drawImage(fireSprite('255,230,150'),x-50,gapY-50,100,100); ctx.restore(); }
+    if(i===S.cur&&!S.done){ textO('▲',x,chanBot+30+Math.sin(S.t*6)*3,18,FB,'#9fd8ff','center',3,900); }
+    if(p.set) textO('✓',x,chanTop-12,18,FB,'#9af06a','center',3,900);
+  });
+  // Scherlinie
+  ctx.save(); ctx.setLineDash([10,6]); ctx.strokeStyle='#ffd23a'; ctx.lineWidth=3; ctx.beginPath(); const lineY=chanBot-20-LP_SHEAR*((chanBot-20)-(chanTop+40)); ctx.moveTo(bx+24,lineY); ctx.lineTo(bx+bw-24,lineY); ctx.stroke(); ctx.restore();
+  textO('Hier muss der Spalt hin',bx+bw-24,lineY-12,12,FB,'#ffd23a','right',3,700);
+  // Maus mit Haarnadel
+  const mx=bx-40, my=by+bh-30; drawChar('maus','rot','south-east',T,mx,my,{s:2.4});
+  const tx=xs[Math.min(S.cur,2)]; ctx.strokeStyle='#d9dde6'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(mx+28,my-40); ctx.quadraticCurveTo(tx-80,chanBot+40,tx,chanBot+6); ctx.stroke();
+  // Funken bei gesetzten Stiften
+  for(const f of S.fx){ const x=xs[f.i]; ctx.save(); ctx.globalAlpha=1-f.t/0.8; for(let j=0;j<8;j++){ const a=j/8*TAU; ctx.fillStyle='#ffe28a'; ctx.fillRect(x+Math.cos(a)*f.t*90,lineY+Math.sin(a)*f.t*90,4,4); } ctx.restore(); }
+  // Spannung
+  const tw=200; ctx.beginPath(); prr(W/2-tw/2,by+bh+22,tw,14,7); ctx.fillStyle='#2a1a20'; ctx.fill();
+  ctx.beginPath(); prr(W/2-tw/2,by+bh+22,tw*(S.tension/3),14,7); ctx.fillStyle=S.tension>=2?'#ff5a5a':'#f0a23a'; ctx.fill();
+  textO('Spannung',W/2,by+bh+52,13,FB,'#b9a98f','center',3,700);
+  if(S.msgT>0) textO(S.msg,W/2,by+bh+84,22,FD,S.done?'#9af06a':S.msg.startsWith('Klick')?'#ffd870':'#ffb0a0','center',4,700);
+  textO(TOUCH?'Tippen: Stift setzen':'E / Leertaste / Klick (Controller A): Stift setzen · Q: aufhören',W/2,H-26,14,FB,'#b9a98f','center',3,600);
+  ctx.restore();
+}
+/* ---------------- Zeichnen im Raum ---------------- */
+function drawEsseObj(list){
+  const E=R_.pz.es; const f=E.forge;
+  // Esse (alte Schmiede) mit Glut
+  list.push({y:f.y,d:()=>{ spr('schmiede',f.x,f.y,{s:1.2}); const g=0.5+0.3*Math.sin(T*3)+(E.blast?0.6*(1-E.blast.t):0);
+    ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=Math.min(1,g); ctx.drawImage(fireSprite('255,140,60'),f.x+5,f.y-95,70,70); ctx.restore(); }});
+  list.push({y:f.y+44,d:()=>spr('amboss',f.x-120,f.y+44,{s:1.3})});
+  // Blasebalg mit Pedal
+  list.push({y:E.bel.y,d:()=>{ const b=E.bel; const sq=E.blast?Math.max(0,1-E.blast.t*3):0; const ready=E.bellCd<=0;
+    ctx.save(); ctx.translate(b.x,b.y); ctx.fillStyle='rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(0,4,42,10,0,0,TAU); ctx.fill();
+    const h=34-sq*16; ctx.fillStyle=OUT; ctx.beginPath(); ctx.moveTo(-40,-6); ctx.lineTo(30,-6-h*0.25); ctx.lineTo(30,-6-h); ctx.lineTo(-40,-6-h*0.2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#7a4a2a'; ctx.beginPath(); ctx.moveTo(-36,-9); ctx.lineTo(27,-9-h*0.22); ctx.lineTo(27,-4-h); ctx.lineTo(-36,-9-h*0.16); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#4a2a16'; ctx.lineWidth=2; for(let i=1;i<4;i++){ const u=i/4; ctx.beginPath(); ctx.moveTo(-36+63*u,-9-h*0.22*u); ctx.lineTo(-36+63*u,-6-h*(0.16+0.8*u)); ctx.stroke(); }
+    ctx.fillStyle='#5a3a22'; ctx.fillRect(-46,-4,96,6); ctx.fillStyle='#8a6a4a'; ctx.fillRect(28,-10-h,14,4);
+    ctx.fillStyle='#3a3640'; ctx.fillRect(-58,-14,12,10);
+    ctx.restore(); if(ready&&!puzzleNearPrompt(b)) { ctx.save(); ctx.globalAlpha=0.5+0.4*Math.sin(T*4); textO('▼',b.x,b.y-58,14,FB,'#ffb050','center',3,900); ctx.restore(); }
+    if(!ready){ ctx.beginPath(); ctx.arc(b.x,b.y-58,10,-Math.PI/2,-Math.PI/2+TAU*(1-E.bellCd/7)); ctx.strokeStyle='#ffb050'; ctx.lineWidth=3; ctx.stroke(); } }});
+  // Feuerstoß
+  if(E.blast){ const c=E.fire, k=E.blast.t; list.push({y:c.y,d:()=>{ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=Math.max(0,1-k); const r=60+k*180; ctx.drawImage(fireSprite('255,120,40'),c.x-r,c.y-r*0.9,r*2,r*1.6); ctx.restore(); }}); }
+  // Galgen mit Kurbel
+  list.push({y:E.post.y,d:()=>{ const p=E.post, top=E.top, ph=p.y-top; const cx=E.cage.x;
+    ctx.fillStyle=OUT; ctx.fillRect(p.x-11,top-6,22,ph+8); ctx.fillStyle='#5a3a22'; ctx.fillRect(p.x-8,top-3,16,ph+2); ctx.fillStyle='#7a5432'; ctx.fillRect(p.x-8,top-3,4,ph+2);
+    ctx.fillStyle=OUT; ctx.fillRect(cx-20,top-12,p.x-cx+34,20); ctx.fillStyle='#6a4428'; ctx.fillRect(cx-17,top-9,p.x-cx+28,14);
+    ctx.fillStyle=OUT; ctx.beginPath(); ctx.moveTo(p.x-8,top+48); ctx.lineTo(p.x-60,top+6); ctx.lineTo(p.x-48,top+2); ctx.lineTo(p.x-2,top+40); ctx.fill();
+    // Kurbelrad
+    const wy=p.y-96; ctx.save(); ctx.translate(p.x+20,wy); ctx.rotate(E.crank); ctx.fillStyle=OUT; ctx.beginPath(); ctx.arc(0,0,22,0,TAU); ctx.fill(); ctx.fillStyle='#8a6a4a'; ctx.beginPath(); ctx.arc(0,0,18,0,TAU); ctx.fill(); ctx.strokeStyle='#4a2a16'; ctx.lineWidth=3; for(let i=0;i<4;i++){ ctx.rotate(Math.PI/2); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(18,0); ctx.stroke(); } ctx.fillStyle='#c8c0b0'; ctx.fillRect(16,-3,16,6); ctx.restore();
+    // Vorhängeschloss an der Kurbel
+    if(E.st==='hang'){ const lx=p.x+20, ly=wy+30; ctx.strokeStyle=OUT; ctx.lineWidth=5; ctx.beginPath(); ctx.arc(lx,ly-6,8,Math.PI,0); ctx.stroke(); ctx.strokeStyle='#a8a8b0'; ctx.lineWidth=3; ctx.stroke(); ctx.fillStyle=OUT; ctx.fillRect(lx-11,ly-6,22,18); ctx.fillStyle=G.flags.cageKey?'#ffd870':'#b8863e'; ctx.fillRect(lx-9,ly-4,18,14); ctx.fillStyle=OUT; ctx.fillRect(lx-1,ly,3,6); }
+  }});
+  // Käfig (hängend oder unten) mit Grimbart
+  list.push({y:E.cage.y+30,d:()=>drawEsseCage(E)});
+  // Hammerwurf
+  if(E.ham){ const H=E.ham; list.push({y:9999,d:()=>{ const u=Math.min(1,H.t/H.dur), e=H.tgt; const tx=e?e.x:H.sx, ty=e?e.y-30:H.sy; const x=lerp(H.sx,tx,u), y=lerp(H.sy,ty,u)-Math.sin(u*Math.PI)*140;
+    ctx.save(); ctx.translate(x,y); ctx.rotate(H.t*18); ctx.fillStyle=OUT; ctx.fillRect(-3,-2,6,30); ctx.fillStyle='#8a5a32'; ctx.fillRect(-2,0,4,27); ctx.fillStyle=OUT; ctx.fillRect(-13,-12,26,14); ctx.fillStyle='#a8a8b0'; ctx.fillRect(-11,-10,22,10); ctx.restore(); }}); }
+  // Namensschild über dem Kerkermeister
+  for(const e of enemies) if(e.jailer&&!e.dying) list.push({y:e.y+1,d:()=>{ textO('Kerkermeister',e.x,e.y-96-(e.z||0),14,FB,'#ff9a7a','center',3,800); }});
+  // Ruf aus dem Käfig
+  if(E.shout&&E.shout.txt){ list.push({y:99999,d:()=>{ const s=E.shout; const a=Math.min(1,s.t*5,(2.8-s.t)*3); const x=E.st==='hang'||E.st==='lower'?E.cage.x:E.cage.x-92, y=(E.st==='hang'||E.st==='lower'?E.cage.y-E.h-150:E.cage.y-110);
+    ctx.save(); ctx.globalAlpha=Math.max(0,a); ctx.font=`700 15px ${FB}`; const w=Math.min(420,ctx.measureText(s.txt).width+24); ctx.beginPath(); prr(x-w/2,y-22,w,30,10); ctx.fillStyle='rgba(246,231,200,.95)'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle=OUT; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-8,y+8); ctx.lineTo(x,y+20); ctx.lineTo(x+8,y+8); ctx.fill(); textO(s.txt,x,y-7,15,FB,'#2a1a18','center',0,700); ctx.restore(); }}); }
+}
+function puzzleNearPrompt(b){ return prompt_&&Math.hypot(prompt_.x-b.x,prompt_.y-(b.y-86))<4; }
+function drawEsseCage(E){
+  const c=E.cage, h=E.h, top=E.top; const y=c.y-h;
+  // Schatten am Boden
+  ctx.save(); ctx.globalAlpha=0.45*(1-h/ESSE_H*0.6); ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(c.x,c.y+6,54*(1-h/ESSE_H*0.3),13,0,0,TAU); ctx.fill(); ctx.restore();
+  // Kette
+  const ct=top+6, cb=y-128; if(cb>ct){ for(let yy=ct;yy<cb;yy+=10){ ctx.fillStyle=OUT; ctx.fillRect(c.x-4,yy,8,9); ctx.fillStyle=(yy/10|0)%2?'#9a9aa4':'#6a6474'; ctx.fillRect(c.x-2,yy+1,4,7); } }
+  // Grimbart drinnen (solange die Tür zu ist oder er noch drin steht)
+  const inside=E.st==='hang'||E.st==='lower'||E.st==='down';
+  if(inside){ const wob=E.st==='lower'?Math.sin(E.t*20)*2:0; drawChar('schmied',dialog?'rot':'rot','south',T,c.x+wob,y+2,{s:0.92}); }
+  // Gitter
+  ctx.fillStyle=OUT; ctx.fillRect(c.x-52,y-128,104,10); ctx.fillRect(c.x-54,y-4,108,10);
+  ctx.fillStyle='#4a4450'; ctx.fillRect(c.x-49,y-125,98,5); ctx.fillStyle='#5a5464'; ctx.fillRect(c.x-51,y-2,102,6);
+  ctx.beginPath(); ctx.moveTo(c.x-44,y-128); ctx.quadraticCurveTo(c.x,y-162,c.x+44,y-128); ctx.lineWidth=7; ctx.strokeStyle=OUT; ctx.stroke(); ctx.lineWidth=3; ctx.strokeStyle='#6a6474'; ctx.stroke();
+  const hinge=c.x-30;
+  for(let i=-3;i<=3;i++){ const doorBar=Math.abs(i)<=1; let x=c.x+i*15; if(doorBar&&E.door>0) x=hinge+(x-hinge)*Math.cos(E.door*1.9)-Math.sin(E.door*1.9)*6;
+    ctx.fillStyle=OUT; ctx.fillRect(x-3,y-120,6,118); ctx.fillStyle=doorBar?'#7a7484':'#6a6474'; ctx.fillRect(x-2,y-118,3,114); }
+  // Türschloss
+  if(E.door<0.5){ const lx=c.x, ly=y-52; ctx.fillStyle=OUT; ctx.fillRect(lx-11,ly-12,22,24); ctx.fillStyle='#8a5a2a'; ctx.fillRect(lx-9,ly-10,18,20); ctx.fillStyle='#5a3418'; ctx.fillRect(lx-7,ly+3,14,5); ctx.fillStyle=OUT; ctx.fillRect(lx-1,ly-4,3,7); }
+  if(E.st==='hang'||E.st==='lower'){ ctx.globalAlpha=0.85; textO('Grimbart',c.x,y+18,14,FB,'#f3e7cf','center',3,700); ctx.globalAlpha=1; }
+}
+function drawEsseHUD(E){
+  if(G.flags.cageKey&&E.st==='hang'){ const x=W-196, y=250; ctx.save(); ctx.beginPath(); prr(x,y,172,44,10); ctx.fillStyle='rgba(20,8,12,.85)'; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle='#8a6a3e'; ctx.stroke();
+    ctx.strokeStyle='#ffd870'; ctx.lineWidth=4; ctx.beginPath(); ctx.arc(x+24,y+22,8,0,TAU); ctx.stroke(); ctx.fillStyle='#ffd870'; ctx.fillRect(x+31,y+20,24,4); ctx.fillRect(x+47,y+20,4,9); ctx.fillRect(x+53,y+20,3,7);
+    textO('Käfigschlüssel',x+108,y+22,14,FB,'#f3e7cf','center',3,700); ctx.restore(); }
+}
 
 /* ======================================================================
    FESTWIESE: freiwillige Minispiele (Solo gegen NPC, Koop gegeneinander)
@@ -7526,7 +7756,7 @@ function mgWrap(txt,x,y,w,size){ ctx.font=`600 ${size}px ${FB}`; const words=txt
    Weiterspielen · Lokales Duo (Steuerung je Figur wählen) · Einstellungen · Hauptmenü
    ====================================================================== */
 let PAUSE=null;
-function canPause(){ return mode==='play'&&ASSETS_READY&&!CHOICE&&!MG&&!EMENU&&!G.dead; }
+function canPause(){ return mode==='play'&&ASSETS_READY&&!CHOICE&&!MG&&!LOCKP&&!EMENU&&!G.dead; }
 function openPause(page,opt){
   if(PAUSE){ pauseShow(page||'main'); return; }
   if(!canPause()) return;
@@ -7848,7 +8078,7 @@ function exitOpen(d){ if(scene!=='room') return false; return !roomLocked()&&!se
 function roomClear(){
   const rm=curRoom(); if(!rm||G.cleared[rm.id]) return;
   G.cleared[rm.id]=true; SFX.win();
-  if(rm.waves&&rm.waves.length>=2&&!R_.chest&&!RM) setTimeout(()=>{ if(scene==='room'&&curRoom()===rm&&!R_.chest){ spawnChest(false,{loot:true}); SFX.chest(); } },900);
+  if(rm.waves&&rm.waves.length>=2&&!R_.chest&&!RM) setTimeout(()=>{ if(scene==='room'&&curRoom()===rm&&!R_.chest){ spawnChest(false,Object.assign({loot:true},rm.pz==='esse'&&!G.flags.cageKey&&!G.puzzles.esse?{cageKey:true}:{})); SFX.chest(); } },900);
   if(rm.flag) G.flags[rm.flag]=true;
   banner={text:'Raum geschafft!',sub:rm.flag?'Irgendwo hat sich ein Siegel gelöst …':'Die Wege sind frei',t:0,small:true};
   hint='';
@@ -8353,7 +8583,7 @@ function render(){
   if(R_.cas&&(scene==='room'||R_.cas.hub)) drawBJUI();
   if(dialog) drawDialog();
   if(G.dead) drawDead();
-  drawBossCard(); drawCut(); drawChoice(); drawLobby(); drawMinigame();
+  drawBossCard(); drawCut(); drawChoice(); drawLobby(); drawMinigame(); drawLockpick();
   if(fade.a>0){ ctx.fillStyle=`rgba(12,6,9,${fade.a})`; ctx.fillRect(0,0,W,H); }
   drawReticle();
 }
@@ -8794,11 +9024,12 @@ function update(dt){
   for(const m of motes){ m.x+=m.vx*dt; m.y+=m.vy*dt; if(m.y<-5){ m.y=H+5; m.x=Math.random()*W; } if(m.x<-5) m.x=W+5; if(m.x>W+5) m.x=-5; }
   if(mode!=='play') return;
   if(pressed.god){ G.god=!G.god; banner={text:G.god?'Testmodus an':'Testmodus aus',sub:G.god?'Du bist unverwundbar (P zum Ausschalten)':'Du kannst wieder Schaden nehmen',t:0,small:true}; SFX.place(); }
-  if(scene==='map'||BC||CUT||CHOICE||MG||dialog||G.dead) padMenuMap();
+  if(scene==='map'||BC||CUT||CHOICE||MG||LOCKP||dialog||G.dead) padMenuMap();
   if(scene==='map'){ updateMap(dt); return; }
   if(BC){ updateBossCard(dt); return; }
   if(CUT){ updateCut(dt); return; }
   if(CHOICE){ updateChoice(dt); return; }
+  if(LOCKP){ updateLockpick(dt); return; }
   if(COOP.lobby){ updateLobby(dt); return; }
   if(MG){ updateMinigame(dt); return; }
   if(hitstop>0){ hitstop-=dt; return; }
