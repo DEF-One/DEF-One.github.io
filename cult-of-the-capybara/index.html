@@ -927,7 +927,7 @@ const REGIONS=[
     {id:'g2',gx:1,gy:-1,type:'dice',name:'Knöchelbeins Teich',sub:'Würfel lügen nicht. Kröten schon.',size:[1240,800],flag:'schluessel'},
     {id:'g3',gx:1,gy:1,type:'page',name:'Die kleine Insel',sub:'Jemand sitzt hier fest',size:[1180,760],page:3,
       npc:{key:'baer',name:'Brumm',fx:.5,fy:.45,talk:'brumm'}},
-    {id:'g4',gx:2,gy:0,type:'boss',name:'Der Damm',sub:'Hier wohnt der Dammbauer',size:[1560,980]},
+    {id:'g4',gx:2,gy:0,type:'boss',name:'Der Damm',sub:'Hier wohnt der Dammbauer',size:[1560,1340]},
   ]},
 ];
 const REGIONBY={}; REGIONS.forEach((r,i)=>{ r.idx=i; r.byId={}; r.rooms.forEach(m=>{ r.byId[m.id]=m; m.region=r; }); REGIONBY[r.key]=r; });
@@ -1488,9 +1488,9 @@ function pixelGround(g,x0,y0,w,h,key,R){
 }
 
 /* Plateau-Umriss: abgerundetes Rechteck mit leichtem Rauschen */
-function plateauPoly(w,h,seed,shape){
-  const R=mulberry(seed);
-  const cx=w/2, cy=h/2-10, rx=w/2-150, ry=h/2-130;
+function plateauPoly(w,h,seed,shape,top){
+  const R=mulberry(seed); top=top||0;
+  const cx=w/2, cy=top+(h-top)/2-10, rx=w/2-150, ry=(h-top)/2-130;
   const pts=[], N=72, p=shape||4.6, ph1=R()*TAU, ph2=R()*TAU;
   for(let i=0;i<N;i++){ const a=i/N*TAU, c=Math.cos(a), s=Math.sin(a);
     const ex=Math.sign(c)*Math.pow(Math.abs(c),2/p), ey=Math.sign(s)*Math.pow(Math.abs(s),2/p);
@@ -1511,7 +1511,7 @@ function buildRoom(rm){
   const [w,h]=rm.size;
   const seed=7000+reg.idx*977+rm.gx*131+rm.gy*71;
   const R=mulberry(seed);
-  const P0=plateauPoly(w,h,seed,boss||big3?3.0:3.4+R()*1.4);
+  const P0=plateauPoly(w,h,seed,boss||big3?3.0:3.4+R()*1.4,boss?DAM_TOP:0); // Endboss: Platz über der Arena für den Damm
   const pts=P0.pts, cx=P0.cx, cy=P0.cy;
   const walkPts=pts.map(p=>[cx+(p[0]-cx)*0.94, cy+(p[1]-cy)*0.88-6]);
   const exits=roomExits(rm);
@@ -2497,11 +2497,14 @@ function dammMove(b,dx,dy){ const nx=b.x+dx, ny=b.y+dy; if(pointInPoly(nx,ny,L.w
 function updateDamm(b,dt){
   b.st+=dt;
   b.mouth=Math.max(0,(b.mouth||0)-dt*2); b.arms=lerp(b.arms||0,(b.state==='damW'||b.state==='wave'||b.state==='enrage'||b.state==='summon')?1:0,dt*6);
+  if(b.state!=='stun') b.crashed=false;
+  if(['cine','crest','jump','introDone'].includes(b.state)) return; // Zwischensequenzen: keine Angriffe, kein Berührungsschaden
   const ph=dammPhase(b); const spd=[1,1,1.18,1.35][ph];
   if(b.state!=='dead'&&ph>b.phase&&!['sub','subMove','erupt'].includes(b.state)){ b.phase=ph; b.state='enrage'; b.st=0; SFX.roar(); addShake(14); banner={text:ph===2?'Der Dammbauer wird wütend!':'Der Damm bricht!',sub:ph===2?'Phase 2 von 3':'Letzte Phase',t:0}; for(let i=0;i<12;i++){ const a=i/12*TAU; R_.stakes.push({x:b.x+Math.cos(a)*200,y:b.y+Math.sin(a)*110,t:-i*0.05,warn:0.9,hit:false}); } }
   if(b.state==='sleep'){ b.sink=1; return; }
   if(b.state==='rise'){ b.sink=Math.max(0,1-b.st/0.9); if(Math.random()<.5) puff(b.x+rand(-80,80),b.y,'rgba(200,240,240,.8)',2); if(b.st>1.0){ b.state='intro'; b.st=0; } return; }
   if(b.state==='intro') return;
+  if(b.state==='dead'&&R_.dam){ if(!R_.dam.fin) damFinaleStart(b); return; }
   if(b.state==='dead'){
     b.mouth=1; if(Math.random()<.4) puff(b.x+rand(-80,80),b.y-rand(20,200),Math.random()<.5?'#8a6a4f':'#a81e2c',2);
     b.sink=Math.min(0.5,b.st/3);
@@ -2553,12 +2556,12 @@ function updateDamm(b,dt){
       if(b.waved&&R_.bands.length===0){ b.waved=false; b.state='stun'; b.st=0.3; } break; }
     case 'chargeW': if(b.st<0.45){ b.ang=leadAng(b.x,b.y,600,0.7,0); face(); } b.sq=0.06; if(b.st>0.8/spd){ b.state='charge'; b.st=0; SFX.roar(); } break;
     case 'build': b.arms=1; b.mouth=1; if(b.st>0.7&&!b.built){ b.built=true; dammBuildWalls(b); floater(b.x,b.y-260,'Ich bau mir meinen Damm!','#ff8a6a'); } if(b.st>1.5){ b.built=false; b.state='idle'; b.st=0; } break;
-    case 'charge': { if(b.fake&&b.st>0.3){ b.fake=false; b.state='idle'; b.st=0; puff(b.x,b.y,'rgba(200,240,240,.8)',6); break; } if(braceCrash(b)) break; if(dammWallCrash(b)){ b.state='stun'; b.st=-1.5; b.sq=0.3; addShake(18); SFX.slam(); floater(b.x,b.y-260,'AUTSCH! Mein Damm!','#f6cf5a'); damageEnemy(b,3); break; }
+    case 'charge': { if(b.fake&&b.st>0.3){ b.fake=false; b.state='idle'; b.st=0; puff(b.x,b.y,'rgba(200,240,240,.8)',6); break; } if(braceCrash(b)) break; if(dammWallCrash(b)){ b.crashed=true; b.state='stun'; b.st=-1.5; b.sq=0.3; addShake(18); SFX.slam(); floater(b.x,b.y-260,'AUTSCH! Mein Damm!','#f6cf5a'); damageEnemy(b,3); break; }
       if(Math.random()<.7) addPart({x:b.x-Math.cos(b.ang)*60,y:b.y,vx:rand(-40,40),vy:rand(-80,-20),life:.6,size:rand(6,12),color:'rgba(200,240,240,.8)',kind:'puff'});
       if(!dammMove(b,Math.cos(b.ang)*600*spd*dt,Math.sin(b.ang)*600*spd*dt)||b.st>1.4){ b.state='stun'; b.st=0; SFX.slam(); addShake(12); b.sq=0.25; puff(b.x,b.y-40,'rgba(200,240,240,.9)',18); } break; }
     case 'sub': b.sink=Math.min(1,b.st/0.6); if(!b.subS){ b.subS=true; SFX.splashBig(); } if(b.st>0.7){ b.subS=false; b.state='subMove'; b.st=0; } break;
-    case 'subMove': { b.sink=1; const a=Math.atan2(P.y-b.y,P.x-b.x); if(b.st<1.2){ dammMove(b,Math.cos(a)*300*dt,Math.sin(a)*300*dt); if(Math.random()<.6) addPart({x:b.x+rand(-20,20),y:b.y,vx:0,vy:-30,life:0.8,size:rand(3,6),color:'rgba(210,255,250,.7)',kind:'bubble',g:0.001,ph:rand(0,TAU)}); }
-      if(b.st>1.9){ b.state='erupt'; b.st=0; SFX.splashBig(); addShake(16); b.sink=0; if(Math.hypot(P.x-b.x,(P.y-b.y)*1.4)<110) hurtPlayer(2,b.x,b.y); puff(b.x,b.y-40,'rgba(200,240,240,.95)',40); for(let k=0;k<8;k++){ const aa=k/8*TAU; projs.push({x:b.x,y:b.y-40,vx:Math.cos(aa)*200,vy:Math.sin(aa)*200,r:10,life:1.4,kind:'drop'}); } } break; }
+    case 'subMove': { b.sink=1; const a=Math.atan2(P.y-b.y,P.x-b.x); const chase=1.5, mark=b.ambush?1.0:0.7; if(b.st>=chase&&!b.marked){ b.marked=true; damAmbushMark(b); } if(b.st<chase){ dammMove(b,Math.cos(a)*300*dt,Math.sin(a)*300*dt); if(Math.random()<.6) addPart({x:b.x+rand(-20,20),y:b.y,vx:0,vy:-30,life:0.8,size:rand(3,6),color:'rgba(210,255,250,.7)',kind:'bubble',g:0.001,ph:rand(0,TAU)}); }
+      if(b.st>chase+mark){ b.marked=false; b.state='erupt'; b.st=0; SFX.splashBig(); addShake(16); b.sink=0; if(Math.hypot(P.x-b.x,(P.y-b.y)*1.4)<110) hurtPlayer(1,b.x,b.y); puff(b.x,b.y-40,'rgba(200,240,240,.95)',40); if(!damAmbushErupt(b)) for(let k=0;k<8;k++){ const aa=k/8*TAU; projs.push({x:b.x,y:b.y-40,vx:Math.cos(aa)*200,vy:Math.sin(aa)*200,r:10,life:1.4,kind:'drop'}); } } break; }
     case 'erupt': b.sink=0; b.mouth=1; if(b.st>0.9){ b.state='stun'; b.st=0.4; } break;
     case 'summon': b.mouth=1; if(!b.sm){ b.sm=true; SFX.summon(); const kind=ph>=3?'spider':'frog', n=ph>=3?3:2; for(let k=0;k<n;k++){ const p=spawnSpot(120); summons.push({x:p[0],y:p[1],t:-k*0.2,dur:0.9,kind,owner:b}); } }
       if(b.st>1.2){ b.state='idle'; b.st=0; b.sm=false; } break;
@@ -2581,7 +2584,7 @@ function drawBossGroundFX(){
   if(b.state==='biteW'){ ctx.save(); ctx.translate(b.x,b.y); ctx.scale(1,0.7); ctx.beginPath(); ctx.arc(0,0,175,b.ang-0.9,b.ang+0.9); ctx.arc(0,0,60,b.ang+0.9,b.ang-0.9,true); ctx.closePath(); ctx.fillStyle=`rgba(255,40,50,${pulse})`; ctx.fill(); ctx.lineWidth=4; ctx.strokeStyle='rgba(255,90,90,.9)'; ctx.stroke(); ctx.restore(); }
   if(b.state==='tailW'){ ctx.save(); ctx.translate(b.x,b.y); ctx.scale(1,1/1.6); ctx.beginPath(); ctx.arc(0,0,180,0,TAU); ctx.fillStyle=`rgba(255,40,50,${pulse*0.8})`; ctx.fill(); ctx.lineWidth=5; ctx.strokeStyle='rgba(255,90,90,.9)'; ctx.stroke(); const k=Math.min(1,b.st/0.7); ctx.beginPath(); ctx.arc(0,0,180*k,0,TAU); ctx.stroke(); ctx.restore(); }
   if(b.state==='chargeW'){ ctx.save(); ctx.globalAlpha=pulse+0.1; ctx.strokeStyle='#ff3b3b'; ctx.lineWidth=90; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(b.x+Math.cos(b.ang)*800,b.y+Math.sin(b.ang)*800); ctx.stroke(); ctx.restore(); }
-  if(b.state==='subMove'&&b.st>1.2){ ctx.save(); ctx.translate(b.x,b.y); ctx.scale(1,1/1.4); const k=(b.st-1.2)/0.7; ctx.beginPath(); ctx.arc(0,0,110,0,TAU); ctx.fillStyle=`rgba(255,40,50,${0.15+k*0.25})`; ctx.fill(); ctx.lineWidth=4; ctx.strokeStyle='rgba(255,90,90,.9)'; ctx.stroke(); ctx.beginPath(); ctx.arc(0,0,110*k,0,TAU); ctx.stroke(); ctx.restore(); }
+  if(b.state==='subMove'&&b.st>1.5){ ctx.save(); ctx.translate(b.x,b.y); ctx.scale(1,1/1.4); const k=Math.min(1,(b.st-1.5)/(b.ambush?1.0:0.7)); ctx.beginPath(); ctx.arc(0,0,110,0,TAU); ctx.fillStyle=`rgba(255,40,50,${0.15+k*0.25})`; ctx.fill(); ctx.lineWidth=4; ctx.strokeStyle='rgba(255,90,90,.9)'; ctx.stroke(); ctx.beginPath(); ctx.arc(0,0,110*k,0,TAU); ctx.stroke(); ctx.restore(); }
   for(const s of (R_.stakes||[])){ if(s.burst||s.t<0) continue; const k=Math.min(1,s.t/s.warn); ctx.save(); ctx.translate(s.x,s.y); ctx.scale(1,0.55); ctx.beginPath(); ctx.arc(0,0,36,0,TAU); ctx.fillStyle=`rgba(255,40,50,${0.12+k*0.25})`; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle='rgba(255,100,100,.85)'; ctx.stroke(); ctx.beginPath(); ctx.arc(0,0,36*k,0,TAU); ctx.stroke(); ctx.restore(); }
   for(const w of (R_.bands||[])){ if(w.warn>0){ ctx.save(); ctx.globalAlpha=0.3+Math.sin(T*25)*0.15; ctx.fillStyle='#ff3a4a'; ctx.fillRect(L.cx-L.rx,w.y-14,w.gap-w.gw/2-(L.cx-L.rx),28); ctx.fillRect(w.gap+w.gw/2,w.y-14,(L.cx+L.rx)-w.gap-w.gw/2,28); ctx.restore(); ctx.save(); ctx.globalAlpha=0.6; ctx.strokeStyle='#e0fff8'; ctx.setLineDash([8,8]); ctx.lineWidth=3; ctx.strokeRect(w.gap-w.gw/2,w.y-18,w.gw,36); ctx.restore(); } }
 }
@@ -2779,32 +2782,52 @@ function drawDummySack(d){
   spr('sack',d.x,d.y,{skew:Math.sin(d.wob*18)*d.wob*0.6+Math.sin(T*1.3)*0.02,flash:d.wob>0.5});
 }
 /* ---------------- Der Dammbauer (Sprite) ---------------- */
+/* Animationswahl. Neue PixelLab-Animationen (siehe tools/endboss_pixellab.py) werden automatisch benutzt,
+   sobald sie im Atlas liegen ('damm2:…' = neu und detaillierter gepixelt, sonst 'damm:…'). */
+let DAMM_SET=null;
+function dammKey(){ return SPRITES.A['damm2:idle:south']?'damm2':'damm'; }
+function dammHas(a){ if(!DAMM_SET){ DAMM_SET=new Set(Object.keys(SPRITES.A).filter(k=>k.startsWith('damm')).map(k=>k.split(':').slice(0,2).join(':'))); } return DAMM_SET.has(dammKey()+':'+a); }
 function dammAnim(b){
-  const st=b.state;
+  const st=b.state, toP=()=>dir8(P.x-b.x,P.y-b.y), dAng=()=>dir8(Math.cos(b.ang||0),Math.sin(b.ang||0));
+  if(st==='chargeW'&&dammHas('charge')) return ['charge',Math.min(0.75,b.st),false,dAng()];
+  if((st==='tailW'||st==='tail')&&dammHas('tail')) return ['tail',st==='tailW'?Math.min(0.35,b.st):0.35+b.st*1.5,false,toP()];
+  if(st==='sub'&&dammHas('dive')) return ['dive',b.st*1.4,false];
+  if(st==='erupt'&&dammHas('emerge')) return ['emerge',b.st*1.2,false];
+  if(st==='stun'&&b.crashed&&dammHas('crash')) return ['crash',b.st+1.6,false];
+  if(st==='letter'&&dammHas('letter')) return ['letter',b.st,true,'north'];
+  if(st==='dead'&&dammHas('defeat')) return ['defeat',b.st*0.9,false];
+  if(st==='crest'&&dammHas('smug')) return ['smug',b.st,true];
+  if(st==='jump'&&dammHas('jump')) return ['jump',b.st*1.2,false];
+  if(st==='cine'&&dammHas('panic')) return ['panic',b.st,true];
+  if(st==='idle'&&b.hp<b.max*0.25&&dammHas('wounded')) return ['wounded',T,true];
   if(st==='biteW') return ['bite',Math.min(0.3,b.st)*1,false];
   if(st==='bite') return ['bite',0.3+b.st*2,false];
   if(st==='tailW'||st==='damW') return ['slam',Math.min(0.35,b.st),false];
   if(st==='tail'||st==='damR') return ['slam',0.35+b.st*1.5,false];
-  if(st==='enrage'||st==='intro'||st==='summon'||st==='wave'||st==='logs'||st==='dead') return ['roar',b.st,true];
+  if(st==='dead') return ['idle',T*0.4,true];                               // Finale: müde, nicht mehr brüllend
+  if(st==='repair'||st==='letter') return ['slam',((b.st*1.6)%1)*0.9,false];   // hämmern / Brief hineinstopfen
+  if((st==='crest'||st==='cine'||st==='jump')&&(b.mouth||0)>0.3) return ['roar',b.st,true];
+  if(st==='enrage'||st==='intro'||st==='summon'||st==='wave'||st==='logs') return ['roar',b.st,true];
   return ['idle',T,true];
 }
 function drawDammSpr(b){
   const sink=b.sink||0;
-  if(sink<0.95){ for(let k=0;k<2;k++){ const t=(T*0.8+k*0.5)%1; ctx.beginPath(); ctx.ellipse(b.x,b.y,100+t*70,28+t*18,0,0,TAU); ctx.lineWidth=3; ctx.strokeStyle=`rgba(200,240,240,${0.35*(1-t)})`; ctx.stroke(); } }
-  shadowE(b.x,b.y,110*(1-sink*0.5),28,.45);
-  const [anim,t,loop]=dammAnim(b);
-  const S=2;
+  if(sink<0.95&&!b.air){ for(let k=0;k<2;k++){ const t=(T*0.8+k*0.5)%1; ctx.beginPath(); ctx.ellipse(b.x,b.y,100+t*70,28+t*18,0,0,TAU); ctx.lineWidth=3; ctx.strokeStyle=`rgba(200,240,240,${0.35*(1-t)})`; ctx.stroke(); } }
+  if(!b.air) shadowE(b.x,b.y,110*(1-sink*0.5),28,.45);
+  const [anim,t,loop,dir]=dammAnim(b), key=dammKey();
+  // neue, detailliertere Fassung: gleiche sichtbare Größe wie bisher (alter Inhalt ~107 px bei Faktor 2)
+  let S=2; if(key==='damm2'){ const f0=SPRITES.f['damm2:idle:south:0']; S=f0?Math.min(2,214/Math.max(1,f0[4])):1.4; }
   ctx.save();
   ctx.beginPath(); ctx.rect(b.x-400,b.y-600,800,600); ctx.clip();
   let x=b.x, y=b.y+sink*300;
   if(b.state==='chargeW'||b.state==='enrage') x+=Math.sin(T*70)*3;
   const sq=b.sq||0;
-  const fr=charFrame('damm',anim,'south',t,10,loop);
+  const fr=charFrame(key,anim,dir||'south',t,10,loop);
   const pull=b.state==='bite'?Math.cos(b.ang||0)*18:0;
-  spr(fr.name,x+pull,y,{s:S,sx:1+sq,sy:(1-sq)*(1+Math.sin(T*3)*0.012),foot:fr.foot,flash:b.flash>0,overlay:b.state==='stun'?'#f6cf5a':(b.phase>=3?'#ff2020':null),overlayA:b.state==='stun'?0.2:0.12});
+  spr(fr.name,x+pull,y,{s:S,flip:fr.flip,sx:1+sq,sy:(1-sq)*(1+Math.sin(T*3)*0.012),foot:fr.foot,flash:b.flash>0,overlay:b.state==='stun'?'#f6cf5a':(b.phase>=3?'#ff2020':null),overlayA:b.state==='stun'?0.2:0.12});
   ctx.restore();
   // Wasserlinie
-  ctx.save(); ctx.globalAlpha=0.5; ctx.fillStyle='rgba(60,140,140,.45)'; ctx.beginPath(); ctx.ellipse(b.x,b.y-4,100,16,0,0,TAU); ctx.fill(); ctx.restore();
+  if(!b.air){ ctx.save(); ctx.globalAlpha=0.5; ctx.fillStyle='rgba(60,140,140,.45)'; ctx.beginPath(); ctx.ellipse(b.x,b.y-4,100,16,0,0,TAU); ctx.fill(); ctx.restore(); }
   if(sink>0.2&&Math.random()<0.3) addPart({x:b.x+rand(-60,60),y:b.y+rand(-10,10),vx:0,vy:-rand(20,40),life:1.2,size:rand(3,6),color:'rgba(210,255,250,.7)',kind:'bubble',g:0.001,ph:rand(0,TAU)});
   if(b.state==='stun'){ for(let i=0;i<4;i++){ const a=T*5+i*1.6; textO('★',b.x+Math.cos(a)*60,b.y-270+Math.sin(a)*12,22,FB,'#f6cf5a',null,3); } }
   if(b.phase>=2&&b.state!=='dead'&&b.sink<0.5){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.25+Math.sin(T*6)*0.1; ctx.drawImage(fireSprite('255,40,40'),b.x-140,b.y-300,280,280); ctx.restore(); }
@@ -3600,12 +3623,21 @@ function hitWalls(x,y,rad){ for(const w of (R_.walls||[]).slice()){ if(w.hitBy==
 function dammWallCrash(b){ for(const w of (R_.walls||[])){ for(const k of [-1.5,0,1.5]){ const sx=w.x+k*40, sy=w.y; if(Math.hypot(b.x-sx,(b.y-sy)*1.3)<95){ breakWall(w); return true; } } } return false; }
 function dammExtras(b,dt){
   // Strömung in der letzten Phase
-  if(b.phase>=3&&b.state!=='dead'){ R_.cur=R_.cur||{a:rand(0,TAU),k:0}; R_.cur.a+=dt*0.22; R_.cur.k=Math.min(1,R_.cur.k+dt*0.5);
-    if(!P.lock&&!G.dead){ const s=(P.rollT>0?30:72)*R_.cur.k; moveBody(P,Math.cos(R_.cur.a)*s*dt,Math.sin(R_.cur.a)*s*dt*0.7,18); }
-    if(Math.random()<dt*14) addPart({x:rand(L.cx-L.rx,L.cx+L.rx),y:rand(L.cy-L.ry,L.cy+L.ry),vx:Math.cos(R_.cur.a)*160,vy:Math.sin(R_.cur.a)*110,life:1.2,size:rand(6,11),color:'rgba(210,250,250,.35)',kind:'puff'}); }
+  // Strömung nur, wenn ein Angriffsmuster sie auslöst: feste Richtung, 1,3 s angekündigt, wirkt nicht auf den Felsen
+  if(R_.cur&&b.state!=='dead'){ const C=R_.cur; C.warn=C.warn||0; C.t=C.t||0;
+    if(C.warn>0){ C.warn-=dt; C.k=Math.max(0,C.k-dt*2); } else if(C.t>0){ C.t-=dt; C.k=Math.min(1,C.k+dt*1.6); } else C.k=Math.max(0,C.k-dt*1.2);
+    const dry=typeof damOnDry==='function'&&damOnDry(P.x,P.y);
+    if(C.k>0&&!P.lock&&!G.dead&&!dry&&!((P.iframes||0)>0.2)){ const s=(P.rollT>0?25:60)*C.k; moveBody(P,Math.cos(C.a)*s*dt,Math.sin(C.a)*s*dt*0.7,18); }
+    if(C.k>0.1&&Math.random()<dt*14) addPart({x:rand(L.cx-L.rx,L.cx+L.rx),y:rand(L.cy-L.ry,L.cy+L.ry),vx:Math.cos(C.a)*160,vy:Math.sin(C.a)*110,life:1.2,size:rand(6,11),color:'rgba(210,250,250,.35)',kind:'puff'}); }
   for(const w of (R_.walls||[])){ w.t+=dt; w.flash=Math.max(0,(w.flash||0)-dt); }
 }
 function drawDammCurrent(){
+  if(R_.cur&&R_.cur.warn>0){ const a=R_.cur.a, p=0.45+Math.sin(T*16)*0.25; ctx.save(); ctx.globalAlpha=p; ctx.strokeStyle='#e8fdff'; ctx.lineWidth=7; ctx.lineCap='round'; ctx.lineJoin='round';
+    for(let i=-2;i<=2;i++) for(let j=-1;j<=1;j++){ const x=L.cx+i*L.rx*0.38, y=L.cy+j*L.ry*0.55; if(typeof damOnDry==='function'&&damOnDry(x,y)) continue; const o=((T*1.6)%1)*30;
+      const ca=Math.cos(a), sa=Math.sin(a), tx=x+ca*(o+18), ty=y+sa*(o+18)*0.7; // Pfeil: Schaft + Spitze
+      ctx.beginPath(); ctx.moveTo(x+ca*(o-34),y+sa*(o-34)*0.7); ctx.lineTo(tx,ty); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(tx-ca*16-sa*14,ty-sa*16*0.7+ca*14*0.7); ctx.lineTo(tx,ty); ctx.lineTo(tx-ca*16+sa*14,ty-sa*16*0.7-ca*14*0.7); ctx.stroke(); }
+    ctx.restore(); }
   if(!R_.cur||!R_.cur.k) return; const a=R_.cur.a; ctx.save(); ctx.globalAlpha=0.35*R_.cur.k; ctx.strokeStyle='#e0fffa'; ctx.lineWidth=3; ctx.lineCap='round';
   for(let i=0;i<26;i++){ const h=Math.sin(i*91.7)*4373.1, f=h-Math.floor(h), h2=Math.sin(i*17.3)*9134.7, f2=h2-Math.floor(h2);
     const u=((T*0.5+f)%1), x=L.cx+(f2-0.5)*L.rx*2+Math.cos(a)*(u-0.5)*700, y=L.cy+(f-0.5)*L.ry*2+Math.sin(a)*(u-0.5)*500;
@@ -5456,6 +5488,8 @@ function musJingle(kind){
     [0,3,7,12].forEach((d,i)=>celNote(r+d,t+i*b*0.5,b*0.5,0.14)); pizNote(r-12,t,b,0.09); pizNote(r-5,t+b,b,0.09); thump(t+b*2,0.12,140); celNote(r+F.maj+12,t+b*2,b*2,0.14);
   } else if(kind==='phase'){ // Phasenwechsel: Schlag + Motivanfang tief
     thump(t,0.4,70); pizNote(r-24,t,b*1.5,0.13,null,true); pizNote(r-21,t+b,b*1.5,0.12,null,true); noise(0.5,0.08,500,0);
+  } else if(kind==='musicbox'){ // „Der kleine Mut“ ganz allein auf der Spieluhr (Finale)
+    const R0=74, bb=60/80; let x=AC.currentTime+0.1; [0,3,2,7,5,0].forEach((d,i)=>{ const dd=MRHY[i]*bb; celNote(R0+d,x,dd*1.4,0.12,null,'box'); x+=dd; }); celNote(R0+3+12,x+bb,bb*3,0.06,null,'glass');
   } else if(kind==='solve'){ // T04 und Rätsel gelöst: helles Erfolgsmotiv
     let x=t; [0,3,2,7].forEach((d,i)=>{ const dd=b*0.5; celNote(r+d,x,dd,0.15); x+=dd; }); celNote(r+12,x,b*2,0.16); celNote(r+7,x,b*2,0.08); pizNote(r-12,x,b*1.5,0.1);
   }
@@ -5478,7 +5512,7 @@ const MREL=[['K04','K05'],['K10','K11'],['K13','K14'],['K16','K17'],['K02','K03'
 const MDIR=window.MDIR={dir:'musik/',buf:{},st:{},use:{},cur:null,dead:false,winAt:0,hold:0,lastPh:-1,lastBoss:null,hb:0,oldWant:false,amb:null,title:false};
 function musRel(a,b){ return MREL.some(p=>p.includes(a)&&p.includes(b)); }
 function musLoad(id){
-  if(!AC||!id||MDIR.st[id]) return; MDIR.st[id]='laden';
+  if(!AC||!id||MDIR.st[id]) return; if(location.protocol==='file:'){ MDIR.st[id]='fehlt'; return; } MDIR.st[id]='laden';
   try{ fetch(MDIR.dir+id+'.mp3').then(r=>{ if(!r.ok) throw new Error('fehlt'); return r.arrayBuffer(); })
     .then(a=>new Promise((ok,no)=>AC.decodeAudioData(a,ok,no))).then(b=>{ MDIR.buf[id]=musPrep(id,b); MDIR.st[id]='ok'; musTrim(); })
     .catch(()=>{ MDIR.st[id]='fehlt'; }); }catch(e){ MDIR.st[id]='fehlt'; }
@@ -5528,6 +5562,7 @@ function musWant(){
   if(scene==='hub') return {id:R_&&R_.fest?'K03':'K02',vol:0.95};
   if(scene!=='room') return null;
   const rm=curRoom(); if(!rm) return null;
+  if(R_&&R_.dam&&(R_.dam.cine||R_.dam.fin||R_.dam.intro)) return null;            // Dammbruch, Auftritt und Finale: nur Wasser und Holz
   if(AC.currentTime<MDIR.hold) return null;                                   // Stille nach Bosssieg
   if(rm.pz==='glocken'&&!(G.puzzles&&G.puzzles.glocken)) return null;          // Glockenkammer: nur die Glocken
   const k=typeof ktKey==='function'?ktKey():null;
@@ -8618,6 +8653,7 @@ function drawGptGround(){
   if(R_.qbar&&R_.qbar.state==='warn') drawQbarWarn();
   if(R_.book) drawBookMarks();
   drawKitGround();
+  if(R_.dam) drawDamAmbush();
 }
 function drawGptObj(list){
   if(scene==='hub'){ drawPancakes(list); return; }
@@ -8626,6 +8662,7 @@ function drawGptObj(list){
   if(R_.heavy) for(const c of R_.heavy) if(c.state!=='warn'&&c.state!=='gone') list.push({y:c.y+4,d:()=>drawHeavyCage(c)});
   if(R_.qbar) drawQbarObj(list);
   if(R_.braces) drawBraces(list);
+  if(R_.dam){ drawDamLevers(list); if(R_.dam.crown) list.push({y:R_.dam.crown.y+2,d:drawDamCrown}); }
   if(R_.belt) list.push({y:R_.belt.hatch.y,d:drawHatch});
   if(R_.gptItems) for(const it of R_.gptItems) if(!it.taken) list.push({y:it.y,d:()=>it.draw(it)});
   drawKitObj(list);
@@ -8816,7 +8853,7 @@ function gptDamm(dt){
     if(mausPrompt(r,54,'Balken annagen (Maus)',150)){ braceDmg(r,2,b); floater(r.x,r.y-150,'*nag nag*','#ffd6e2'); SFX.chomp(); }
     if(Math.random()<dt*(1+3*(1-r.hp/r.max))) addPart({x:r.x+rand(-14,14),y:r.y-rand(40,140),vx:rand(-90,90),vy:rand(-40,40),life:.5,size:rand(2,4),color:'rgba(200,240,255,.8)',kind:'spark',g:300}); }
 }
-function braceCrash(b){ const R=R_.braces; if(!R) return false; for(const r of R){ if(r.down) continue; if(Math.hypot(b.x-r.x,(b.y-r.y)*1.3)<100){ braceDmg(r,r.max,b,true); b.state='stun'; b.st=-2.4; b.sq=0.3; damageEnemy(b,3); floater(b.x,b.y-260,'AUTSCH! Meine Stütze!','#f6cf5a'); return true; } } return false; }
+function braceCrash(b){ const R=R_.braces; if(!R) return false; for(const r of R){ if(r.down) continue; if(Math.hypot(b.x-r.x,(b.y-r.y)*1.3)<100){ braceDmg(r,r.max,b,true); b.crashed=true; b.state='stun'; b.st=-2.4; b.sq=0.3; damageEnemy(b,3); floater(b.x,b.y-260,'AUTSCH! Meine Stütze!','#f6cf5a'); return true; } } return false; }
 function braceHit(x,y,rad){ const R=R_.braces; if(!R) return; for(const r of R){ if(r.down||r.hitBy===P.spinId) continue; if(Math.hypot(r.x-x,(r.y-50)-y)<rad+40){ r.hitBy=P.spinId; braceDmg(r,1,enemies.find(e=>e.boss)); } } }
 function braceDmg(r,n,b,crash){ if(r.down) return; r.hp-=n; r.shake=0.3; SFX.hit(); woodPuff(r.x,r.y-80,4);
   if(r.hp>0){ if(!crash) floater(r.x,r.y-160,'Knack!','#f3e7cf'); return; }
@@ -8836,7 +8873,7 @@ function drawBraces(list){ const R=R_.braces; const mx=(R[0].x+R[1].x)/2, my=Mat
     ctx.fillStyle=OUT; ctx.fillRect(x-30,y-6,60,10); ctx.fillStyle='#6a6474'; ctx.fillRect(x-28,y-4,56,6); }});
   list.push({y:my,d:()=>{ const loose=R.filter(r=>r.down).length; const bob=Math.sin(T*(2+loose*3))*(2+loose*4); ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.45+0.2*Math.sin(T*3); ctx.drawImage(fireSprite('255,220,170'),mx-70,my-200,140,140); ctx.restore();
     ctx.strokeStyle='#5a3e2a'; ctx.lineWidth=10; ctx.beginPath(); ctx.moveTo(R[0].x,R[0].y-150); ctx.lineTo(R[1].x,R[1].y-150); ctx.stroke();
-    spr('brief',mx,my-118+bob,{s:1.6}); }});
+    if(!(R_.dam&&R_.dam.fin&&R_.dam.fin.t>6.6)) spr('brief',mx,my-118+bob,{s:1.6}); }});
 }
 
 /* ================= FAIRNESS ================= */
@@ -8929,7 +8966,7 @@ const KT_HEAD={damm:250,quak:150,morruk:180,jailer:130,bookie:150,nager:150};
 function ktKey(){ const rm=curRoom(); if(!rm||!R_) return null; if(R_.nager&&R_.nagerPhase==='fight') return 'nager'; if(rm.type==='boss'&&!G.won) return 'damm'; if(rm.type==='mini2') return 'quak'; if(R_.mo) return 'morruk'; if(rm.id==='w10') return 'jailer'; if(rm.type==='arena'&&R_.slot) return 'bookie'; return null; }
 const KA={
   damm:{find:()=>enemies.find(e=>e.boss&&!e.dead&&e.state!=='dead'), base:'idle', free:e=>e.state==='idle', hold:e=>{ if(e.state==='idle') e.st=Math.min(e.st,0.15); },
-    ok:e=>!['sleep','rise','intro','dead','enrage','sub','subMove','erupt','summon'].includes(e.state),
+    ok:e=>(e.kitSub&&['sub','subMove','erupt','stun'].includes(e.state))||!['sleep','rise','intro','dead','enrage','sub','subMove','erupt','summon','cine','crest','jump','introDone'].includes(e.state),
     go:(e,s,o)=>{ e.state=s; e.st=0; e.vol=0; e.waved=false; e.built=false; e.sm=false; if(s==='biteW'||s==='chargeW') e.ang=Math.atan2(P.y-e.y,P.x-e.x); Object.assign(e,o||{}); }, frac:e=>e.hp/e.max},
   quak:{find:()=>enemies.find(e=>e.type==='quak'&&!e.dying&&!e.downed), base:'idle', free:e=>e.state==='idle', hold:e=>{ e.cd=Math.max(e.cd,0.5); },
     ok:e=>!['intro','shrink','tiny','rage','ritualGo','ritual','swallowed','choke','dazed','stuck'].includes(e.state), go:(e,s,o)=>{ e.state=s; e.st=0; e.vol=0; Object.assign(e,o||{}); }, frac:e=>e.hp/e.max},
@@ -8965,7 +9002,8 @@ function updateKit(dt){
   if(!K.q.length){ const R=KP[k][K.ph].rot; if(R.length>1&&R[K.rot%R.length]===K.last) K.rot++; K.q=[R[K.rot%R.length]]; K.rot++; }
   const name=K.q.shift(); const steps=KP[k][K.ph].pat[name](e,K); K.cur={name,steps,i:0,t:0,started:false}; K.last=name;
 }
-function ktTrans(k,e,ph){ const t=KT_PH[k][ph]; e.bkInv=1.1; if(k!=='nager'){ if(KA[k].free(e)) { e.state='bkRest'; e.st=0; e.restT=1.1; } }
+function ktTrans(k,e,ph){ if(k==='damm'&&ph===2&&typeof damBreakStart==='function'){ hzClear(); for(const z of R_.kit.zones) z.done=true; try{ musJingle('phase'); }catch(_){ } damBreakStart(e); return; }
+  const t=KT_PH[k][ph]; e.bkInv=1.1; if(k!=='nager'){ if(KA[k].free(e)) { e.state='bkRest'; e.st=0; e.restT=1.1; } }
   banner={text:t[0],sub:t[1],t:0,small:true}; SFX.roar(); addShake(10); if(ph>0) try{ musJingle('phase'); }catch(_){ } hzClear(); for(const z of R_.kit.zones) z.done=true;
   for(const p of projs) if(p.enemy||p.kind==='log'||p.kind==='spear'||p.kind==='coin') p.dead=true; }
 function ktNext(c){ c.i++; c.t=0; c.started=false; }
@@ -9133,22 +9171,41 @@ KP.morruk=[
 /* ---------- Dammbauer ---------- */
 function ktSide(e,side,warn){ ktZone({shape:'side',x:e.x,y:e.y,side,r:260,warn,dmg:1,col2:'255,90,60',sfx:'water'}); e.face=side; floater(e.x+side*120,e.y-200,side<0?'◀':'▶','#ff8a6a'); }
 KP.damm=[
- {open:['abnahme','nagel'],rot:['abnahme','nagel'],pat:{
-  abnahme:e=>[['f',()=>ktSide(e,-1,0.85)],['wz'],['f',()=>ktSide(e,1,0.75)],['wz'],['f',()=>{ for(let i=0;i<2;i++) setTimeout(()=>{ puff(e.x+rand(-60,60),e.y,'rgba(140,110,80,.8)',6); noise(0.08,0.2,300); },i*260); }],['w',0.55],['s','chargeW'],['rest',1.2]],
-  nagel:e=>[['f',()=>talkSeq([[atE(e,270),'ICH HABE JEDE DIESER PLANKEN SELBST VERBAUT!',C_BOSS,2],[atMaus,'Piep.',C_MAUS,1],[atE(e,270),'JA, AUCH DIE KRUMME!',C_BOSS,1.6]])],['s','build'],['s','chargeW'],['rest',1.5]] }},
- {open:['schleuse','stamm'],rot:['stamm','schleuse'],pat:{
-  schleuse:e=>{ const x0=L.cx-L.rx, w=L.rx*2/3, y0=L.cy-L.ry, h=L.ry*2; return [['f',()=>ktZone({shape:'rect',x:x0,y:y0,w,h,warn:1.1,n:1,col2:'90,170,255',sfx:'water'})],['w',0.9],['f',()=>ktZone({shape:'rect',x:x0+2*w,y:y0,w,h,warn:1.1,n:2,col2:'90,170,255',sfx:'water'})],['w',1.4],['f',()=>ktZone({shape:'rect',x:x0+w,y:y0,w,h,warn:1.1,n:3,col2:'90,170,255',sfx:'water'})],['wz'],['f',()=>ktSay(e,270,'DAS IST KEINE ÜBERSCHWEMMUNG! DAS IST EINE KONTROLLIERTE WASSERUMVERTEILUNG!',C_BOSS,2.6)],['rest',1.1]]; },
-  stamm:e=>{ const dir=P.x<L.cx?1:-1; return [['f',()=>{ noise(0.6,0.15,200); ktLog({x:dir>0?L.cx-L.rx-120:L.cx+L.rx+120,x0:dir>0?L.cx-L.rx-120:L.cx+L.rx+120,y:P.y,w:150,h:46,vx:dir*520,vy:0,warn:1.1,dur:4}); }],['w',1.6],['s','biteW'],['rest',1.3]]; } }},
- {open:['gegenstrom','bruecke'],rot:['bruecke','gegenstrom','stamm'],pat:{
-  stamm:e=>KP.damm[1].pat.stamm(e),
-  gegenstrom:e=>[['f',()=>{ R_.cur=R_.cur||{a:0,k:0}; R_.cur.a=Math.atan2(P.y-e.y,P.x-e.x)+Math.PI; R_.cur.k=1; floater(P.x,P.y-140,'Strömung!','#bfe0ff'); }],['w',1.4],['s','chargeW'],['s','tailW'],['rest',1.4]],
-  bruecke:e=>{ const pts=[]; for(let i=0;i<3;i++){ const a=rand(0,TAU), r=rand(110,220); let x=P.x+Math.cos(a)*r, y=P.y+Math.sin(a)*r*0.7; if(!L.walk(x,y)){ const p=spawnSpot(120); x=p[0]; y=p[1]; } pts.push([x,y]); }
-    return [['f',()=>{ pts.forEach((p,i)=>ktFall(p[0],p[1],i+1,i*0.55)); SFX.rumble(); }],['wz'],['f',()=>talkSeq([[atE(e,270),'DAS WAR EIN TRAGENDER BALKEN! EIN TRAGENDER!',C_BOSS,2],[atMaus,'Piep?',C_MAUS,1],[atE(e,270),'NEIN, DAS IST KEIN GARANTIEFALL!',C_BOSS,1.8]])],['s','chargeW'],['rest',1.6]]; } }},
- {open:['stuetzen','flut'],rot:['flut','stuetzen'],pat:{
-  stuetzen:e=>[['f',()=>{ if(!R_.versSaid){ R_.versSaid=true; bub(atTop,'DA IST DER BRIEF! ZWISCHEN DEN BALKEN! BITTE NICHT MIT DEM SCHWERT DURCHSCHNEIDEN!',C_VERRIS,3); } }],['s','chargeW',{fake:true}],['w',0.3],['s','chargeW',{fake:true}],['w',0.5],['f',()=>{ for(let i=0;i<2;i++) setTimeout(()=>{ addShake(6); SFX.slam(); },i*300); }],['w',0.7],['s','chargeW'],['rest',1.0]],
-  flut:e=>{ const zones=[[L.cx-L.rx*0.95,L.cy-L.ry*0.45],[L.cx+L.rx*0.45,L.cy-L.ry*0.45],[L.cx-L.rx*0.25,L.cy-L.ry*0.45]]; const st=[];
-    zones.forEach((z,i)=>{ st.push(['f',()=>{ ktZone({shape:'except',sx:z[0],sy:z[1],sw:L.rx*0.5,sh:L.ry*0.9,warn:1.6,dmg:1,col2:'90,170,255',sfx:'water',shake:12}); tone(110,0.3,'sawtooth',0.06); }],['wz']); });
-    return st.concat([['f',()=>ktSay(e,270,'ICH HABE DIESEN DAMM GEBAUT! ICH HABE ALLES DAFÜR GEGEBEN!',C_BOSS,2.6)],['rest',2.2]]); } }} ];
+ // Phase 1 „MEIN DAMM!“: Bauabnahme, Nagelprobe, Notfallreparatur (A B | A Rep B …)
+ {open:['abnahme','nagel'],rot:['abnahme','reparatur','nagel'],pat:{
+  abnahme:e=>[['f',()=>ktSide(e,-1,0.8)],['wz'],['f',()=>ktSide(e,1,0.8)],['wz'],['f',()=>{ for(let i=0;i<2;i++) setTimeout(()=>{ puff(e.x+rand(-60,60),e.y,'rgba(140,110,80,.8)',6); noise(0.08,0.2,300); },i*300); }],['w',0.6],['s','chargeW'],['rest',0.8]],
+  nagel:e=>[['f',()=>talkSeq([[atE(e,270),'ICH HABE JEDE DIESER PLANKEN SELBST VERBAUT!',C_BOSS,2],[atMaus,'Piep.',C_MAUS,1],[atE(e,270),'JA, AUCH DIE KRUMME!',C_BOSS,1.6]])],['s','build'],
+    ['f',()=>{ for(let i=0;i<3;i++) setTimeout(()=>{ if(R_.stakes&&!G.dead) R_.stakes.push({x:P.x,y:P.y,t:0,warn:0.9,hit:false}); },i*750); }],['w',2.9],['s','chargeW'],['rest',1.0]],
+  reparatur:e=>{ const w=(R_.walls||[]).filter(q=>q.hp<4).sort((a,b)=>Math.hypot(a.x-e.x,a.y-e.y)-Math.hypot(b.x-e.x,b.y-e.y))[0];
+    if(!w) return KP.damm[0].pat.nagel(e);
+    return [['f',()=>{ e.repW=w; e.repAt=0; ktSay(e,270,'WENN MAN ETWAS ORDENTLICH BAUT, HÄLT ES FÜR IMMER! …',C_BOSS,2.2); }],['s','repair'],['rest',0.6]]; } }},
+ // Phase 2 „Die Schleusen öffnen sich“: Schleusenreißer, Stammwalze, Abtauchen (A B | C B A C)
+ {open:['schleuse','stamm'],rot:['tauchen','stamm','schleuse','tauchen'],pat:{
+  schleuse:e=>{ const x0=L.cx-L.rx, w=L.rx*2/3, y0=L.cy-L.ry, h=L.ry*2, D=R_.dam;
+    const lane=(i,n)=>()=>{ const q=D&&D.gates[i]; if(q&&(q.lock||0)>0){ floater(q.x,D.g.baseY+60,'Die Maus hält die Schleuse zu!','#bfe9ff'); return; } if(q){ q.shake=1.0; q.want=1; }
+      ktZone({shape:'rect',x:x0+(i===0?0:i===2?2*w:w),y:y0,w,h,warn:1.0,n,col2:'90,170,255',sfx:'water',onHit:()=>{ if(q) for(let k=0;k<16;k++) addPart({x:q.x+rand(-50,50),y:D.g.baseY+rand(0,40),vx:rand(-80,80),vy:rand(120,420),life:0.8,size:rand(5,10),color:'rgba(210,250,255,.85)',kind:'puff'}); }}); };
+    return [['f',lane(0,1)],['w',0.9],['f',lane(2,2)],['wz'],
+      ['f',()=>{ const g=D?D.g:{baseY:L.cy-L.ry}; const sp=230, reach=225*0.95*(1.5+Math.max(0,P.y-g.baseY)/sp)-90; const gap=clamp(P.x+rand(-1,1)*Math.min(300,Math.max(0,reach)),L.cx-L.rx*0.75,L.cx+L.rx*0.75);
+        if(D) D.gates[1].shake=1.5; R_.bands=R_.bands||[]; R_.bands.push({y:g.baseY+30,gap,gw:210,sp,hit:false,warn:1.5}); floater(L.cx,g.baseY+80,'Die Mittelschleuse!','#bfe9ff'); }],
+      ['until',()=>!(R_.bands&&R_.bands.length),7],['rest',1.4]]; },
+  stamm:e=>{ const dir=P.x<L.cx?1:-1; return [['f',()=>{ noise(0.6,0.15,200); ktLog({x:dir>0?L.cx-L.rx-120:L.cx+L.rx+120,x0:dir>0?L.cx-L.rx-120:L.cx+L.rx+120,y:P.y,w:150,h:46,vx:dir*520,vy:0,warn:1.3,dur:4}); }],['w',1.5],['s','biteW'],
+    ['f',()=>{ noise(0.6,0.15,200); ktLog({x:dir<0?L.cx-L.rx-120:L.cx+L.rx+120,x0:dir<0?L.cx-L.rx-120:L.cx+L.rx+120,y:P.y,w:150,h:46,vx:-dir*520,vy:0,warn:1.3,dur:4}); }],['wz'],['rest',1.5]]; },
+  tauchen:e=>[['f',()=>{ e.kitSub=true; e.ambush=false; }],['s','sub'],['f',()=>{ e.kitSub=false; }],['s','tailW'],['rest',1.6]] }},
+ // Phase 3 „Der Damm bricht!“: Gegenstrom, Brechende Brücke, Unterwasser-Hinterhalt (A B | C A C B)
+ {open:['gegenstrom','bruecke'],rot:['hinterhalt','gegenstrom','hinterhalt','bruecke'],pat:{
+  gegenstrom:e=>[['f',()=>{ R_.cur=R_.cur||{a:0,k:0}; R_.cur.a=Math.PI/2+(P.x<L.cx?-0.25:0.25); R_.cur.warn=1.3; R_.cur.t=4.2; floater(P.x,P.y-140,'Strömung! Auf die Felsen!','#bfe9ff'); }],['w',1.3],['s','chargeW'],['s','tailW'],['rest',1.0]],
+  bruecke:e=>{ const pts=[]; for(let i=0;i<3;i++){ const a=rand(0,TAU), r=rand(110,220); let x=P.x+Math.cos(a)*r, y=P.y+Math.sin(a)*r*0.7; if(!L.walk(x,y)||damOnDry(x,y)){ const p=spawnSpot(120); x=p[0]; y=p[1]; } pts.push([x,y]); }
+    return [['f',()=>{ pts.forEach((p,i)=>ktFall(p[0],p[1],i+1,i*0.55+0.5)); SFX.rumble(); }],['wz'],['f',()=>talkSeq([[atE(e,270),'DAS WAR EIN TRAGENDER BALKEN! EIN TRAGENDER!',C_BOSS,2],[atMaus,'Piep?',C_MAUS,1],[atE(e,270),'NEIN, DAS IST KEIN GARANTIEFALL!',C_BOSS,1.8]])],['s','chargeW'],['rest',1.8]]; },
+  hinterhalt:e=>[['f',()=>{ e.kitSub=true; e.ambush=true; if(!R_.umgest){ R_.umgest=true; ktSay(e,270,'DAS IST KEIN EINSTURZ! DAS IST EINE SPONTANE UMGESTALTUNG!',C_BOSS,2.6); } }],['s','sub'],['f',()=>{ e.kitSub=false; }],['until',()=>!R_.ringW,3],['rest',1.6]] }},
+ // Phase 4 „Die letzte Verstrebung“: Stützenbrecher, Letzte Flut, Brief zurück (A B C)
+ {open:['stuetzen','flut'],rot:['brief','stuetzen','flut'],pat:{
+  stuetzen:e=>[['f',()=>{ if(!R_.versSaid){ R_.versSaid=true; bub(atTop,'DA IST DER BRIEF! ZWISCHEN DEN BALKEN! BITTE NICHT MIT DEM SCHWERT DURCHSCHNEIDEN!',C_VERRIS,3); } }],['s','chargeW',{fake:true}],['w',0.3],['s','chargeW',{fake:true}],['w',0.6],['f',()=>{ for(let i=0;i<2;i++) setTimeout(()=>{ addShake(6); SFX.slam(); },i*300); }],['w',0.6],['s','chargeW'],['rest',0.8]],
+  flut:e=>{ const dry=damDry(); const st=[];
+    for(let n=0;n<3;n++){ st.push(['f',()=>{ for(let i=0;i<1;i++){ addShake(8); SFX.slam(); } const cand=dry.filter(d=>d!==R_.lastSafe).sort((a,b)=>Math.hypot(a.x-P.x,a.y-P.y)-Math.hypot(b.x-P.x,b.y-P.y)); const z=cand[0];
+        R_.lastSafe=z; const dist=Math.hypot(z.x-P.x,z.y-P.y), warn=Math.max(1.4,dist/(225*0.85)+0.6);
+        ktZone({shape:'except',sx:z.x-z.rx,sy:z.y-z.ry,sw:z.rx*2,sh:z.ry*2,warn,dmg:1,col2:'90,170,255',sfx:'water',shake:12}); tone(110,0.3,'sawtooth',0.06); }],['wz']); }
+    return st.concat([['f',()=>ktSay(e,270,'ICH HABE DIESEN DAMM GEBAUT! ICH HABE ALLES DAFÜR GEGEBEN!',C_BOSS,2.6)],['rest',2.2]]); },
+  brief:e=>[['f',()=>{ e.letA=0; e.letZ=false; ktSay(e,270,'NEIN! DER BRIEF BLEIBT HIER! ICH HABE DEN SCHON ORDENTLICH EINGEBAUT!',C_BOSS,2.4); }],['s','letter'],['w',0.2]] }} ];
 
 /* ---------------- Verris-Hinweise nach 4 Niederlagen ---------------- */
 const KT_HINT={nager:'Mir ist aufgefallen: Nach Krawalls großem Keulenschlag steht er immer kurz still. Ich notiere: völlig unwichtig. Oder?',
@@ -9157,7 +9214,8 @@ const KT_HINT={nager:'Mir ist aufgefallen: Nach Krawalls großem Keulenschlag st
   quak:'Nach seinem dritten, tiefen Quaken schnappt er nach Luft. Und die Kerzen muss man wirklich alle ausschlagen.',
   morruk:'Er scheint genau zu beobachten, wie du ausweichst. Ich würde ja mal etwas anderes versuchen. Aber ich bin nur der Chronist.',
   damm:'Mir ist aufgefallen, dass er zweimal auf den Boden haut, bevor er wirklich losrennt. Das ist bestimmt völlig bedeutungslos. Ich schreibe es trotzdem auf.'};
-function ktDeathHint(k){ const s=bstat(k); if(!KT_HINT[k]) return; if(s.tries===4||s.tries===8) G.flags.vhint=k; }
+Object.defineProperty(KT_HINT,'damm',{configurable:true,enumerable:true,get(){ const ph=(typeof G!=='undefined'&&G.flags&&G.flags.dammDeathPh)||0; return ['Mir ist aufgefallen, dass er seine eigenen Wände nicht besonders gut umgehen kann. Lock ihn hinein!','Diese Schleusen öffnen sich immer in derselben Reihenfolge: links, rechts, dann die Mitte. Ich glaube nicht, dass das Zufall ist.','Die großen Felsen bewegen sich nicht mit dem Wasser. Vielleicht ist das wichtiger, als es klingt.','Er scheint seine Stützen mehr zu fürchten als dein Schwert. Interessant, oder?'][ph]; }});
+function ktDeathHint(k){ if(k==='damm'&&R_&&R_.kit&&G.flags) G.flags.dammDeathPh=Math.max(0,R_.kit.ph||0); const s=bstat(k); if(!KT_HINT[k]) return; if(s.tries===4||s.tries===8) G.flags.vhint=k; }
 function ktShowHint(){ const k=G.flags.vhint; if(!k||scene!=='room'||!R_||R_.t<1.5) return; G.flags.vhint=null; bub(atTop,'Verris: „'+KT_HINT[k]+'“',C_VERRIS,7); }
 
 /* Galgenparade: 2 Käfige, dann 3 Ambossreihen mit früh sichtbarer Lücke */
@@ -9167,6 +9225,368 @@ function kitParade(e){ let last=0;
     setTimeout(()=>{ if(e.state!=='sky'||scene!=='room') return; const horiz=r!==1, n=9, gapI=1+Math.floor(Math.random()*(n-3));
       for(let i=0;i<n;i++){ if(i===gapI||i===gapI+1) continue; const u=i/(n-1); const x=horiz?L.cx-L.rx*0.85+u*L.rx*1.7:P.x, y=horiz?P.y:L.cy-L.ry*0.8+u*L.ry*1.6; if(!L.walk(x,y)) continue; addFall(x,y,'anvil',0,{tele:1.1}); } },del*1000); }
   e.skyDur=last+1.5; jSay(e,'Galgenparade!'); }
+
+/* ======================================================================
+   ENDBOSS-BÜHNE: Der Damm (mit ChatGPT abgestimmt)
+   Der Damm steht als riesige Holzwand am oberen Arenarand. Er verändert sich
+   mit den Phasen: Schleusen öffnen sich, Risse, Dammbruch mit Flut, Ruine.
+   Alles per Code gezeichnet (später durch PixelLab-Sprites ersetzbar).
+   ====================================================================== */
+const DAM_TOP=360;           // zusätzlicher Platz über der Arena (Raum g4 ist dafür 1340 hoch)
+const DAMC={};               // vorgerenderte Dammwände (intakt / gebrochen)
+const DAM_PAL={log:['#6b4a2e','#7a5536','#5e3f26','#71502f'],hi:'#9a7048',sh:'#3a2414',bark:'#46301c',ring1:'#b08a5a',ring2:'#8a6a42',
+  mud:'#3b2a1c',stick:'#4a3020',stake:'#5a3a24',stakeHi:'#7d5638',rope:'#c8b080',moss:'#3e6a50',red:'#a81e2c',redD:'#6e1018'};
+function damGeo(){ // Lage des Damms in Weltkoordinaten
+  const baseY=Math.round(L.cy-L.ry+14), H=250, x0=Math.round(L.cx-L.rx-110), w=Math.round(L.rx*2+220);
+  const lanes=[L.cx-L.rx*2/3,L.cx,L.cx+L.rx*2/3].map(Math.round);
+  return {baseY,crestY:baseY-H,H,x0,w,lanes,gw:112,gh:132};
+}
+function damInit(){
+  if(R_.dam) return R_.dam;
+  const g=damGeo();
+  R_.dam={g,gates:g.lanes.map(x=>({x,open:0,want:0,jet:0,shake:0})),crack:0,crackT:0,broken:0,flood:0,floodT:0,ruin:0,t:0,level:1,
+    cracks:damCrackPaths(g),leaks:[]};
+  return R_.dam;
+}
+/* zufällige Risslinien (fest pro Damm) */
+function damCrackPaths(g){ // gezackte Risse mit Verästelungen
+  const R=mulberry(4242), out=[];
+  const origins=[[g.lanes[0]+80,g.baseY-160],[g.lanes[1]-90,g.baseY-200],[g.lanes[1]+70,g.baseY-185],[g.lanes[2]-80,g.baseY-150],[g.lanes[1],g.baseY-228],[g.lanes[0]-120,g.baseY-120],[g.lanes[2]+130,g.baseY-130]];
+  for(const o of origins){ for(let b=0;b<2;b++){ const pts=[[o[0],o[1]]]; let x=o[0], y=o[1], dir=b?1:-1;
+      for(let i=0;i<12;i++){ const ang=(i%2?0.25:1.05)*dir+(R()-.5)*0.5+(i%3===0?0.6:0); const l=6+R()*11; x+=Math.cos(ang)*l*dir; y+=Math.abs(Math.sin(ang))*l*(R()<.7?1:-0.6); pts.push([Math.round(x),Math.round(Math.min(g.baseY-6,Math.max(g.crestY+12,y)))]);
+        if(R()<.28){ let bx=x, by=y; const br=[[Math.round(bx),Math.round(by)]]; for(let k=0;k<3;k++){ bx+=(R()-.3)*12*dir; by+=4+R()*8; br.push([Math.round(bx),Math.round(Math.min(g.baseY-6,by))]); } out.push(br); } }
+      out.push(pts); } }
+  return out;
+}
+/* Holzwand vorrendern */
+function damWall(kind){
+  const key=kind+'|'+L.key+'|'+L.w; if(DAMC[key]) return DAMC[key];
+  const g=damGeo(), PAD=70, c=mkCanvas(g.w,g.H+PAD), x=c.getContext('2d'), R=mulberry(kind==='broken'?913:911);
+  const oy=PAD; // Wandkrone liegt bei y=PAD im Bild
+  const px=(X,Y,w,h,col)=>{ x.fillStyle=col; x.fillRect(Math.round(X),Math.round(Y),Math.round(w),Math.round(h)); };
+  // Umriss der Wand: unten etwas breiter (Böschung)
+  const left=y=>18+(1-(y-oy)/g.H)*26, right=y=>g.w-18-(1-(y-oy)/g.H)*26;
+  // Dunkler Grundkörper
+  for(let y=oy;y<oy+g.H;y+=2) px(left(y)-3,y,right(y)-left(y)+6,2,'#1a0e08');
+  // Stammreihen
+  for(let y=oy+4, row=0;y<oy+g.H-4;y+=18+Math.floor(R()*5), row++){
+    const hgt=15+Math.floor(R()*5); let xx=left(y)+(row%2?-30:0);
+    while(xx<right(y)){
+      const len=110+R()*170, a=Math.max(xx,left(y)), b=Math.min(xx+len,right(y)); if(b-a>16){
+        const col=DAM_PAL.log[Math.floor(R()*DAM_PAL.log.length)];
+        px(a,y,b-a,hgt,col); px(a,y,b-a,2,DAM_PAL.hi); px(a,y+hgt-3,b-a,3,DAM_PAL.sh);
+        for(let k=0;k<(b-a)/14;k++){ px(a+R()*(b-a-10),y+3+R()*(hgt-7),6+R()*12,1,DAM_PAL.bark); }
+        if(R()<.5) { const kx=a+R()*(b-a-8); px(kx,y+5,5,4,DAM_PAL.sh); px(kx+1,y+6,2,2,DAM_PAL.ring2); }
+        // Stammende (Jahresringe)
+        if(b<right(y)-4&&R()<.75){ const ex=b-5, ey=y+hgt/2, r=hgt/2+1;
+          x.fillStyle='#24140a'; x.beginPath(); x.ellipse(ex,ey,r*0.62+1,r+1,0,0,TAU); x.fill();
+          x.fillStyle=DAM_PAL.ring1; x.beginPath(); x.ellipse(ex,ey,r*0.62,r,0,0,TAU); x.fill();
+          x.fillStyle=DAM_PAL.ring2; x.beginPath(); x.ellipse(ex,ey,r*0.36,r*0.6,0,0,TAU); x.fill(); px(ex-1,ey-1,2,2,'#5a3a22'); }
+      }
+      xx+=len;
+    }
+    // Lehm und Äste in der Fuge
+    for(let k=0;k<(right(y)-left(y))/60;k++){ const mx=left(y)+R()*(right(y)-left(y)); px(mx,y-2,6+R()*14,3+R()*2,DAM_PAL.mud); }
+    for(let k=0;k<(right(y)-left(y))/140;k++){ const sx=left(y)+R()*(right(y)-left(y)), sl=20+R()*30, sa=(R()-.5)*1.2; x.strokeStyle=DAM_PAL.stick; x.lineWidth=2; x.beginPath(); x.moveTo(sx,y); x.lineTo(sx+Math.cos(sa)*sl,y-Math.abs(Math.sin(sa))*sl*0.5-2); x.stroke(); }
+  }
+  // Äste ragen über die Krone
+  for(let k=0;k<70;k++){ const sx=left(oy)+R()*(right(oy)-left(oy)), sl=14+R()*40, sa=-Math.PI/2+(R()-.5)*1.4; x.strokeStyle=R()<.5?DAM_PAL.stick:'#5e3f26'; x.lineWidth=2+Math.floor(R()*2); x.beginPath(); x.moveTo(sx,oy+6); x.lineTo(sx+Math.cos(sa)*sl,oy+6+Math.sin(sa)*sl); x.stroke(); }
+  // Moos an der Wasserlinie
+  for(let k=0;k<160;k++){ const mx=left(oy+g.H)+R()*(right(oy+g.H)-left(oy+g.H)); px(mx,oy+g.H-4-R()*26,3+R()*5,2+R()*2,R()<.5?DAM_PAL.moss:'#2e5a44'); }
+  // Schleusenrahmen
+  for(const lx of g.lanes){ const gx=lx-g.x0, top=oy+g.H-g.gh-18;
+    px(gx-g.gw/2-24,top-12,g.gw+48,22,'#2a1810'); px(gx-g.gw/2-22,top-10,g.gw+44,16,'#5a3a24'); px(gx-g.gw/2-22,top-10,g.gw+44,3,DAM_PAL.stakeHi);
+    for(const sd of [-1,1]){ const sx=gx+sd*(g.gw/2+11); px(sx-12,top-12,24,g.gh+30,'#2a1810'); px(sx-10,top-10,20,g.gh+28,DAM_PAL.stake); px(sx-10,top-10,4,g.gh+28,DAM_PAL.stakeHi);
+      for(const ry of [top+20,top+g.gh-10]){ px(sx-11,ry,22,4,'#3a3a40'); px(sx-8,ry+1,2,2,'#9a9aa8'); px(sx+6,ry+1,2,2,'#9a9aa8'); } }
+    px(gx-g.gw/2,top+12,g.gw,g.gh+6,'#0c1418'); // dunkle Öffnung hinter dem Tor
+    // rote Kult-Markierung über dem Tor
+    px(gx-9,top-8,18,10,DAM_PAL.red); px(gx-5,top-6,3,6,'#f3e7cf'); px(gx+2,top-6,3,6,'#f3e7cf'); }
+  // Pfähle vor der Wand mit Seilbindung (spitze Krone wie seine Krone)
+  for(let sx=left(oy)+40;sx<right(oy)-30;sx+=128+R()*40){ if(g.lanes.some(l=>Math.abs(l-g.x0-sx)<g.gw/2+50)) continue;
+    const top=oy-26-R()*24; px(sx-9,top,18,oy+g.H-top,'#24140a'); px(sx-7,top+2,14,oy+g.H-top-2,DAM_PAL.stake); px(sx-7,top+2,4,oy+g.H-top-2,DAM_PAL.stakeHi);
+    x.fillStyle='#24140a'; x.beginPath(); x.moveTo(sx-9,top+1); x.lineTo(sx,top-18); x.lineTo(sx+9,top+1); x.fill(); x.fillStyle=DAM_PAL.stake; x.beginPath(); x.moveTo(sx-6,top+1); x.lineTo(sx,top-13); x.lineTo(sx+6,top+1); x.fill();
+    for(const ry of [oy+30,oy+g.H*0.6]){ px(sx-10,ry,20,5,DAM_PAL.rope); px(sx-10,ry+5,20,1,'#7a6a40'); } }
+  // Banner des Dammbauers über der mittleren Schleuse
+  { const bx=g.lanes[1]-g.x0, by=oy+14, bw=70, bh=96;
+    px(bx-bw/2-6,by-6,bw+12,8,'#2a1810'); x.fillStyle='#24060c'; x.beginPath(); x.moveTo(bx-bw/2-2,by); x.lineTo(bx+bw/2+2,by); x.lineTo(bx+bw/2+2,by+bh); for(let i=6;i>=0;i--) x.lineTo(bx-bw/2+i*bw/6,by+bh-(i%2?14:0)); x.fill();
+    x.fillStyle=DAM_PAL.red; x.beginPath(); x.moveTo(bx-bw/2,by+2); x.lineTo(bx+bw/2,by+2); x.lineTo(bx+bw/2,by+bh-4); for(let i=6;i>=0;i--) x.lineTo(bx-bw/2+i*bw/6,by+bh-4-(i%2?14:0)); x.fill();
+    px(bx-bw/2,by+2,6,bh-20,DAM_PAL.redD);
+    // Biberzähne als Wappen
+    px(bx-14,by+26,28,30,'#f3e7cf'); px(bx-1,by+26,2,30,DAM_PAL.red); px(bx-14,by+54,28,3,'#c8b8a0'); x.strokeStyle='#24060c'; x.lineWidth=2; x.strokeRect(bx-14,by+26,28,30); }
+  // Kleine Seitenbanner
+  for(const f of [0.2,0.8]){ const bx=g.w*f, by=oy+20; px(bx-16,by,32,54,'#24060c'); px(bx-14,by+2,28,48,DAM_PAL.red); px(bx-14,by+44,9,6,'#24060c'); px(bx+5,by+44,9,6,'#24060c'); px(bx-4,by+14,8,14,'#f3e7cf'); }
+  // Gebrochene Fassung: Mitte heraus, gesplitterte Enden
+  if(kind==='broken'){
+    const cxL=g.lanes[1]-g.x0, hw=210;
+    x.save(); x.globalCompositeOperation='destination-out'; x.beginPath(); x.moveTo(cxL-hw,0); x.lineTo(cxL+hw,0);
+    for(let y=oy;y<=oy+g.H;y+=12){ const k=(y-oy)/g.H; x.lineTo(cxL+hw*(1-k*0.55)+(R()-.5)*26,y); }
+    for(let y=oy+g.H;y>=oy;y-=12){ const k=(y-oy)/g.H; x.lineTo(cxL-hw*(1-k*0.55)+(R()-.5)*26,y); }
+    x.closePath(); x.fill(); x.restore();
+    // Splitter
+    for(let k=0;k<60;k++){ const side=k%2?1:-1, yy=oy+R()*g.H, kk=(yy-oy)/g.H, ex=cxL+side*hw*(1-kk*0.55);
+      x.save(); x.translate(ex,yy); x.rotate(side*(0.2+R()*0.9)); px(-2,-14-R()*16,5,16+R()*16,R()<.5?'#c89a62':DAM_PAL.log[0]); x.restore(); }
+  }
+  // Umriss
+  x.globalCompositeOperation='source-atop'; const sh=x.createLinearGradient(0,oy,0,oy+g.H); sh.addColorStop(0,'rgba(0,0,0,0)'); sh.addColorStop(1,'rgba(10,20,25,.35)'); x.fillStyle=sh; x.fillRect(0,0,g.w,g.H+PAD); x.globalCompositeOperation='source-over';
+  const out={c,PAD}; DAMC[key]=out; return out;
+}
+/* Stausee hinter dem Damm, Wand, Tore, Risse, Wasserfälle */
+function drawDamStage(){
+  if(scene!=='room'||!curRoom()||curRoom().type!=='boss') return;
+  const D=damInit(), g=D.g; D.t+=0;
+  // Stausee über der Krone
+  const lvl=g.crestY+18+(1-D.level)*150, top=Math.max(0,g.crestY-150);
+  ctx.save();
+  let gr=ctx.createLinearGradient(0,top,0,g.crestY+40); gr.addColorStop(0,'#071418'); gr.addColorStop(0.5,'#123a44'); gr.addColorStop(1,'#1d5560'); ctx.fillStyle=gr;
+  ctx.fillRect(g.x0-200,lvl-90,g.w+400,g.crestY+60-(lvl-90));
+  ctx.fillStyle='rgba(160,230,235,.25)'; for(let i=0;i<14;i++){ const wx=g.x0+((i*137+T*30)%(g.w+200))-100, wy=lvl-60+(i*37%70); ctx.fillRect(Math.round(wx),Math.round(wy),40+(i%3)*20,2); }
+  ctx.restore();
+  // Wand
+  const W_=damWall(D.broken>0.5?'broken':'intact'); const shake=(D.crackT>0?Math.sin(T*70)*2:0);
+  ctx.drawImage(W_.c,g.x0+shake,g.crestY-W_.PAD);
+  // Schleusentore (gleiten nach oben)
+  for(const q of D.gates){ if(D.broken>0.5&&q===D.gates[1]) continue;
+    const top=g.baseY-g.gh-6, op=q.open, gx=q.x+(q.shake>0?Math.sin(T*60)*2:0), gh=g.gh*(1-op*0.85);
+    ctx.fillStyle='#24140a'; ctx.fillRect(gx-g.gw/2,top,g.gw,gh);
+    for(let k=0;k<6;k++){ ctx.fillStyle=k%2?'#6a4630':'#5a3a24'; ctx.fillRect(gx-g.gw/2+2+k*(g.gw-4)/6,top+2,(g.gw-4)/6-2,gh-4); }
+    ctx.fillStyle='#3a3a40'; for(const yy of [0.2,0.75]) if(gh*yy>4) ctx.fillRect(gx-g.gw/2,top+gh*yy,g.gw,6);
+    if(q.want>0.5&&op<0.95){ ctx.fillStyle=`rgba(255,80,60,${0.35+Math.sin(T*20)*0.25})`; ctx.fillRect(gx-g.gw/2,top,g.gw,4); }
+  }
+  // Risse
+  if(D.crack>0){ const n=D.cracks.length; ctx.save(); ctx.lineCap='round';
+    D.cracks.forEach((pts,i)=>{ const show=clamp(D.crack*n*1.15-i,0,1); if(show<=0) return; const m=Math.max(2,Math.round(pts.length*show));
+      ctx.lineJoin='miter'; ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); for(let k=1;k<m;k++) ctx.lineTo(pts[k][0],pts[k][1]); ctx.lineWidth=3; ctx.strokeStyle='#0a0604'; ctx.stroke(); if(D.crack>0.3){ ctx.lineWidth=1; ctx.strokeStyle='rgba(190,240,255,.8)'; ctx.stroke(); }
+      if(D.crack>0.45&&Math.random()<0.02) addPart({x:pts[m-1][0],y:pts[m-1][1],vx:rand(-30,30),vy:rand(10,60),life:0.6,size:rand(2,4),color:'rgba(200,245,255,.85)',kind:'spark',g:300}); });
+    ctx.restore(); }
+  // Wasserstrahlen aus offenen Toren
+  for(const q of D.gates){ if(q.open<0.3) continue; drawFallWater(q.x,g.baseY-g.gh+10,g.gw*0.8*q.open,g.gh-6,0.85*q.open); }
+  // Dammbruch: Wasser stürzt durch die Lücke (Form der Bruchstelle)
+  if(D.broken>0.5) drawBreach(D,g);
+}
+function drawFallWater(x,y,w,h,a){
+  if(w<4) return; ctx.save(); ctx.globalAlpha=a;
+  const gr=ctx.createLinearGradient(0,y,0,y+h); gr.addColorStop(0,'#2e8a98'); gr.addColorStop(1,'#7fd4dc'); ctx.fillStyle=gr; ctx.fillRect(Math.round(x-w/2),y,Math.round(w),h);
+  ctx.fillStyle='rgba(235,255,255,.75)'; for(let i=0;i<w/10;i++){ const sx=x-w/2+((i*29)%Math.max(1,w)), off=(T*420+i*53)%h; ctx.fillRect(Math.round(sx),Math.round(y+off),3,Math.min(26,h-off)); }
+  ctx.fillStyle='rgba(240,255,255,.8)'; for(let i=0;i<w/14;i++){ const fx=x-w/2+((i*41+T*60)%w), fr=4+((i*7+Math.floor(T*12))%6); ctx.beginPath(); ctx.arc(fx,y+h,fr,0,TAU); ctx.fill(); }
+  ctx.restore();
+  if(Math.random()<0.12) addPart({x:x+rand(-w/2,w/2),y:y+h,vx:rand(-60,60),vy:rand(-120,-40),life:0.5,size:rand(3,6),color:'rgba(220,250,255,.8)',kind:'puff'});
+}
+
+function drawBreach(D,g){
+  const hw=210, cx=g.lanes[1], top=g.crestY+4, flow=0.35+0.65*D.level; ctx.save();
+  for(let y=top;y<g.baseY+6;y+=4){ const k=(y-g.crestY)/g.H, w=(hw*(1-k*0.55)-14)*2*Math.min(1,flow*1.15);
+    if(w<4) continue; const t=(y-top)/(g.baseY-top);
+    ctx.fillStyle=t<0.15?'#24707c':t<0.5?'#2e8a98':'#4fb0bc'; ctx.fillRect(Math.round(cx-w/2),y,Math.round(w),4); }
+  ctx.fillStyle='rgba(235,255,255,.7)';
+  for(let i=0;i<46;i++){ const sx=cx+((i*37)%400-200)*0.9*flow, off=(T*380*(0.8+(i%5)*0.08)+i*61)%(g.H-10); const y=top+off, k=(y-g.crestY)/g.H, w=(hw*(1-k*0.55)-14)*flow; if(Math.abs(sx-cx)>w) continue; ctx.fillRect(Math.round(sx),Math.round(y),2,10+(i%4)*5); }
+  // Überlaufkante oben
+  ctx.fillStyle='rgba(220,250,255,.85)'; for(let x=cx-hw*flow+14;x<cx+hw*flow-14;x+=8){ ctx.fillRect(Math.round(x),top+Math.round(Math.sin(x*0.13+T*9)*2),6,3); }
+  // Gischt am Fuß
+  const fw=hw*0.9*flow; for(let i=0;i<18;i++){ const fx=cx-fw+((i*53+T*80)%(fw*2)), fr=7+((i*5+Math.floor(T*14))%8); ctx.fillStyle=i%2?'rgba(240,255,255,.85)':'rgba(200,240,250,.7)'; ctx.beginPath(); ctx.arc(fx,g.baseY+4,fr,0,TAU); ctx.fill(); }
+  ctx.restore();
+  if(Math.random()<0.22) addPart({x:cx+rand(-fw,fw),y:g.baseY,vx:rand(-90,90),vy:rand(-160,-60),life:0.7,size:rand(4,8),color:'rgba(220,250,255,.75)',kind:'puff'});
+}
+
+/* ---------------- Trockene Flächen in der gefluteten Arena ---------------- */
+function damDry(){ // Felsinseln und Plankenfeld (in Weltkoordinaten)
+  if(R_&&R_.dam&&R_.dam.dry&&R_.dam.dryL===L) return R_.dam.dry; const out=[{k:'rock',x:L.cx-430,y:L.cy+90,rx:125,ry:78},{k:'rock',x:L.cx+410,y:L.cy+90,rx:125,ry:78},{k:'plank',x:L.cx,y:L.cy+185,rx:150,ry:52}]; if(R_&&R_.dam){ R_.dam.dry=out; R_.dam.dryL=L; } return out;
+}
+function damRockPoly(d){ if(d.poly) return d.poly; const R=mulberry(Math.round(d.x)), pts=[]; for(let i=0;i<14;i++){ const a=i/14*TAU, n=0.86+R()*0.22; pts.push([Math.round(d.x+Math.cos(a)*d.rx*n),Math.round(d.y+Math.sin(a)*d.ry*n)]); } d.poly=pts; return pts; }
+function damOnDry(x,y){ return damDry().some(d=>d.k==='plank'?Math.abs(x-d.x)<d.rx&&Math.abs(y-d.y)<d.ry:Math.hypot((x-d.x)/d.rx,(y-d.y)/d.ry)<1); }
+function damFlooded(){ return !!(R_&&R_.dam&&R_.dam.flood>0.5); }
+function floodSlow(o){ if(scene!=='room'||!damFlooded()) return 1; return damOnDry(o.x,o.y)?1:0.85; }
+/* Flut-Ebene: seichtes Wasser über der Arena, Inseln und Planken obenauf */
+function drawFloodLayer(){
+  const D=R_.dam; if(!D||D.flood<=0.01) return; const k=Math.min(1,D.flood);
+  // statischer Teil (Wasserfläche, Felsen, Planken) einmal vorgerendert, wie der Boden in logischer Auflösung
+  if(!D.floodC){ const bx=Math.floor(L.cx-L.rx*1.12), by=Math.floor(L.cy-L.ry*1.2), bw=Math.ceil(L.rx*2.24), bh=Math.ceil(L.ry*2.4), c=mkCanvas(bw,bh), g=c.getContext('2d'), o=ctx;
+    ctx=g; try{ g.translate(-bx,-by); damFloodStatic(); } finally { ctx=o; } D.floodC={c,bx,by}; }
+  const F=D.floodC; ctx.save(); ctx.globalAlpha=k; ctx.drawImage(F.c,F.bx,F.by); ctx.restore();
+  // Fließlinien Richtung Süden
+  ctx.save(); ctx.globalAlpha=0.35*k; ctx.fillStyle='#d8fbff';
+  for(let i=0;i<40;i++){ const h=Math.sin(i*12.9898)*43758.5, f=h-Math.floor(h), h2=Math.sin(i*78.233)*12345.6, f2=h2-Math.floor(h2);
+    const x=L.cx+(f-0.5)*L.rx*1.9, y=L.cy-L.ry+((f2*L.ry*2+T*(40+i%5*8))%(L.ry*2)); if(damOnDry(x,y)) continue;
+    ctx.fillRect(Math.round(x+Math.sin(T+i)*3),Math.round(y),2,12); }
+  ctx.restore();
+  // Schaumringe um die Felsen
+  ctx.save(); ctx.globalAlpha=0.5*k; ctx.strokeStyle='rgba(230,255,255,.8)'; ctx.lineWidth=2;
+  for(const d of damDry()) if(d.k==='rock'){ ctx.beginPath(); ctx.ellipse(d.x,d.y+12,d.rx+14+Math.sin(T*2+d.x)*3,d.ry+14,0,0,TAU); ctx.stroke(); }
+  ctx.restore();
+  // Treibgut (nur Kulisse)
+  for(const q of D.drift||[]) spr('stamm_w',q.x,q.y,{s:1.1,rot:q.rot,alpha:Math.min(1,q.life)});
+}
+function damFloodStatic(){
+  ctx.save(); ctx.globalAlpha=0.5; polyPath(ctx,L.walkPts.map(p=>[L.cx+(p[0]-L.cx)*1.06,L.cy+(p[1]-L.cy)*1.12])); ctx.fillStyle='#2b7f90'; ctx.fill(); ctx.restore();
+  for(const d of damDry()){
+    if(d.k==='rock'){ const poly=damRockPoly(d); ctx.save();
+      polyPath(ctx,poly.map(p=>[p[0],p[1]+14])); ctx.fillStyle='#141c1e'; ctx.fill();
+      polyPath(ctx,poly.map(p=>[p[0],p[1]+8])); ctx.fillStyle='#2e3a3a'; ctx.fill();
+      polyPath(ctx,poly); ctx.fillStyle='#55605c'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle=OUT; ctx.stroke();
+      polyPath(ctx,poly); ctx.clip();
+      ctx.fillStyle='#6c7872'; ctx.beginPath(); ctx.ellipse(d.x-18,d.y-14,d.rx*0.7,d.ry*0.55,-0.1,0,TAU); ctx.fill();
+      ctx.fillStyle='#808c84'; ctx.beginPath(); ctx.ellipse(d.x-30,d.y-22,d.rx*0.35,d.ry*0.25,-0.1,0,TAU); ctx.fill();
+      ctx.fillStyle='rgba(20,28,30,.5)'; for(let i=0;i<9;i++){ const a=i*0.7+d.x, r=d.rx*(0.2+((i*29)%10)/14); ctx.fillRect(Math.round(d.x+Math.cos(a)*r),Math.round(d.y+Math.sin(a)*r*0.6),10+(i%3)*4,2); }
+      ctx.fillStyle='#3e6a50'; for(let i=0;i<22;i++){ const a=i*0.29+d.y, r=d.rx*(0.55+((i*37)%10)/24); ctx.fillRect(Math.round(d.x+Math.cos(a)*r),Math.round(d.y+Math.sin(a)*r*0.62),5+(i%2)*3,3); }
+      ctx.restore(); }
+    else { ctx.save(); for(let i=-3;i<=3;i++){ const px=d.x+i*42, py=d.y+(i%2?2:-1); ctx.fillStyle='#24140a'; ctx.fillRect(px-20,py-d.ry,40,d.ry*2); ctx.fillStyle=i%2?'#7a5536':'#6b4a2e'; ctx.fillRect(px-18,py-d.ry+2,36,d.ry*2-4); ctx.fillStyle='#9a7048'; ctx.fillRect(px-18,py-d.ry+2,36,3); }
+      ctx.fillStyle='#3a2414'; ctx.fillRect(d.x-d.rx,d.y-14,d.rx*2,6); ctx.fillRect(d.x-d.rx,d.y+10,d.rx*2,6); ctx.restore(); } }
+}
+/* ---------------- Mausi-Hebel an den Schleusen (Phase 2, freiwillig) ---------------- */
+function damLevers(){ const g=R_.dam.g; return [{i:0,x:g.lanes[0]+g.gw/2+70,y:g.baseY+44},{i:2,x:g.lanes[2]-g.gw/2-70,y:g.baseY+44}]; }
+function drawDamLevers(list){
+  const D=R_.dam; if(!D||!D.p2||D.broken>0.5) return;
+  for(const v of damLevers()){ const q=D.gates[v.i]; list.push({y:v.y,d:()=>{ const down=(q.lock||0)>0;
+    ctx.fillStyle=OUT; ctx.fillRect(v.x-8,v.y-46,16,48); ctx.fillStyle='#5a3a24'; ctx.fillRect(v.x-6,v.y-44,12,44);
+    ctx.save(); ctx.translate(v.x,v.y-40); ctx.rotate(down?0.9:-0.9); ctx.fillStyle=OUT; ctx.fillRect(-3,-34,6,36); ctx.fillStyle='#9a9aa8'; ctx.fillRect(-2,-33,4,34); ctx.fillStyle='#a81e2c'; ctx.beginPath(); ctx.arc(0,-34,6,0,TAU); ctx.fill(); ctx.restore(); }}); }
+}
+/* ---------------- Bühnen-Steuerung (jedes Bild) ---------------- */
+function damStageUpdate(dt){
+  if(!curRoom()||curRoom().type!=='boss') return; const D=damInit(); D.t+=dt;
+  const b=enemies.find(e=>e.boss); const ph=R_.kit&&R_.kit.ph>=0?R_.kit.ph:0;
+  for(const q of D.gates){ const w=(q.lock||0)>0?0:q.want; q.open+=((w>0.5?1:0)-q.open)*Math.min(1,dt*2.5); q.shake=Math.max(0,(q.shake||0)-dt); if(q.lock>0) q.lock-=dt; }
+  if(ph>=1&&!D.p2&&!G.won){ D.p2=true; D.gates[0].want=1; D.gates[2].want=1; if(b&&ph===1) setTimeout(()=>{ if(R_.dam===D) ktSay(b,270,'ICH HABE DREI SCHLEUSEN! DREI! ICH KANN MEHR WASSER MACHEN ALS IHR AUSWEICHEN KÖNNT!',C_BOSS,3); },1400); }
+  if(D.crackT>0) D.crackT-=dt;
+  // Mausi zieht einen Schleusenhebel: Tor schließt sich 5 Sekunden
+  if(D.p2&&D.broken<0.5) for(const v of damLevers()){ const q=D.gates[v.i]; if((q.lock||0)<=0&&mausPrompt(v,58,'Schleuse schließen (Maus)',90)){ q.lock=5; SFX.door(); floater(v.x,v.y-110,'Schleuse zu!','#bfe9ff'); P.mouse.cheer=2; } }
+  // Treibgut in der Flut
+  if(D.flood>0.5){ D.drift=D.drift||[]; if(D.drift.length<5&&Math.random()<dt*0.6){ D.drift.push({x:L.cx+rand(-L.rx*0.8,L.rx*0.8),y:L.cy-L.ry+30,vx:rand(-25,25),vy:rand(30,55),rot:rand(-0.4,0.4),life:9}); }
+    for(const q of D.drift){ q.x+=q.vx*dt; q.y+=q.vy*dt; q.life-=dt; if(damOnDry(q.x,q.y)) q.life=Math.min(q.life,0.5); } D.drift=D.drift.filter(q=>q.life>0&&q.y<L.cy+L.ry);
+    if(b&&b.state!=='dead'&&!['sub','subMove','erupt'].includes(b.state)) b.sink=Math.max(b.sink||0,0.1); }
+  if(D.cine) damBreakTick(D,b,dt);
+  if(D.intro) damIntroTick(D,b,dt);
+  if(D.fin&&b) damFinale(b,dt);
+  if(b&&b.state==='repair') damRepairTick(b,dt);
+  if(b&&b.state==='letter') damLetterTick(b,dt);
+  // Schutz während Zwischensequenzen
+  if(D.cine||D.intro||(D.fin&&D.fin.t<12)){ P.iframes=Math.max(P.iframes||0,0.3); if(b) b.bkInv=Math.max(b.bkInv||0,0.3); }
+}
+
+/* ---------------- Der Dammbruch (Phase 2 → 3) ---------------- */
+function damBreakStart(b){
+  const D=damInit(); if(D.cine||D.broken>0.5) return; const long=!G.flags.dammBruch; G.flags.dammBruch=true;
+  D.cine={t:0,long,done:{}}; b.state='cine'; b.st=0; b.bkInv=12; P.lock=true; P.vx=P.vy=0;
+  R_.stakes=[]; R_.bands=[]; if(R_.kit){ R_.kit.zones.length=0; R_.kit.logs.length=0; }
+  for(const e of enemies) if(e!==b&&!e.boss&&!e.dying){ e.hp=0; e.dying=true; puff(e.x,e.y-20,'rgba(200,240,240,.9)',10); } // ab jetzt keine Helfer mehr
+  cine(L.cx,D.g.baseY+60,0.12,long?9.2:2.8);
+}
+function damBreakTick(D,b,dt){
+  const C=D.cine; C.t+=dt; const t=C.t, once=(k,fn)=>{ if(!C.done[k]){ C.done[k]=true; fn(); } }, g=D.g;
+  const L_=C.long; const s=L_?1:0.32; // Zeitfaktor für die kurze Fassung
+  if(b) b.state='cine';
+  once('creak',()=>{ tone(70,1.4,'sawtooth',0.06,52); noise(1.2,0.18,220); D.crackT=1.2; addShake(6); });
+  D.crack=Math.max(D.crack,Math.min(0.45,t/(1.0*s)*0.45));
+  if(L_&&t>1.0) once('nein',()=>{ if(b){ b.face=0; ktSay(b,270,'NEIN. NEIN NEIN NEIN. DAS WAR EIN TRAGENDER BALKEN!',C_BOSS,2.2); } P.mouse.alert=2; });
+  if(t>2.0*s&&t<3.5*s){ D.crack=Math.min(0.95,0.45+(t-2.0*s)/(1.5*s)*0.5); D.crackT=0.2;
+    once('beams',()=>{ for(let i=0;i<2;i++){ const x=g.lanes[1]+(i?120:-130); damChunk(x,g.crestY+40,i?160:-160); } SFX.slam(); addShake(10); });
+    if(Math.random()<dt*20){ const c=D.cracks[Math.floor(Math.random()*D.cracks.length)], p=c[c.length-1]; addPart({x:p[0],y:p[1],vx:rand(-60,60),vy:rand(20,120),life:0.7,size:rand(3,6),color:'rgba(210,250,255,.9)',kind:'spark',g:400}); } }
+  if(t>3.5*s) once('break',()=>{ D.broken=1; D.crack=1; D.level=1; WFLASH=0.6; addShake(26); SFX.splashBig(); SFX.rumble(); tone(42,1.8,'sine',0.32,30); noise(1.6,0.4,300);
+    for(let i=0;i<14;i++) damChunk(g.lanes[1]+rand(-180,180),g.crestY+rand(20,200),rand(-420,420));
+    D.front={y:g.baseY,sp:560}; for(const q of D.gates) q.want=1; });
+  if(D.front){ D.front.y+=D.front.sp*dt; if(D.front.y>L.cy+L.ry+60) D.front=null; }
+  if(t>5.0*s) D.flood=Math.min(1,D.flood+dt/(1.5*s));
+  if(L_&&t>6.5) once('kaputt',()=>{ if(b){ b.mouth=1; SFX.roar(); addShake(10); ktSay(b,270,'IHR … HABT … MEINEN … DAMM … KAPUTTGEMACHT!',C_BOSS,2.4); } });
+  if(L_&&t>7.6) once('verris',()=>bub(atTop,'DAS IST EINE KATASTROPHE! … ABER EINE SEHR BEEINDRUCKENDE!',C_VERRIS,2.4));
+  if(t>(L_?9.0:2.9)){ D.cine=null; D.flood=1; P.lock=false; if(b){ b.state='idle'; b.st=0; b.bkInv=1.0; b.phase=Math.max(b.phase||1,3); }
+    banner={text:'Der Damm bricht!',sub:'Phase 3 von 4 · Bleib auf den Felsen, wenn die Strömung kommt',t:0,small:true}; P.iframes=Math.max(P.iframes||0,1.0); unstick(P); }
+}
+function damChunk(x,y,vx){ for(let i=0;i<3;i++) addPart({x:x+rand(-20,20),y:y+rand(-10,10),vx:vx*rand(0.5,1)+rand(-60,60),vy:rand(-320,-120),life:rand(0.9,1.4),size:rand(6,11),color:Math.random()<.5?'#6b4a2e':'#8a6a42',kind:'bone',g:800});
+  for(let i=0;i<4;i++) addPart({x,y,vx:rand(-200,200),vy:rand(-200,-40),life:0.6,size:rand(2,3),color:'#c8c8d0',kind:'spark',g:600}); }
+/* Wasserfront während des Bruchs (nur Bild, kein Schaden) */
+function drawDamFront(){ const D=R_.dam; if(!D||!D.front) return; const y=D.front.y;
+  ctx.save(); ctx.fillStyle='rgba(60,170,190,.55)'; ctx.fillRect(L.cx-L.rx-40,y-40,L.rx*2+80,40);
+  ctx.fillStyle='rgba(235,255,255,.9)'; for(let x=L.cx-L.rx-40;x<L.cx+L.rx+40;x+=16){ ctx.fillRect(Math.round(x),Math.round(y-44+Math.sin(x*0.07+T*12)*5),12,6); }
+  ctx.restore(); }
+
+/* ---------------- Auftritt: Er steht oben auf seinem Damm ---------------- */
+function damIntroStart(b){
+  const D=damInit(), g=D.g, long=!G.flags.dammIntro; G.flags.dammIntro=true;
+  if(!long){ b.state='rise'; b.st=0; SFX.splashBig(); SFX.rumble(); addShake(10); P.mouse.alert=2; D.introShort=true; return; }
+  D.intro={t:0,done:{},x0:L.cx,y0:g.crestY+26,x1:L.cx,y1:L.cy-70}; b.state='crest'; b.st=0; b.sink=0; b.air=true; b.x=L.cx; b.y=g.crestY+26; b.bkInv=12; P.lock=true;
+  cine(L.cx,g.crestY+70,0.06,7.6); banner=null; hint='';
+}
+function damIntroTick(D,b,dt){
+  const I=D.intro; I.t+=dt; const t=I.t, once=(k,fn)=>{ if(!I.done[k]){ I.done[k]=true; fn(); } };
+  if(!b) { D.intro=null; return; }
+  if(t<6.0){ b.state='crest'; b.sink=0; b.x=I.x0; b.y=I.y0; b.arms=t>2&&t<4.4?1:0; }
+  if(t>1.9) once('praise',()=>{ ktSay(b,250,'SEHT IHN EUCH AN! DEN GRÖSSTEN DAMM DER WELT! GEBAUT VON MIR!',C_BOSS,2.6); b.mouth=1; });
+  if(t>3.3) once('brett',()=>{ damChunk(I.x0+90,I.y0-40,90); tone(300,0.12,'triangle',0.05,180); setTimeout(()=>{ SFX.splashBig&&noise(0.3,0.15,700); },500); floater(I.x0+70,I.y0-150,'*schieb*','#d8c0a0'); });
+  if(t>4.6) once('piep',()=>{ bub(atMaus,'Piep!',C_MAUS,1.0); P.mouse.alert=2; });
+  if(t>5.3) once('was',()=>ktSay(b,250,'… WAS WAR DAS?!',C_BOSS,1.2));
+  if(t>5.5) once('verris',()=>bub(atTop,'Ich dokumentiere alles! Auch den Einsturz! Vor allem den Einsturz!',C_VERRIS,2.6));
+  if(t>6.0) once('roar',()=>{ SFX.roar(); addShake(12); b.mouth=1; });
+  if(t>=6.4&&t<7.3){ const k=(t-6.4)/0.9; b.state='jump'; b.x=lerp(I.x0,I.x1,k); b.y=lerp(I.y0,I.y1,k)-Math.sin(k*Math.PI)*170; b.sq=-0.1; }
+  if(t>=7.3) once('land',()=>{ b.x=I.x1; b.y=I.y1; b.air=false; b.sq=0.3; SFX.splashBig(); SFX.slam(); addShake(22); puff(b.x,b.y-30,'rgba(200,240,240,.95)',46);
+    waves.push({x:b.x,y:b.y,r:60,sp:420,max:520,hit:true,water:true}); for(let i=0;i<20;i++) addPart({x:b.x+rand(-120,120),y:b.y,vx:rand(-260,260),vy:rand(-420,-160),life:rand(.6,1.1),size:rand(4,8),color:'rgba(210,250,255,.85)',kind:'spark',g:900}); });
+  if(t>8.0){ D.intro=null; P.lock=false; b.state='introDone'; b.st=0;
+    bossCard('damm',()=>{ b.state='idle'; b.st=0; b.bkInv=0.6; hint='Rolle (Leertaste) durch Angriffe. Ist er betäubt, gibt es doppelten Schaden!'; setTimeout(()=>{ if(hint.startsWith('Rolle')) hint=''; },6000); }); }
+}
+
+/* ---------------- Notfallreparatur (Phase 1) ---------------- */
+function damRepairTick(b,dt){
+  const w=b.repW; if(!w||!(R_.walls||[]).includes(w)){ b.state='idle'; b.st=0; return; }
+  const tx=w.x, ty=w.y+70, d=Math.hypot(tx-b.x,ty-b.y);
+  if(!b.repAt){ if(d>30&&b.st<2.6){ const a=Math.atan2(ty-b.y,tx-b.x); dammMove(b,Math.cos(a)*300*dt,Math.sin(a)*300*dt); b.face=tx>b.x?1:-1; return; } b.repAt=b.st; b.hits=0; }
+  const k=b.st-b.repAt; b.arms=1;
+  if(k>0.35+b.hits*0.6&&b.hits<3){ b.hits++; SFX.slam(); addShake(4); woodPuff(w.x,w.y-30,5); for(let i=0;i<3;i++) addPart({x:w.x+rand(-30,30),y:w.y-40,vx:rand(-120,120),vy:rand(-200,-80),life:0.4,size:2,color:'#d8d8e0',kind:'spark',g:600}); floater(w.x,w.y-120,'*klopf*','#d8c0a0'); w.hp=Math.min(4,w.hp+1); }
+  if(k>2.2){ b.state='idle'; b.st=0; b.repW=null; b.repAt=0; ktSay(b,270,'WARUM IST DAS SCHON WIEDER KAPUTT?!',C_BOSS,1.8); }
+}
+/* ---------------- Er will den Brief zurück (Phase 4) ---------------- */
+function damLetterPos(){ const R=R_.braces; if(R&&R.length===2) return {x:(R[0].x+R[1].x)/2,y:Math.min(R[0].y,R[1].y)-6}; return {x:L.cx,y:L.cy-L.ry*0.24}; }
+function damLetterTick(b,dt){
+  const lp=damLetterPos(), tx=lp.x, ty=lp.y+80, D=R_.dam;
+  if(!b.letA){ const d=Math.hypot(tx-b.x,ty-b.y); if(d>34&&b.st<2.4){ const a=Math.atan2(ty-b.y,tx-b.x); dammMove(b,Math.cos(a)*320*dt,Math.sin(a)*320*dt); return; } b.letA=b.st; b.pushes=0; D.held=false; }
+  const k=b.st-b.letA; b.arms=1;
+  if(mausPrompt(lp,64,'Brief festhalten (Maus)',120)&&!D.held){ D.held=true; floater(lp.x,lp.y-120,'Festgehalten!','#ffd6e2'); SFX.squeak&&SFX.squeak(); P.mouse.cheer=2; }
+  if(k>0.3+b.pushes*0.7&&b.pushes<2){ b.pushes++; b.mouth=1; woodPuff(lp.x,lp.y,4); noise(0.12,0.2,500); if(b.pushes===1&&!D.verrisBrief){ D.verrisBrief=true; bub(atTop,'DAS IST EIN BRIEF! KEIN BAUSTOFF!',C_VERRIS,2.2); } }
+  if(k>1.7&&!b.letZ){ b.letZ=true; ktZone({shape:'circle',x:b.x,y:b.y,r:150,warn:1.0,dmg:1,col2:'255,90,60',shake:10}); floater(b.x,b.y-280,'GRRR!','#ff8a6a'); }
+  if(k>2.8){ b.letA=0; b.letZ=false; const w=D.held?2.6:1.6; b.state='bkRest'; b.st=0; b.restT=w; floater(b.x,b.y-280,'Jetzt!','#ffd870'); if(D.held) floater(lp.x,lp.y-150,'Er ist abgelenkt!','#ffd6e2'); D.held=false; }
+}
+
+/* ---------------- Unterwasser-Hinterhalt: Scheinblasen und Ringwelle ---------------- */
+function damAmbushMark(b){ if(!b.ambush) return; R_.decoys=[]; for(let i=0;i<2;i++){ let x=0,y=0,n=0; do{ const p=spawnSpot(120); x=p[0]; y=p[1]; n++; }while(Math.hypot(x-b.x,y-b.y)<260&&n<12); R_.decoys.push({x,y,t:0}); } }
+function damAmbushErupt(b){ if(!b.ambush) return false; R_.decoys=null; R_.ringW={x:b.x,y:b.y,t:0.8}; b.ambush=false; return true; }
+function damAmbushTick(dt){
+  if(R_.decoys) for(const d of R_.decoys){ d.t+=dt; if(Math.random()<dt*8) addPart({x:d.x+rand(-14,14),y:d.y,vx:0,vy:-28,life:0.8,size:rand(3,5),color:'rgba(210,255,250,.7)',kind:'bubble',g:0.001,ph:rand(0,TAU)}); }
+  if(R_.ringW){ R_.ringW.t-=dt; if(R_.ringW.t<=0){ const r=R_.ringW; R_.ringW=null; waves.push({x:r.x,y:r.y,r:70,sp:330,max:560,hit:false,water:true}); SFX.splashBig(); addShake(8); } }
+}
+function drawDamAmbush(){
+  if(R_.decoys) for(const d of R_.decoys){ ctx.save(); ctx.globalAlpha=0.35; ctx.strokeStyle='#e0fbff'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(d.x,d.y,26+Math.sin(T*6)*4,10,0,0,TAU); ctx.stroke(); ctx.restore(); }
+  if(R_.ringW){ const k=1-R_.ringW.t/0.8; ctx.save(); ctx.translate(R_.ringW.x,R_.ringW.y); ctx.scale(1,1/1.6); ctx.lineWidth=4; ctx.strokeStyle=`rgba(255,80,70,${0.5+Math.sin(T*25)*0.3})`; ctx.setLineDash([14,10]); ctx.beginPath(); ctx.arc(0,0,70+k*30,0,TAU); ctx.stroke(); ctx.setLineDash([]); ctx.restore(); }
+}
+
+/* ---------------- Finale: kein Verpuffen, sondern ein Ende mit Würde ---------------- */
+function damFinaleStart(b){
+  const D=damInit(); if(D.fin) return; D.fin={t:0,done:{}}; G.won=true; b.state='dead'; b.st=0; b.bkInv=99;
+  D.crown={x:b.x+30,y:b.y-200,vx:120,vy:-260,z:200,rest:false,rot:0};
+  R_.stakes=[]; R_.bands=[]; if(R_.kit){ R_.kit.zones.length=0; R_.kit.logs.length=0; } for(const e of enemies) if(e!==b&&!e.dying){ e.hp=0; e.dying=true; }
+  try{ if(AC){ MDIR.winAt=0; MDIR.hold=AC.currentTime+40; } }catch(_){ }
+  hint=''; P.mouse.alert=2;
+}
+function damFinale(b,dt){
+  const D=R_.dam, F=D.fin; F.t+=dt; const t=F.t, once=(k,fn)=>{ if(!F.done[k]){ F.done[k]=true; fn(); } };
+  b.state='dead'; b.mouth=0; b.sink=Math.min(0.24,t*0.2); b.sq=Math.min(0.12,t*0.1);
+  const c=D.crown; if(c&&!c.rest){ c.vy+=900*dt; c.x+=c.vx*dt; c.y+=c.vy*dt; c.rot+=dt*6; if(c.y>b.y+20){ c.y=b.y+20; c.rest=true; c.rot=1.3; SFX.place(); woodPuff(c.x,c.y,4); } }
+  if(t>0.4) once('hit',()=>{ tone(48,1.6,'sine',0.25,36); noise(0.9,0.2,240); });
+  if(t>2.0) once('schoen',()=>bub(atE(b,230),'Aber … ich habe doch alles so schön gebaut …',C_BOSS,3.2));
+  if(t>3.6) once('brace',()=>{ for(const r of (R_.braces||[])) if(!r.down) braceDmg(r,r.max,null,true); SFX.rumble(); addShake(10); });
+  if(t>3.6) D.level=Math.max(0.25,D.level-dt*0.25);
+  if(t>5.0) once('sieh',()=>{ D.letterGlow=1; bub(atMaus,'Piep! Piep!',C_MAUS,1.6); P.mouse.alert=3; });
+  if(t>6.6) once('hol',()=>{ const lp=damLetterPos(); envelope={x:lp.x,y:lp.y-60,ty:P.y+6,t:0,landed:false,tx:P.x+46}; P.mouse.cheer=4; SFX.squeak&&SFX.squeak(); hearts(lp.x,lp.y-40,8); });
+  if(envelope&&envelope.tx!==undefined&&!envelope.landed){ envelope.x+=(envelope.tx-envelope.x)*Math.min(1,dt*1.8); }
+  if(t>8.2) once('spieluhr',()=>musJingle('musicbox'));
+  if(t>10.4) once('verris',()=>bub(atTop,'Ich glaube … diese Geschichte sollte ich nicht selbst zu Ende schreiben.',C_VERRIS,4.6));
+  if(t>12) once('end',()=>{ banner={text:'Sieg!',sub:'Der Damm ist offen · der Brief ist gerettet',t:0}; });
+}
+function drawDamCrown(){ const c=R_.dam&&R_.dam.crown; if(!c) return; ctx.save(); ctx.translate(c.x,c.y); ctx.rotate(c.rot);
+  for(const o of [[-14,0.55,-0.25],[0,0.7,0],[14,0.55,0.25]]){ ctx.save(); ctx.translate(o[0],0); ctx.rotate(o[2]); spr('pfahl',0,0,{s:o[1]}); ctx.restore(); }
+  ctx.fillStyle=OUT; ctx.fillRect(-26,-6,52,10); ctx.fillStyle='#a81e2c'; ctx.fillRect(-24,-4,48,6); ctx.restore(); }
+/* Licht durch die Risse (Phase 4 und Finale) */
+function drawDamShafts(){
+  const D=R_.dam; if(!D||D.broken<0.5) return; const ph=R_.kit&&R_.kit.ph||0; const a=(ph>=3||D.fin)?(D.fin?0.22:0.14):0.07; if(a<=0) return;
+  const sp=shaftSprite(), g=D.g; ctx.save(); ctx.translate(-cam.x,-cam.y); ctx.globalCompositeOperation='lighter';
+  for(let i=0;i<4;i++){ const x=g.lanes[1]-260+i*170+Math.sin(T*0.3+i)*20; ctx.globalAlpha=a*(0.7+0.3*Math.sin(T*0.8+i*1.7)); ctx.drawImage(sp,x,g.crestY-40,200*(i%2?1.5:1.1),L.cy+L.ry-g.crestY+60); }
+  ctx.restore();
+}
 
 /* ======================================================================
    FESTWIESE: freiwillige Minispiele (Solo gegen NPC, Koop gegeneinander)
@@ -9647,7 +10067,8 @@ function enterRoomById(id,fromDir){
   if(rm.type==='exit'){ R_.gate={x:L.cx,y:L.ex.N?L.cy+L.ry*0.35:L.cy-L.ry*0.35}; L.solids=L.solids.filter(s=>!s.gate); for(const s2 of [[-52,0,18],[52,0,18]]) L.solids.push({x:R_.gate.x+s2[0],y:R_.gate.y+s2[1],r:s2[2],gate:true}); hint='Der Wegstein bringt dich zurück ins Dorf.'; }
   R_.stakes=[]; R_.bands=[];
   { const nF=rm.type==='boss'||rm.type==='boss3'||rm.type==='mini'?0:rm.type==='town'?5:4, nB=rm.type==='boss'||rm.type==='mini'||reg.key==='spinne'?0:rm.type==='town'?6:3; makeCritters(rm.type==='town'?'stadt':reg.key,nF,nB); }
-  if(rm.type==='boss'&&!G.won){ spawnEnemy('damm',L.cx,L.cy-40,{boss:true,hp:160,max:160,r:70,state:'sleep',phase:1,sink:1,mouth:0,arms:0,ang:0,face:1}); R_.introAt=1.0; hint=''; }
+  if(rm.type==='boss'&&!G.won){ const b=spawnEnemy('damm',L.cx,L.cy-40,{boss:true,hp:160,max:160,r:70,state:'sleep',phase:1,sink:1,mouth:0,arms:0,ang:0,face:1}); R_.introAt=1.0; hint='';
+    if(!G.flags.dammIntro&&b){ const g=damGeo(); b.x=L.cx; b.y=g.crestY+26; b.sink=0; b.air=true; b.state='crest'; b.waitIntro=true; R_.introAt=0.4; } }
   makePet();
   snapCam();
 }
@@ -9767,7 +10188,7 @@ function updatePlayer(dt){
     if(P.rollT<=0){ P.squash=0.18; puff(P.x+P.rdx*10,P.y,'rgba(170,150,120,.55)',4); }
   } else {
     const slow=(P.spinT>0?0.7:1)*(P.atkT>0?0.35:1);
-    const sp=225*slow*(P.wet?0.6:1)*(P.webbed&&!capePoison()?0.55:1)*capeSpeed();
+    const sp=225*slow*(P.wet?0.6:1)*floodSlow(P)*(P.webbed&&!capePoison()?0.55:1)*capeSpeed();
     P.vx+=(mx*sp-P.vx)*Math.min(1,dt*12); P.vy+=(my*sp-P.vy)*Math.min(1,dt*12);
     if(pressed.roll&&P.rollCd<=0&&P.bathT<=0){
       let dx=mx,dy=my; if(Math.hypot(dx,dy)<0.2){ dx=AV?AV.x:(P.dirX||1); dy=AV?AV.y:(P.dirY||0); } const d=Math.hypot(dx,dy); P.rdx=dx/d; P.rdy=dy/d; P.dir8=dir8(P.rdx,P.rdy);
@@ -9982,11 +10403,11 @@ function updateSpring(dt){
 }
 function updateBossRoom(dt){
   const b=enemies.find(e=>e.boss);
-  updateBossHazards(dt); if(b) dammExtras(b,dt);
+  updateBossHazards(dt); if(b) dammExtras(b,dt); damStageUpdate(dt); damAmbushTick(dt);
   if(P.moving&&Math.random()<dt*7) addPart({x:P.x,y:P.y,vx:0,vy:0,life:0.5,size:18,color:'rgba(200,240,240,.5)',kind:'ring'});
-  if(b&&b.state==='sleep'&&R_.t>R_.introAt){ b.state='rise'; b.st=0; SFX.splashBig(); SFX.rumble(); addShake(10); P.mouse.alert=2; }
+  if(b&&(b.state==='sleep'||(b.state==='crest'&&b.waitIntro))&&R_.t>R_.introAt){ b.waitIntro=false; damIntroStart(b); } // erstes Mal: er steht oben auf seinem Damm, sonst taucht er kurz auf
   if(b&&b.state==='intro'&&!R_.introDone){ R_.introDone=true; SFX.roar(); addShake(12);
-    bossIntro('damm',TALK.bossIntro,()=>bossCard('damm',()=>{ b.state='idle'; b.st=0; hint='Rolle (Leertaste) durch Angriffe. Ist er betäubt, gibt es doppelten Schaden!'; setTimeout(()=>{ if(hint.startsWith('Rolle')) hint=''; },6000); })); }
+    bossCard('damm',()=>{ b.state='idle'; b.st=0; hint='Rolle (Leertaste) durch Angriffe. Ist er betäubt, gibt es doppelten Schaden!'; setTimeout(()=>{ if(hint.startsWith('Rolle')) hint=''; },6000); }); }
   if(envelope){
     envelope.t+=dt;
     if(!envelope.landed){ envelope.y+=(envelope.ty-envelope.y)*Math.min(1,dt*1.6); if(Math.abs(envelope.y-envelope.ty)<2){ envelope.landed=true; SFX.heart(); hearts(envelope.x,envelope.y,12); } }
@@ -10048,6 +10469,7 @@ function render(){
   if(scene==='hub'){ drawRitualCircle(); for(const o of L.objs) if(o.kind==='flat') spr(o.nm,o.x,o.y,{s:o.s}); waterEllipse(1250,1120,108,50,'pond',{flow:12,seed:1,ringRate:0.05}); drawPondLife(); }
   else { drawPuddles(); drawSwampFlow(); if(curRoom().type==='mini2') drawQuakWater(); }
   drawCloudShadows();
+  if(scene==='room'&&curRoom().type==='boss'){ drawDamStage(); drawFloodLayer(); drawDamFront(); }
   if(scene==='room'){ drawStreams(); drawFalls(); drawVines(); }
   if(scene==='room'){
     const t=curRoom().type;
@@ -10181,7 +10603,7 @@ function render(){
   const mc=scene==='hub'?'255,226,150':({wald:'190,255,150',pilz:'255,190,90',wasser:'120,255,210',spinne:'200,160,255',damm:'255,120,90'}[L.key]||'255,226,150');
   const fs=fireSprite(mc); for(const m of motes){ const a=0.35+Math.sin(T*2.4+m.p)*0.3; if(a<0.1) continue; ctx.globalAlpha=Math.min(1,a+0.2); ctx.drawImage(fs,Math.round(m.x)-10,Math.round(m.y)-10,20,20); } ctx.globalAlpha=1;
   ctx.restore();
-  postFX(); drawGrain();
+  postFX(); if(scene==='room'&&curRoom().type==='boss') drawDamShafts(); drawGrain();
   if(prompt_&&!dialog&&!R_.fight&&!R_.summon&&!R_.parade) drawPrompt(prompt_.x-cx0,prompt_.y-cy0,prompt_.label);
   if(R_.fight){ drawCageStage(); drawFightUI(); } else if(!(R_.bj||(R_.cas&&R_.cas.phase==='reward'))) drawHUD(); else drawHearts();
   if(R_.cas&&(scene==='room'||R_.cas.hub)) drawBJUI();
