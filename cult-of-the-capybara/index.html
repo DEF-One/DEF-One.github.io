@@ -5911,126 +5911,173 @@ function buildLife(lv,R,st,key,P0,D){
     lv.vines.push({x:p[0],y:p[1]-40-R()*40,len:50+R()*90,ph:R()*TAU,web:key==='spinne',flow:R()<.4}); }
 }
 /* ---------------- Bäche und Wasserfälle als Pixelkunst ----------------
-   Jeder Bach wird einmal in 2-px-Pixeln vorgezeichnet: tiefe Mitte, flache Ränder,
-   Kiesel unter Wasser, nasses Ufer, bemooste Steine und eine Quelle unter einem Felsen.
-   Darüber laufen 8 vorgezeichnete Bilder mit Strömungsstreifen, Glitzern und Schaum. */
+   Gezeichnet in echten 1-px-Pixeln, genau so fein wie die Figuren, mit klaren Farbbändern statt Rauschen.
+   Grundbild (einmal pro Raum): Ufer mit dunklem Umriss, helle Wasserkante, Uferschatten, flache Ränder,
+   dunkle Rinne in der Mitte, Kiesel unter Wasser, Steine mit Moos, Schilf, Seerosen, Quelle unter einem Felsen.
+   Bewegung (jedes Bild): Strömungsstriche, die dem Bach folgen, Glitzern, Schaum an Steinen und an der Kante. */
 const STREAM_PAL={
-  wald:{deep:[20,52,66],mid:[28,78,90],shal:[42,106,110],edge:[66,138,132],hi:[146,210,202],foam:[222,248,240],mud:[36,32,24],mud2:[50,44,32],peb:[58,90,84]},
-  wasser:{deep:[12,62,74],mid:[20,92,100],shal:[34,132,134],edge:[66,176,162],hi:[164,238,222],foam:[234,255,250],mud:[22,40,40],mud2:[32,58,54],peb:[48,104,98]},
-  pilz:{deep:[24,48,46],mid:[36,70,64],shal:[54,98,84],edge:[86,130,100],hi:[186,228,156],foam:[228,246,212],mud:[38,28,26],mud2:[54,40,34],peb:[68,92,72]},
-  stadt:{deep:[22,48,78],mid:[32,72,104],shal:[50,102,132],edge:[84,136,160],hi:[176,222,240],foam:[234,246,255],mud:[38,34,32],mud2:[54,48,44],peb:[70,94,108]}};
-const STONE={ol:[22,18,26],dk:[66,62,74],md:[90,86,98],lt:[122,118,128],ms:[62,92,42],ms2:[94,126,56]};
-const BAYER=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+  wald:{out:[30,24,20],bankD:[70,54,34],bankL:[96,76,46],bankH:[126,102,62],
+    deep:[20,52,78],mid:[27,76,102],body:[36,102,124],shal:[54,138,148],shad:[22,58,84],rim:[118,204,200],hi:[180,238,230],foam:[234,252,248],peb:[38,104,118],pebL:[72,142,146]},
+  wasser:{out:[14,30,32],bankD:[32,66,64],bankL:[50,94,88],bankH:[76,126,114],
+    deep:[10,56,72],mid:[15,84,100],body:[22,112,124],shal:[36,150,148],shad:[12,64,82],rim:[104,220,204],hi:[176,248,232],foam:[234,255,250],peb:[20,124,128],pebL:[58,170,160]},
+  pilz:{out:[30,22,20],bankD:[72,52,38],bankL:[100,76,52],bankH:[130,102,68],
+    deep:[20,48,50],mid:[28,68,66],body:[38,92,82],shal:[56,120,98],shad:[22,54,56],rim:[128,194,150],hi:[194,236,178],foam:[236,250,228],peb:[44,104,86],pebL:[80,140,108]},
+  stadt:{out:[26,24,30],bankD:[0,0,0],bankL:[0,0,0],bankH:[0,0,0],
+    deep:[18,42,72],mid:[26,62,98],body:[34,86,122],shal:[50,116,148],shad:[20,46,78],rim:[120,190,226],hi:[182,228,248],foam:[236,246,255],peb:[42,96,126],pebL:[78,130,156]}};
+const STONE={ol:[26,22,30],dk:[64,60,74],md:[94,90,104],lt:[128,124,136],hl:[164,160,168],ms:[66,100,44],ms2:[98,136,58],ms3:[132,166,74]};
 const sHash=(a,b)=>{ const h=Math.sin(a*127.1+b*311.7)*43758.5453; return h-Math.floor(h); };
 function streamLine(f){ if(f.line) return f.line; const P=f.path, pts=[];
   for(let i=0;i<P.length-1;i++){ const p0=P[Math.max(0,i-1)],p1=P[i],p2=P[i+1],p3=P[Math.min(P.length-1,i+2)];
     for(let k=0;k<8;k++){ const t=k/8,t2=t*t,t3=t2*t, cr=c=>0.5*(2*p1[c]+(-p0[c]+p2[c])*t+(2*p0[c]-5*p1[c]+4*p2[c]-p3[c])*t2+(-p0[c]+3*p1[c]-3*p2[c]+p3[c])*t3); pts.push([cr(0),cr(1)]); } }
   pts.push(P[P.length-1].slice()); const S=[0]; for(let i=1;i<pts.length;i++) S.push(S[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
   const len=S[S.length-1]; const hwAt=s=>{ const u=s/len; return f.w/2*(0.45+0.55*Math.min(1,u/0.28))*(1+0.14*Math.max(0,(u-0.82)/0.18)); };
-  return f.line={pts,S,len,hwAt}; }
+  // Abtastung je 1 px Bogenlänge: Punkt und Normale (zeigt zur Seite +1, also nach links bei einem Bach nach unten)
+  const N=Math.ceil(len)+1, X=new Float32Array(N), Y=new Float32Array(N), NX=new Float32Array(N), NY=new Float32Array(N);
+  for(let s=0,k=0;s<N;s++){ while(k<pts.length-2&&S[k+1]<s) k++; const a=pts[k], b=pts[k+1], sl=(S[k+1]-S[k])||1, t=Math.min(1,Math.max(0,(s-S[k])/sl)); X[s]=a[0]+(b[0]-a[0])*t; Y[s]=a[1]+(b[1]-a[1])*t; const dx=b[0]-a[0], dy=b[1]-a[1], dl=Math.hypot(dx,dy)||1; NX[s]=-dy/dl; NY[s]=dx/dl; }
+  return f.line={pts,S,len,hwAt,X,Y,NX,NY,N}; }
+/* halbe Breite mit sanft geschwungenem Ufer (je Seite anders) */
+function streamHW(f,s,side){ const Ln=streamLine(f), sd=f.seed||0; if(f.key==='stadt') return Ln.hwAt(s)*0.85; return Ln.hwAt(s)*(1+0.10*Math.sin(s*0.06+side*1.9+sd)+0.05*Math.sin(s*0.17+side*0.7+sd*1.3)); }
 /* Abstand eines Punkts zur Bachmitte: d, Bogenlänge s, Seite (+1/-1), halbe Breite hw */
 function streamDist(f,x,y){ const Ln=streamLine(f), p=Ln.pts; let best=null;
   for(let i=0;i<p.length-1;i++){ const ax=p[i][0],ay=p[i][1],bx=p[i+1][0],by=p[i+1][1],dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy||1; let t=((x-ax)*dx+(y-ay)*dy)/l2; t=t<0?0:t>1?1:t;
     const qx=ax+dx*t,qy=ay+dy*t,d=Math.hypot(x-qx,y-qy); if(!best||d<best.d) best={d,s:Ln.S[i]+t*(Ln.S[i+1]-Ln.S[i]),side:(dx*(y-ay)-dy*(x-ax))>0?1:-1,tx:dx,ty:dy,qx,qy}; }
-  if(best){ const sd=f.seed||0, s=best.s; best.hw=f.key==='stadt'?Ln.hwAt(s)*0.85:Ln.hwAt(s)*(1+0.15*Math.sin(s*0.083+best.side*1.9+sd)+0.08*Math.sin(s*0.21+best.side*0.7+sd*1.3)); } return best; }
+  if(best) best.hw=streamHW(f,best.s,best.side); return best; }
 function streamBake(f){
-  const PX=2, pal=STREAM_PAL[f.key]||STREAM_PAL.wald, Ln=streamLine(f), len=Ln.len, sd=f.seed||0;
-  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9; for(const q of Ln.pts){ x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); y0=Math.min(y0,q[1]); y1=Math.max(y1,q[1]); }
-  const M=f.w*0.8+26; x0=Math.floor(x0-M); x1=Math.ceil(x1+M); y0=Math.floor(y0-M-10); y1=Math.ceil(f.y+2);
-  const W=Math.ceil((x1-x0)/PX), H=Math.ceil((y1-y0)/PX); f.box={x0,y0,W,H,PX}; const town=f.key==='stadt';
-  const cell=new Array(W*H);
-  for(let j=0;j<H;j++) for(let i=0;i<W;i++){ const q=streamDist(f,x0+i*PX+1,y0+j*PX+1); cell[j*W+i]=q; }
-  // Steine am Ufer und an der Quelle
-  const stones=[]; const pushStone=(s,side,lat,r)=>{ const k=Math.min(Ln.pts.length-1,Math.max(0,Ln.S.findIndex(v=>v>=s))); const a=Ln.pts[Math.max(0,k-1)], b=Ln.pts[k]; let tx=b[0]-a[0], ty=b[1]-a[1]; const tl=Math.hypot(tx,ty)||1; tx/=tl; ty/=tl;
-    const nx=-ty*side, ny=tx*side; const hw=Ln.hwAt(s); stones.push({x:b[0]+nx*(hw+lat),y:b[1]+ny*(hw+lat)*0.85,r}); };
-  for(let s=34+sHash(sd,1)*20,n=0;s<len-26;s+=38+sHash(sd,s)*46,n++){ const side=sHash(n,sd+3)<0.5?-1:1; pushStone(s,side,0.5+sHash(s,n)*3,3.2+sHash(n,s+1)*3.2);
-    if(sHash(s+7,n)<0.55) pushStone(s+6+sHash(n,2)*5,side,3+sHash(n,7)*3,1.8+sHash(n,9)*1.4);
-    if(sHash(s+3,n)<0.3) pushStone(s+16,-side,1+sHash(n,11)*2,2.2+sHash(n,13)*1.6); }
-  pushStone(len-6,-1,1,3.6); pushStone(len-4,1,0.5,3.2);
-  { const hx=Ln.pts[0][0], hy=Ln.pts[0][1]; stones.push({x:hx,y:hy-5,r:8.5,src:true}); stones.push({x:hx-11,y:hy-1,r:4.6}); stones.push({x:hx+10,y:hy-2,r:3.8}); stones.push({x:hx+3,y:hy-13,r:4.2}); }
-  if(town) stones.length=0;
-  for(const st of stones){ st.cx=(st.x-x0)/PX; st.cy=(st.y-y0)/PX; st.rc=st.r/PX*2; }
+  const pal=STREAM_PAL[f.key]||STREAM_PAL.wald, Ln=streamLine(f), len=Ln.len, sd=f.seed||0, town=f.key==='stadt';
+  let x0=1e9,x1=-1e9,y0=1e9; for(const q of Ln.pts){ x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); y0=Math.min(y0,q[1]); }
+  const Rm=Math.ceil(f.w*0.75+14); x0=Math.floor(x0-Rm); x1=Math.ceil(x1+Rm); y0=Math.floor(y0-Rm-14); const y1=Math.ceil(f.y+1);
+  const W=x1-x0, H=y1-y0; f.box={x0,y0,W,H};
+  // Abstandsfeld: jedes Segment trägt nur in seiner Nähe ein
+  const DD=new Float32Array(W*H).fill(1e9), SS=new Float32Array(W*H), SD=new Int8Array(W*H), P=Ln.pts;
+  for(let k=0;k<P.length-1;k++){ const ax=P[k][0],ay=P[k][1],bx=P[k+1][0],by=P[k+1][1],dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy||1, sl=Ln.S[k+1]-Ln.S[k];
+    const i0=Math.max(0,Math.floor(Math.min(ax,bx)-Rm-x0)), i1=Math.min(W-1,Math.ceil(Math.max(ax,bx)+Rm-x0)), j0=Math.max(0,Math.floor(Math.min(ay,by)-Rm-y0)), j1=Math.min(H-1,Math.ceil(Math.max(ay,by)+Rm-y0));
+    for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){ const px=x0+i+0.5, py=y0+j+0.5; let t=((px-ax)*dx+(py-ay)*dy)/l2; t=t<0?0:t>1?1:t; const qx=ax+dx*t-px, qy=ay+dy*t-py, d=qx*qx+qy*qy, o=j*W+i;
+      if(d<DD[o]){ DD[o]=d; SS[o]=Ln.S[k]+t*sl; SD[o]=(dx*(py-ay)-dy*(px-ax))>0?1:-1; } } }
   const c=mkCanvas(W,H), g=c.getContext('2d'), id=g.createImageData(W,H), d=id.data;
-  const put=(o,col,a)=>{ d[o]=col[0]; d[o+1]=col[1]; d[o+2]=col[2]; d[o+3]=a===undefined?255:a; };
-  for(let j=0;j<H;j++) for(let i=0;i<W;i++){ const q=cell[j*W+i], o=(j*W+i)*4, wy=y0+j*PX+1; if(!q||wy>f.y+1) continue; const hw=q.hw, b=BAYER[(j&3)*4+(i&3)]/16;
-    if(q.d<hw){ const t=1-q.d/hw; let col=t+b*0.12>0.62?pal.deep:t+b*0.12>0.36?pal.mid:t+b*0.12>0.16?pal.shal:pal.edge;
-      // Schatten vom linken Ufer (Licht von oben links)
-      if((q.qx-(x0+i*PX+1))>0&&t<0.45&&b<0.6) col=t>0.16?pal.deep:pal.mid;
-      // Kiesel unter Wasser
-      const pk=sHash(Math.floor(i/2)+sd,Math.floor(j/2)); if(t>0.12&&t<0.75&&pk<0.09) col=b<0.5?pal.peb:[pal.peb[0]+14,pal.peb[1]+14,pal.peb[2]+12];
-      // Kante am Wasserfall: schneller, heller
-      if(q.s>len-9){ const k=(len-q.s)/9, hh=sHash(i+sd,j*3); col=hh>0.35+k*0.55?pal.foam:hh>0.15+k*0.4?pal.edge:pal.shal; }
-      put(o,col); }
-    else if(town&&q.d<hw+5){ const blk=Math.floor((q.s+(q.side>0?5:0))/11), jn=((q.s+(q.side>0?5:0))%11+11)%11<1.6, top=q.d<hw+1.6;
-      put(o,jn?[44,40,48]:top?[150,146,154]:(sHash(blk,q.side+sd)<0.5?[112,108,118]:[100,96,106])); if(!jn&&!top&&sHash(i,j+sd)<0.08) put(o,[70,96,50]); }
-    else if(town&&q.d<hw+6.5){ put(o,[30,28,34],150); }
-    else if(town){}
-    else if(q.d<hw+2.5+1.5*Math.sin(q.s*0.17+q.side+sd)){ put(o,b<0.5?pal.mud:pal.mud2); if(sHash(i+sd,j)<0.06) put(o,[110,104,98]); }
-    else if(q.d<hw+6){ put(o,[30,46,24],Math.round(110*(1-(q.d-hw-3)/3)+40*b)); } }
+  const put=(i,j,col,a)=>{ if(i<0||j<0||i>=W||j>=H) return; const o=(j*W+i)*4; if(a!==undefined&&a<255){ const k=a/255; d[o]=Math.round(d[o]*(1-k)+col[0]*k); d[o+1]=Math.round(d[o+1]*(1-k)+col[1]*k); d[o+2]=Math.round(d[o+2]*(1-k)+col[2]*k); d[o+3]=Math.max(d[o+3],a); return; } d[o]=col[0]; d[o+1]=col[1]; d[o+2]=col[2]; d[o+3]=255; };
+  const isWater=new Uint8Array(W*H);
+  for(let j=0;j<H;j++) for(let i=0;i<W;i++){ const o=j*W+i; if(DD[o]>=1e8||y0+j+0.5>f.y+1) continue; const dist=Math.sqrt(DD[o]), s=SS[o], side=SD[o], hw=streamHW(f,s,side), e=hw-dist;
+    if(e>=0){ isWater[o]=1; const depth=dist/hw, wig=0.07*Math.sin(s*0.11+sd*2)+0.05*Math.sin(s*0.29+sd); let col;
+      if(e<1) col=side>0?pal.shad:pal.rim;                                   // Wasserkante: rechts im Licht, links im Schatten
+      else if(side>0&&e<3.4+0.9*Math.sin(s*0.13+sd)) col=pal.shad;           // Schatten unter dem linken Ufer
+      else if(e<2.6+0.6*Math.sin(s*0.21+sd*3)) col=pal.shal;                 // flacher, heller Rand
+      else if(depth<0.30+wig) col=pal.deep;                                  // tiefe Rinne
+      else if(depth<0.62+wig) col=pal.mid; else col=pal.body;
+      if(s>len-4) col=e<1?pal.foam:pal.rim;                                  // Kante vor dem Wasserfall
+      put(i,j,col); continue; }
+    const out=-e;
+    if(town){ const u=s+(side>0?5:0), blk=Math.floor(u/10), jn=(u%10+10)%10<1;
+      if(out<1) put(i,j,pal.out); else if(out<5){ put(i,j,jn?[50,46,54]:out<2.2?[156,152,160]:(sHash(blk,side+sd)<0.5?[116,112,122]:[104,100,110])); if(!jn&&out>2.2&&sHash(i,j+sd)<0.05) put(i,j,[72,100,52]); }
+      else if(out<7) put(i,j,[26,24,30],out<6?110:60); continue; }
+    const bw=2.3+1.2*Math.sin(s*0.15+side*2+sd)+0.6*Math.sin(s*0.41+sd);
+    if(out<1.1) put(i,j,pal.out);
+    else if(out<1.1+bw){ const inner=out<2.3; put(i,j,side<0?(inner?pal.bankH:pal.bankL):(inner?pal.bankD:pal.bankL)); }
+    else if(out<2.1+bw) put(i,j,[34,40,18],150);
+    else if(out<5.1+bw) put(i,j,[20,30,10],out<3.6+bw?70:36); }
+  // Hilfen entlang des Bachs
+  const at=(s,lat)=>{ const k=Math.max(0,Math.min(Ln.N-1,Math.round(s))); return [Ln.X[k]+Ln.NX[k]*lat,Ln.Y[k]+Ln.NY[k]*lat]; };
+  const W2=(x,y)=>{ const i=Math.round(x-x0), j=Math.round(y-y0); return i>=0&&j>=0&&i<W&&j<H&&isWater[j*W+i]; };
+  // Kiesel unter Wasser
+  if(!town) for(let s=12+sHash(sd,2)*8,n=0;s<len-10;s+=7+sHash(n,sd)*10,n++){ if(sHash(n,sd+4)>0.55) continue; const side=sHash(n,sd+5)<0.5?-1:1, hw=streamHW(f,s,side), e=2.2+sHash(n,6)*2.4;
+    const [px,py]=at(s,side*(hw-e)); const ci=Math.round(px-x0), cj=Math.round(py-y0), w=sHash(n,8)<0.5?3:4;
+    for(let q=0;q<w;q++){ if(W2(px-x0+q-1+x0,py)) put(ci+q-1,cj,pal.peb); } for(let q=1;q<w-1;q++) if(W2(px+q-1,py-1)) put(ci+q-1,cj-1,pal.pebL); }
   // Steine
-  for(const st of stones){ const r=st.rc, rx=r, ry=r*0.78;
-    for(let j=Math.floor(st.cy-ry-1);j<=Math.ceil(st.cy+ry+1);j++) for(let i=Math.floor(st.cx-rx-1);i<=Math.ceil(st.cx+rx+1);i++){ if(i<0||j<0||i>=W||j>=H) continue; if(y0+j*PX+1>f.y+1) continue;
-      const nx=(i-st.cx)/rx, ny=(j-st.cy)/ry, rr=nx*nx+ny*ny; if(rr>1.0) continue; const o=(j*W+i)*4, bb=BAYER[(j&3)*4+(i&3)]/16;
-      const edge=rr>Math.pow(1-1.3/r,2); if(edge){ put(o,STONE.ol); continue; }
-      const lit=-(nx*0.55+ny*0.85); let col=lit+bb*0.25>0.45?STONE.lt:lit+bb*0.25>-0.15?STONE.md:STONE.dk;
-      if(ny<-0.15&&sHash(i+st.cx,j)<0.7&&(ny<-0.4||bb<0.5)) col=lit>0.3?STONE.ms2:STONE.ms;
-      if(st.src&&ny>0.35&&Math.abs(nx)<0.45) col=ny>0.6?pal.deep:[16,22,24];
-      put(o,col); } }
-  if(town){ const hx=Math.round((Ln.pts[0][0]-x0)/PX), hy=Math.round((Ln.pts[0][1]-y0)/PX), bw=Math.round(f.w*0.6/PX)+3;
-    for(let j=-9;j<=1;j++) for(let i=-bw;i<=bw;i++){ const xx=hx+i, yy=hy+j; if(xx<0||yy<0||xx>=W||yy>=H) continue; const o=(yy*W+xx)*4, e=Math.abs(i)===bw||j===-9;
-      const hole=Math.abs(i)<bw-3&&j>-6&&(i*i)/((bw-3)*(bw-3))+((j+1)*(j+1))/30<1; put(o,e?[34,30,38]:hole?(j>-1?pal.deep:[14,16,20]):(((j+9)%4===0)||((i+(Math.floor((j+9)/4)%2)*3)%6===0)?[60,56,66]:[118,114,124])); } }
-  // Schilf am Ufer und ein paar Seerosenblätter
-  const reedCol=[[46,74,30],[66,98,40],[92,124,52]], padCol=[[38,78,40],[58,104,50]];
-  if(!town) for(let s=24+sHash(sd,5)*30,n=0;s<len-30;s+=46+sHash(n,sd)*50,n++){ const st0=stones.length; pushStone(s,sHash(n,sd+9)<0.5?-1:1,3+sHash(n,4)*3,1); const sp=stones.pop(); stones.length=st0;
-    const cx_=Math.round((sp.x-x0)/PX), cy_=Math.round((sp.y-y0)/PX), nb=3+Math.floor(sHash(n,sd+2)*3);
-    for(let k=0;k<nb;k++){ const bx=cx_+k-1-Math.floor(nb/2)+(k%2), hgt=3+Math.floor(sHash(k,n+sd)*4), lean=sHash(k+3,n)<0.5?0:(k%2?1:-1);
-      for(let t=0;t<hgt;t++){ const xx=bx+(t>hgt-3?lean:0), yy=cy_-t; if(xx<0||yy<0||xx>=W||yy>=H) continue; put((yy*W+xx)*4,reedCol[t===hgt-1?2:t>hgt/2?1:0]); } }
-    if(sHash(n,sd+12)<0.45){ const s2=s+12; const k2=Math.min(Ln.pts.length-1,Ln.S.findIndex(v=>v>=s2)); if(k2>0){ const pp=Ln.pts[k2], side=sHash(n,1)<0.5?-1:1, hw2=Ln.hwAt(s2)*0.45;
-      const px_=Math.round((pp[0]+side*hw2-x0)/PX), py_=Math.round((pp[1]-y0)/PX), pr=1.6+sHash(n,3);
-      for(let j=-2;j<=2;j++) for(let i=-3;i<=3;i++){ const rr=(i*i)/(pr*pr*1.4)+(j*j)/(pr*pr*0.7); if(rr>1) continue; if(i===1&&j<=0) continue; const xx=px_+i, yy=py_+j; if(xx<0||yy<0||xx>=W||yy>=H) continue; put((yy*W+xx)*4,rr>0.55?padCol[0]:padCol[1]); }
-      if(sHash(n,6)<0.4){ const xx=px_-1, yy=py_-1; if(xx>=0&&yy>=0) put((yy*W+xx)*4,[236,180,200]); } } } }
-  g.putImageData(id,0,0); f.base=c;
-  // Bewegte Bilder: Strömungsstreifen, Glitzern, Schaum an der Kante, Blubbern an der Quelle
-  const NF=8, Pp=44; f.frames=[];
-  const lanes=[[-0.5,0,9,0],[-0.15,17,6,1],[0.2,31,11,0],[0.55,8,7,1],[0.02,24,5,1]];
-  for(let k=0;k<NF;k++){ const fc=mkCanvas(W,H), fg=fc.getContext('2d'), fid=fg.createImageData(W,H), fd=fid.data, ph=k*Pp/NF;
-    const fput=(o,col,a)=>{ fd[o]=col[0]; fd[o+1]=col[1]; fd[o+2]=col[2]; fd[o+3]=a===undefined?255:a; };
-    for(let j=0;j<H;j++) for(let i=0;i<W;i++){ const q=cell[j*W+i]; if(!q||y0+j*PX+1>f.y+1) continue; const hw=q.hw; if(q.d>=hw*0.92) continue; const o=(j*W+i)*4, ql=q.side*q.d/hw;
-      for(let n=0;n<lanes.length;n++){ const L_=lanes[n], lat=L_[0]+0.16*Math.sin(q.s*0.055+n*2.1+sd); if(Math.abs(ql-lat)*hw>1.25) continue;
-        const u=((q.s-ph-L_[1])%Pp+Pp)%Pp; if(u<L_[2]){ fput(o,L_[3]&&u>L_[2]-3?pal.foam:pal.hi,u<2?150:230); } }
-      if(sHash(i*3+k,j*7+sd)>0.9965) fput(o,pal.foam);
-      if(q.s>len-14){ const u=((q.s-ph*1.7)%11+11)%11; if(u<3&&sHash(i,j+k)<0.8) fput(o,pal.foam,220); }
-      if(q.s<12){ const r=(k/NF)*7+1, dd=Math.hypot(x0+i*PX+1-Ln.pts[0][0],(y0+j*PX+1-Ln.pts[0][1]-4)*1.4); if(Math.abs(dd-r)<1.1) fput(o,pal.foam,Math.round(230*(1-k/NF))); } }
-    fg.putImageData(fid,0,0); f.frames.push(fc); }
-  // Wasserfall über die Klippe
-  const fw=Math.ceil((Ln.hwAt(len)*2+4)/PX), fh=Math.ceil((f.D+34)/PX); f.fall={W:fw,H:fh,x0:Math.round(Ln.pts[Ln.pts.length-1][0]-fw*PX/2),y0:Math.round(f.y-2)}; f.fallFrames=[];
-  for(let k=0;k<NF;k++){ const fc=mkCanvas(fw,fh), fg=fc.getContext('2d'), fid=fg.createImageData(fw,fh), fd=fid.data, ph=k*48/NF;
-    for(let j=0;j<fh;j++) for(let i=0;i<fw;i++){ const o=(j*fw+i)*4, b=BAYER[(j&3)*4+(i&3)]/16, e=Math.min(i,fw-1-i), wy=j*PX;
-      let col=e===0?[Math.max(0,pal.deep[0]-10),Math.max(0,pal.deep[1]-12),Math.max(0,pal.deep[2]-12)]:e===1?pal.deep:sHash(i,sd)<0.5?pal.mid:pal.shal;
-      const sp=((wy-ph+sHash(i,sd+1)*48)%48+48)%48, sl=6+Math.floor(sHash(i+5,sd)*16); if(e>1&&sp<sl) col=sp<3?pal.foam:sp<6?pal.hi:pal.edge;
-      if(e===1&&((wy-ph*1.3+i*13)%20+20)%20<4) col=pal.edge;
-      const lip=2+Math.round(1.6*Math.sin((i/(fw-1))*Math.PI));
-      if(j<lip) col=sHash(i,j+k)<0.75?pal.foam:pal.hi; else if(j<lip+2&&e>0) col=sHash(i+k,j)<0.45?pal.foam:pal.edge;
-      const fadeK=Math.max(0,(wy-(f.D-24))/52); let a=255*(1-fadeK); if(a<=0) continue; if(fadeK>0&&b<fadeK) { col=pal.foam; a*=0.55; }
-      fd[o]=col[0]; fd[o+1]=col[1]; fd[o+2]=col[2]; fd[o+3]=Math.max(0,Math.round(a)); }
-    fg.putImageData(fid,0,0); f.fallFrames.push(fc); }
+  const stones=[];
+  const stoneAt=(s,side,lat,r,o)=>{ const hw=streamHW(f,s,side), [x,y]=at(s,side*(hw+lat)); stones.push(Object.assign({x,y,r,s},o||{})); };
+  if(!town){ for(let s=40+sHash(sd,1)*24,n=0;s<len-34;s+=58+sHash(sd,s)*44,n++){ const side=sHash(n,sd+3)<0.5?-1:1; { const r=8+sHash(n,s+1)*4; stoneAt(s,side,r*0.4+sHash(s,n)*2,r); }
+      if(sHash(s+7,n)<0.7) stoneAt(s+13+sHash(n,2)*4,side,5+sHash(n,7)*2,4.4+sHash(n,9)*1.6);
+      if(sHash(s+3,n)<0.25) stoneAt(s+28,-side,2.5+sHash(n,11)*1.5,5+sHash(n,13)*1.8); }
+    if(len>120) stoneAt(len*0.55+sHash(sd,21)*20,1,-streamHW(f,len*0.55,1)*0.85,5,{mid:true});
+    stoneAt(len-7,-1,3,9); stoneAt(len-7,1,3,8); stoneAt(len-19,1,6,4.6);
+    { const [hx,hy]=at(0,0); stones.push({x:hx+8,y:hy-19,r:8.5,s:0}); stones.push({x:hx,y:hy-6,r:16,src:true,s:0}); stones.push({x:hx-18,y:hy+3,r:8.5,s:0}); stones.push({x:hx+18,y:hy+2,r:7.2,s:0}); } }
+  else { const [hx,hy]=at(0,0); stones.push({x:hx,y:hy-2,r:0,pipe:true,s:0}); }
+  stones.sort((a,b)=>a.y-b.y);
+  for(const st of stones){
+    if(st.pipe){ const bw=Math.round(Ln.hwAt(0)*0.85)+4, ci=Math.round(st.x-x0), cj=Math.round(st.y-y0);
+      for(let j=-11;j<=1;j++) for(let i=-bw;i<=bw;i++){ const e=Math.abs(i)===bw||j===-11, hole=Math.abs(i)<bw-3&&j>-7&&(i*i)/((bw-3)*(bw-3))+((j+1)*(j+1))/36<1;
+        put(ci+i,cj+j,e?pal.out:hole?(j>-1?pal.deep:[12,14,18]):((j+11)%4===0||((i+bw+(Math.floor((j+11)/4)%2)*3)%7===0))?[62,58,68]:(j<-8?[150,146,156]:[118,114,124])); }
+      continue; }
+    const rx=st.r, ry=st.r*0.74, ci=st.x-x0, cj=st.y-y0;
+    // Kontaktschatten
+    for(let j=Math.floor(cj);j<=Math.ceil(cj+ry*0.6+1);j++) for(let i=Math.floor(ci-rx-1);i<=Math.ceil(ci+rx+1);i++){ const nx=(i+0.5-ci)/(rx+1), ny=(j+0.5-cj-ry*0.35)/(ry*0.55+1); if(nx*nx+ny*ny<1) put(i,j,[10,16,18],W2(i+x0,j+y0)?120:90); }
+    for(let j=Math.floor(cj-ry-1);j<=Math.ceil(cj+ry);j++) for(let i=Math.floor(ci-rx-1);i<=Math.ceil(ci+rx+1);i++){ const nx=(i+0.5-ci)/rx, ny=(j+0.5-cj)/ry, rr=nx*nx+ny*ny; if(rr>1) continue;
+      const inner=((i+0.5-ci)/(rx-1))**2+((j+0.5-cj)/(ry-1))**2; if(inner>1){ put(i,j,STONE.ol); continue; }
+      const lit=-(nx*0.6+ny*0.8); let col=lit>0.62?STONE.hl:lit>0.2?STONE.lt:lit>-0.35?STONE.md:STONE.dk;
+      const mossLine=-0.2+0.35*Math.sin(i*1.7+st.x)+0.15*Math.sin(i*0.6+st.y);
+      if(!st.mid&&ny<mossLine) col=lit>0.5?STONE.ms3:lit>0.05?STONE.ms2:STONE.ms;
+      if(st.src&&ny>0.18&&Math.abs(nx)<0.5-ny*0.2) col=ny>0.55?pal.deep:[12,16,20];
+      put(i,j,col); }
+    // nasser Fuß: helle Wasserlinie um den Stein, wo er im Wasser steht
+    for(let i=Math.floor(ci-rx-1);i<=Math.ceil(ci+rx+1);i++){ const nx=(i+0.5-ci)/(rx+1); if(Math.abs(nx)>=1) continue; const j=Math.round(cj+ry*Math.sqrt(1-nx*nx)); if(W2(i+x0,j+y0)) put(i,j,pal.rim); }
+    st.wet=W2(st.x,st.y+ry+1)||st.mid; }
+  // Schilf und Seerosen
+  const reedCol=[[42,72,30],[62,98,40],[90,128,52]], head=[[96,58,32],[132,86,48]];
+  if(!town) for(let s=26+sHash(sd,5)*24,n=0;s<len-30;s+=44+sHash(n,sd)*46,n++){ const side=sHash(n,sd+9)<0.5?-1:1, hw=streamHW(f,s,side), [bx,by]=at(s,side*(hw+4+sHash(n,4)*2)); const ci=Math.round(bx-x0), cj=Math.round(by-y0), nb=4+Math.floor(sHash(n,sd+2)*4);
+    for(let k=0;k<nb;k++){ const sx=ci+Math.round((k-(nb-1)/2)*3+(sHash(k,n)-0.5)), hgt=15+Math.floor(sHash(k,n+sd)*11), lean=sHash(k+3,n)<0.4?0:(sHash(k,n+1)<0.5?1:-1);
+      for(let t=0;t<hgt;t++){ const xx=sx+(t>hgt*0.55?lean:0)+(t>hgt*0.85?lean:0); put(xx,cj-t,reedCol[t>hgt-4?2:t>hgt*0.4?1:0]); if(t<hgt*0.7) put(xx+1,cj-t,t<hgt*0.3?[30,52,22]:[46,78,32]); }
+      if(sHash(k,n+7)<0.4){ const xx=sx+lean*2; for(let q=0;q<6;q++){ put(xx,cj-hgt-q,q>0&&q<4?head[1]:head[0]); put(xx+1,cj-hgt-q,head[0]); } put(xx,cj-hgt-6,reedCol[1]); put(xx,cj-hgt-7,reedCol[2]); } }
+    if(sHash(n,sd+12)<0.5){ const s2=s+14, side2=-side, hw2=streamHW(f,s2,side2), [px,py]=at(s2,side2*(hw2*0.42)); const ci2=Math.round(px-x0), cj2=Math.round(py-y0), pr=4+sHash(n,3)*1.4;
+      for(let j=-4;j<=4;j++) for(let i=-7;i<=7;i++){ const rr=(i*i)/(pr*pr*1.45)+(j*j)/(pr*pr*0.55); if(rr>1) continue; if(i>=0&&i<=Math.abs(j)+0&&j<=0) continue; const edge=rr>0.62; put(ci2+i,cj2+j,edge?[34,74,40]:(i+j<0?[86,140,66]:[60,112,52])); }
+      if(sHash(n,6)<0.5){ put(ci2-1,cj2-1,[246,186,206]); put(ci2-2,cj2-1,[226,150,180]); put(ci2-1,cj2-2,[252,214,226]); put(ci2-1,cj2,[226,150,180]); } } }
+  g.putImageData(id,0,0); f.base=c; f.stones=stones;
+  // Strömungsbahnen für die Bewegung
+  const lanes=[]; for(let k=0;k<6;k++){ const lat=-0.62+k*0.25+(sHash(k,sd)-0.5)*0.08; lanes.push({lat,v:30+34*(1-Math.abs(lat)),per:34+sHash(k,sd+1)*26,ph:sHash(k,sd+2)*100,len:4+Math.floor(sHash(k,sd+3)*5)}); }
+  f.lanes=lanes;
+  // Wasserfall-Grundbild
+  const hwe=Ln.hwAt(len)*1.0, FW=Math.max(8,Math.round(hwe*2)+2), FH=Math.round(f.D+34), fc=mkCanvas(FW,FH), fg=fc.getContext('2d'), fid=fg.createImageData(FW,FH), fd=fid.data;
+  const [ex]=at(len,0); f.fall={x0:Math.round(ex-FW/2),y0:Math.round(f.y-1),W:FW,H:FH};
+  const lipH=i=>3+Math.round(1.6*Math.sin(Math.PI*(i+0.5)/FW));
+  for(let j=0;j<FH;j++) for(let i=0;i<FW;i++){ const o=(j*FW+i)*4, e=Math.min(i,FW-1-i), band=sHash(Math.floor((i+1)/3),sd+7);
+    let col=e===0?pal.out:e===1?pal.shad:e===2?pal.deep:band<0.35?pal.mid:band<0.8?pal.body:pal.shal;
+    const lp=lipH(i); if(e>0){ if(j<lp-1) col=j===0?pal.hi:pal.foam; else if(j<lp+1) col=pal.rim; else if(j<lp+3&&e>1) col=pal.shal; }
+    // unten löst sich der Fall unregelmäßig in Gischt auf (jede Spalte endet anders)
+    const fadeStart=f.D-18+Math.floor(sHash(i,sd+3)*6), colEnd=FH-2-Math.floor(sHash(i,sd+4)*18-(e<3?0:4)); let a=255;
+    if(j>=colEnd) continue;
+    if(j>fadeStart){ const k=(j-fadeStart)/Math.max(1,colEnd-fadeStart); a=k<0.3?255:k<0.55?190:k<0.8?115:50; if(e>0) col=k<0.3?pal.rim:k<0.55?pal.hi:pal.foam; if(e===0) a=Math.round(a*0.4); }
+    fd[o]=col[0]; fd[o+1]=col[1]; fd[o+2]=col[2]; fd[o+3]=a; }
+  fg.putImageData(fid,0,0); f.fallBase=fc;
 }
+const rgbS=c=>`rgb(${c[0]},${c[1]},${c[2]})`;
 function drawStreams(){
   if(!L.falls) return;
-  for(const f of L.falls){ if(!f.base) streamBake(f); const B=f.box;
-    if(B.x0>cam.x+VIEWW+20||B.x0+B.W*B.PX<cam.x-20||B.y0>cam.y+VIEWH+20||B.y0+B.H*B.PX<cam.y-20) continue;
-    ctx.save(); ctx.imageSmoothingEnabled=false; ctx.drawImage(f.base,B.x0,B.y0,B.W*B.PX,B.H*B.PX);
-    ctx.drawImage(f.frames[Math.floor(T*11+(f.seed||0))%f.frames.length],B.x0,B.y0,B.W*B.PX,B.H*B.PX); ctx.restore(); }
+  for(const f of L.falls){ if(!f.base) streamBake(f); const B=f.box, Ln=streamLine(f), pal=STREAM_PAL[f.key]||STREAM_PAL.wald, sd=f.seed||0, len=Ln.len;
+    if(B.x0>cam.x+VIEWW+20||B.x0+B.W<cam.x-20||B.y0>cam.y+VIEWH+20||B.y0+B.H<cam.y-20) continue;
+    ctx.save(); ctx.imageSmoothingEnabled=false; ctx.drawImage(f.base,B.x0,B.y0);
+    const px=(s,lat,col)=>{ const k=Math.max(0,Math.min(Ln.N-1,Math.round(s))); const hw=Ln.hwAt(k)*0.86; ctx.fillStyle=col; ctx.fillRect(Math.round(Ln.X[k]+Ln.NX[k]*lat*hw-0.5),Math.round(Ln.Y[k]+Ln.NY[k]*lat*hw-0.5),1,1); };
+    const cHi=rgbS(pal.hi), cRim=rgbS(pal.rim), cFoam=rgbS(pal.foam), cShal=rgbS(pal.shal);
+    // Strömungsstriche
+    for(let n=0;n<f.lanes.length;n++){ const ln=f.lanes[n], off=(T*ln.v+ln.ph)%ln.per;
+      for(let k=-1;k*ln.per<len+ln.per;k++){ const sh=off+k*ln.per; if(sh<10||sh>len-5) continue; if(sHash(k+Math.floor((T*ln.v+ln.ph)/ln.per),n+sd)<0.22) continue;
+        const L_=ln.len+((k+n)%3===0?2:0), lat=ln.lat+0.08*Math.sin(sh*0.07+n);
+        for(let j=0;j<L_;j++){ const s=sh-j; if(s<8) break; px(s,lat,j===0?cHi:j<2?cRim:cShal); } } }
+    // Glitzern
+    const GP=1.7; for(let n=0;n<Math.ceil(len/30);n++){ const cyc=Math.floor((T+n*0.37)/GP), u=((T+n*0.37)%GP)/GP; if(u>0.22) continue;
+      const s=12+sHash(n,cyc+sd)*(len-24)+u*20, lat=(sHash(cyc,n+sd)-0.5)*1.2; px(s,lat,cFoam);
+      if(u>0.06&&u<0.15){ const k=Math.round(s), hw=Ln.hwAt(k)*0.86, x=Math.round(Ln.X[k]+Ln.NX[k]*lat*hw-0.5), y=Math.round(Ln.Y[k]+Ln.NY[k]*lat*hw-0.5); ctx.fillStyle=cHi; ctx.fillRect(x-1,y,1,1); ctx.fillRect(x+1,y,1,1); ctx.fillRect(x,y-1,1,1); ctx.fillRect(x,y+1,1,1); } }
+    // Schaum an Steinen im Wasser und an der Kante
+    ctx.fillStyle=cFoam; const tk=Math.floor(T*8);
+    for(const st of f.stones||[]){ if(!st.wet||st.src) continue; const by=Math.round(st.y+st.r*0.74+1); for(let i=-Math.round(st.r);i<=Math.round(st.r);i++){ if(sHash(i+st.x,tk)<0.45) ctx.fillRect(Math.round(st.x)+i,by+(sHash(i,tk+1)<0.3?1:0),1,1); } }
+    for(let s=len-6;s<len-1;s++) for(let l=-0.9;l<=0.9;l+=0.12){ if(sHash(Math.round(l*20)+s*7,tk)<0.35) px(s,l,cFoam); }
+    // Quelle: kleine Ringe, die vom Felsen weglaufen
+    if(f.key!=='stadt'||true){ const k=4, rr=((T*7)%8)+2; ctx.fillStyle=rr<6?cRim:cShal; for(let a=0.15;a<Math.PI-0.15;a+=0.35){ const x=Math.round(Ln.X[k]+Math.cos(a)*rr), y=Math.round(Ln.Y[k]+Math.sin(a)*rr*0.6); ctx.fillRect(x,y,1,1); } }
+    ctx.restore(); }
 }
 function drawFalls(){
   if(!L.falls) return;
-  for(const f of L.falls){ if(!f.fallFrames) streamBake(f); const F=f.fall;
-    if(F.x0>cam.x+VIEWW+20||F.x0+F.W*2<cam.x-20) continue;
-    ctx.save(); ctx.imageSmoothingEnabled=false; ctx.drawImage(f.fallFrames[Math.floor(T*16+(f.seed||0))%f.fallFrames.length],F.x0,F.y0,F.W*2,F.H*2);
-    // Gischt unten, leicht leuchtend
-    ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.22+Math.sin(T*3+(f.seed||0))*0.05; const mx=F.x0+F.W, my=F.y0+f.D+4; ctx.drawImage(fireSprite('150,220,230'),mx-F.W*1.6,my-F.W,F.W*3.2,F.W*2); ctx.restore();
-    if(Math.random()<0.45) addPart({x:F.x0+F.W+rand(-F.W,F.W),y:F.y0+f.D+rand(-6,10),vx:rand(-24,24),vy:rand(-34,-10),life:rand(.8,1.5),size:rand(5,10),color:'rgba(220,250,255,.22)',kind:'puff'});
-    if(Math.random()<0.2) addPart({x:F.x0+F.W+rand(-F.W*0.8,F.W*0.8),y:F.y0+2,vx:rand(-30,30),vy:rand(-60,-20),life:.5,size:2,color:'#e6fff6',kind:'spark',g:300}); }
+  for(const f of L.falls){ if(!f.fallBase) streamBake(f); const F=f.fall, pal=STREAM_PAL[f.key]||STREAM_PAL.wald, sd=f.seed||0;
+    if(F.x0>cam.x+VIEWW+20||F.x0+F.W<cam.x-20||F.y0>cam.y+VIEWH+20||F.y0+F.H<cam.y-20) continue;
+    ctx.save(); ctx.imageSmoothingEnabled=false; ctx.drawImage(f.fallBase,F.x0,F.y0);
+    // fallende Wasserfäden
+    const cHi=rgbS(pal.hi), cRim=rgbS(pal.rim), cFoam=rgbS(pal.foam), top=5, bot=f.D-14;
+    for(let i=2;i<F.W-2;i++){ const h=sHash(i,sd+11); if(h<0.3) continue; const v=110+h*80, per=22+sHash(i,sd+12)*26, ln=4+Math.floor(sHash(i,sd+13)*9), off=(T*v+sHash(i,sd+14)*99)%per;
+      for(let y=off-per;y<bot;y+=per){ for(let j=0;j<ln;j++){ const yy=y-j; if(yy<top||yy>bot) continue; ctx.fillStyle=j===0?cFoam:j<3?cHi:cRim; ctx.fillRect(F.x0+i,Math.round(F.y0+yy),1,1); } } }
+    // Schaum an der Kante oben
+    const tk=Math.floor(T*10); ctx.fillStyle=cFoam; for(let i=1;i<F.W-1;i++) if(sHash(i,tk+sd)<0.4) ctx.fillRect(F.x0+i,F.y0+(sHash(i+1,tk)<0.5?0:1),1,1);
+    // Spritzer unten
+    const by=F.y0+f.D+2; for(let n=0;n<6;n++){ const u=((T*1.6+n*0.29)%1), x=F.x0+Math.round(sHash(n,Math.floor(T*1.6+n*0.29)+sd)*F.W), y=Math.round(by-Math.sin(u*Math.PI)*(5+sHash(n,sd)*6)); ctx.fillStyle=n%2?cFoam:cHi; ctx.fillRect(x,y,1,1); }
+    // Gischt: weiches Leuchten
+    ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.2+Math.sin(T*3+sd)*0.05; const mx=F.x0+F.W/2, my=by+2; ctx.drawImage(fireSprite('150,220,230'),mx-F.W*1.4,my-F.W*0.8,F.W*2.8,F.W*1.7); ctx.restore();
+    if(Math.random()<0.35) addPart({x:F.x0+F.W/2+rand(-F.W/2,F.W/2),y:by+rand(-4,8),vx:rand(-20,20),vy:rand(-30,-10),life:rand(.8,1.4),size:rand(5,9),color:'rgba(220,250,255,.18)',kind:'puff'}); }
 }
 function drawVines(){
   if(!L.vines) return;
