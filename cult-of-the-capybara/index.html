@@ -2044,13 +2044,23 @@ function hubWall(g){ const S=2, X0=414, X1=1386, W=(X1-X0)/S, BW=14, CH=6, NC=6;
   g.beginPath(); g.ellipse(PLAZA.x,PLAZA.y,PLAZA.rx,PLAZA.ry,0,0,TAU); g.clip();
   for(let x=X0;x<X1;x+=2){ const yb=hubWallBase(x)+2; for(let k=0;k<5;k++){ g.fillStyle=`rgba(10,8,16,${0.32-k*0.06})`; g.fillRect(x,yb+k*2,2,2); } }
   g.restore(); }
+/* Teich: der Steinring ist nicht begehbar (Ellipse aus dem Umriss der Grafik) */
+const inPond=(x,y)=>((x-POND.x)/127)**2+((y-(POND.y+7))/80)**2<1;
+/* Umriss eines Baums (sichtbarer Teil der Grafik) in Weltkoordinaten */
+function hubTreeBox(t){ const f=SPRITES.f[t.nm], s=t.s; let x0=(f[5]-f[7]/2)*s, x1=x0+f[3]*s; if(t.flip){ const q=-x1; x1=-x0; x0=q; }
+  return {x0:t.x+x0,x1:t.x+x1,y0:t.y+(f[6]-f[8])*s,y1:t.y+(f[6]+f[4]-f[8])*s}; }
+/* Sortierte Bäume: jede Kombination aus Baum, Grünton und Schatten wird einmal vorgezeichnet */
+const HUBTC={};
+function hubTreeCv(t){ const k=t.nm+'|'+(t.hue||'')+'|'+t.ha+'|'+t.dark; let c=HUBTC[k]; if(c) return c; const f=SPRITES.f[t.nm]; c=mkCanvas(f[7],f[8]); const g=c.getContext('2d'); g.imageSmoothingEnabled=false;
+  withCtx(g,()=>{ const o={}; if(t.hue){ o.overlay=t.hue; o.overlayA=t.ha; } spr(t.nm,f[7]/2,f[8],o); spr(t.nm,f[7]/2,f[8],{tint:'#05080a',alpha:t.dark}); }); return HUBTC[k]=c; }
+function drawHubTree(t){ const c=hubTreeCv(t); ctx.save(); ctx.translate(Math.round(t.x),Math.round(t.y)); ctx.scale(t.flip?-t.s:t.s,t.s); ctx.imageSmoothingEnabled=false; ctx.drawImage(c,-c.width/2,-c.height); ctx.restore(); }
 function buildHub(){
   const w=HUBX1,h=HUBY1, CW=HUBX1-HUBX0, CH=HUBY1;
-  const ground=mkCanvas(CW,CH), front=mkCanvas(CW,CH);
-  const g=ground.getContext('2d'), fg=front.getContext('2d');
-  g.imageSmoothingEnabled=false; fg.imageSmoothingEnabled=false;
+  const ground=mkCanvas(CW,CH);
+  const g=ground.getContext('2d');
+  g.imageSmoothingEnabled=false;
   const R=mulberry(77);
-  g.translate(-HUBX0,0); fg.translate(-HUBX0,0);
+  g.translate(-HUBX0,0);
   g.fillStyle='#070b08'; g.fillRect(HUBX0,0,CW,CH);
   g.save();
   pixelGround(g,HUBX0+40,40,CW-80,CH-80,'hub',R);
@@ -2078,26 +2088,17 @@ function buildHub(){
   const trees=[], SMALL=['baumA','baumB','baumC','baumD'], HUE=[null,'#3a5a12','#0e3a30','#4a4a14','#123018','#2a4a2a'];
   const mk=(x,y,row,bigOk)=>{ if(hubSD(x,y)<26+row*10) return; const big=bigOk&&R()<(row===0?0.22:0.42); const nm=big?(R()<.28?'baumG1':R()<.5?'baumG2':'baumG3'):SMALL[Math.floor(R()*4)];
     trees.push({x,y,row,nm,big,s:big?(nm==='baumG1'?0.95:1.05)+R()*0.3:1.0+R()*0.38,flip:R()<.5,hue:HUE[Math.floor(R()*HUE.length)],ha:0.08+R()*0.1,dark:[0.16,0.3,0.42][row]+R()*0.08}); };
+  // Der Waldrand ist keine gleichmäßige Linie: Buchten und Vorsprünge wechseln sich ab
+  const edgeN=a=>Math.sin(a*3+1.7)*0.5+Math.sin(a*7+0.3)*0.3+Math.sin(a*13+2.1)*0.2;
   for(let row=0;row<3;row++){ const n=row===0?68:row===1?54:44;
-    for(let i=0;i<n;i++){ const a=i/n*TAU+R()*0.05+row*0.3; const k=hubRf(a)*0.95; const off=70+row*100+R()*40+(Math.sin(a)>0.3?60:0);
+    for(let i=0;i<n;i++){ const a=i/n*TAU+R()*0.05+row*0.3; const k=hubRf(a)*0.95; const off=70+row*100+R()*40+(Math.sin(a)>0.3?60:0)+(row<2?edgeN(a)*45:0);
       const x=HUBC.cx+Math.cos(a)*(HUBC.rx*k+off), y=HUBC.cy+Math.sin(a)*(HUBC.ry*k+off*0.75)+30;
       if(((x-900)/540)**2+((y-300)/180)**2<1) continue; mk(x,y,row,(row>0&&y<HUBC.cy+HUBC.ry*0.72)||(row===0&&Math.abs(x-HUBC.cx)>HUBC.rx*0.7&&y<HUBC.cy+HUBC.ry*0.35)); } }
   for(let i=0;i<26;i++){ const a=Math.PI+i/25*Math.PI; mk(900+Math.cos(a)*(540+R()*130),300+Math.sin(a)*(160+R()*90)-20,1,true); }
   for(let i=0;i<10;i++){ const sg=i<5?-1:1; mk(900+sg*(490+R()*170),300+R()*150,0,false); }
   // Tiefer Wald in den Ecken, damit dort kein schwarzes Loch bleibt (eigener Zufall)
-  { const R3=mulberry(31337); for(let k=0;k<420;k++){ const x=HUBX0+R3()*CW, y=R3()*CH; if(hubSD(x,y)<250) continue; if(trees.some(t=>Math.hypot(t.x-x,(t.y-y)*1.4)<(t.big?120:90))) continue;
+  { const R3=mulberry(31337); for(let gy=20,j=0;gy<CH+230;gy+=56,j++) for(let gx=HUBX0-40+(j&1)*38;gx<HUBX1+60;gx+=74){ const x=gx+(R3()-.5)*32, y=gy+(R3()-.5)*24; if(hubSD(x,y)<150) continue; if(trees.some(t=>Math.abs(t.x-x)<110&&Math.hypot(t.x-x,(t.y-y)*1.4)<(t.big?96:70))) continue;
       const big=R3()<0.35; trees.push({x,y,row:2,nm:big?(R3()<.3?'baumG1':R3()<.5?'baumG2':'baumG3'):SMALL[Math.floor(R3()*4)],big,s:big?0.95+R3()*0.2:1.0+R3()*0.3,flip:R3()<.5,hue:HUE[Math.floor(R3()*HUE.length)],ha:0.08+R3()*0.1,dark:0.5+R3()*0.12}); } }
-  trees.sort((a,b)=>a.y-b.y);
-  // Bodenschatten: so stehen die Wurzeln wirklich im Boden
-  const shadowT=t=>{ const sz=sprSize(t.nm), rw=sz.w*t.s*(t.big?0.34:0.4), rh=rw*0.3; g.save(); g.translate(t.x,t.y-3); g.scale(1,rh/rw); const gr=g.createRadialGradient(0,0,0,0,0,rw); gr.addColorStop(0,'rgba(2,5,3,.6)'); gr.addColorStop(0.55,'rgba(2,5,3,.32)'); gr.addColorStop(1,'rgba(2,5,3,0)'); g.fillStyle=gr; g.beginPath(); g.arc(0,0,rw,0,TAU); g.fill(); g.restore(); };
-  const drawT=t=>{ const o={s:t.s,flip:t.flip}; if(t.hue){ o.overlay=t.hue; o.overlayA=t.ha; } spr(t.nm,t.x,t.y,o); spr(t.nm,t.x,t.y,{s:t.s,flip:t.flip,tint:'#05080a',alpha:t.dark}); };
-  const fy=HUBC.cy+HUBC.ry*0.8, backT=trees.filter(t=>t.y<=fy), frontT=trees.filter(t=>t.y>fy);
-  for(const t of trees) shadowT(t);
-  const behindWall=t=>t.x>380&&t.x<1420&&t.y<hubWallBase(Math.min(1386,Math.max(414,t.x)))+2;
-  withCtx(g,()=>{ for(const t of backT) if(behindWall(t)) drawT(t); });
-  hubWall(g);
-  withCtx(g,()=>{ for(const t of backT) if(!behindWall(t)) drawT(t); });
-  withCtx(fg,()=>{ for(const t of frontT) drawT(t); });
   // Gebäude & Deko als y-sortierte Objekte
   const objs=[], solids=[], lights=[];
   const add=(nm,x,y,s,sol,li,kind)=>{ const o={nm,x,y,s:s||1,ph:R()*TAU,flip:false,kind:kind||DECOKIND[nm]||'static',wob:0}; if(o.kind==='candle'){ const sz=sprSize(nm); o.fy=y-(sz.h-sz.top)*o.s+6*o.s; o.glow='255,140,80'; lights.push({x,y:o.fy,r:140,i:.8,c:'rgba(255,90,60,.35)',flick:1}); }
@@ -2140,27 +2141,48 @@ function buildHub(){
   add('schaedelhaufen',1132,640,1.1,[[0,-4,18]]);
   for(const t of [[330,690],[1520,600],[300,1010],[1580,1060],[460,1220],[1350,1230]]) add('totem',t[0],t[1],1.1,[[0,0,10]],null,'static');
   add('knochenzaun',1060,1250,1.1,null,null,'static');
-  for(const b of [[700,960],[1100,960],[1350,1180],[480,1180],[650,700],[1150,720]]) add(Math.random()<0.5?'blutblumen':'blumen',b[0],b[1],1.25,null,null,'sway');
+  for(const b of [[700,960],[1100,960],[1420,1160],[480,1180],[650,700],[1150,720]]) add(Math.random()<0.5?'blutblumen':'blumen',b[0],b[1],1.25,null,null,'sway');
   for(const b of [[350,850],[1380,560],[440,640],[1620,1010]]) add('busch',b[0],b[1],1.2);
   for(const b of [[580,960],[1240,960],[330,930],[1450,1130],[780,1250]]) add('rotpilze',b[0],b[1],1.2,null,null,'wobble');
   add('topf',980,1060,1.1); add('topf',1000,1075,0.9);
   for(const p of PORTALS){ const o=add('portal',p.x,p.y,1.35,[[-50,-4,16],[50,-4,16]]); o.kind='portal'; o.pi=p.i; }
-  for(const s2 of [[0,4,76],[-64,2,52],[64,2,52]]) solids.push({x:POND.x+s2[0],y:POND.y+s2[1],r:s2[2]});
-  // Einzelne hohe Bäume am Rand der Lichtung: Stamm, Äste und Krone sind ganz zu sehen, man kann um sie herumlaufen
-  { const RT=mulberry(4711);
-    const SMALLD=['busch','rotpilze','blumen','blutblumen','totem','topf','holz','steine'];
-    for(const f of [0.917,1.083,0.792,1.208,0.0,1.917,0.167]){ const a=f*Math.PI, k=hubRf(a)*0.95;
-      const x=HUBC.cx+Math.cos(a)*(HUBC.rx*k-115), y=HUBC.cy+Math.sin(a)*(HUBC.ry*k-80);
-      if(objs.some(o=>Math.hypot(o.x-x,(o.y-y)*1.3)<(SMALLD.includes(o.nm)?70:170))||Math.hypot(x-POND.x,y-POND.y)<200) continue;
-      const nm=RT()<.5?'baumG2':'baumG3', sc=1.05+RT()*0.25; shadowT({nm,s:sc,big:true,x,y});
-      const o=add(nm,x,y,sc,[[0,-4,18]],null,'static'); o.flip=RT()<.5; o.soloTree=true; } }
+  // Vorsprünge am Waldrand: kleine Gruppen, die ein Stück in die Lichtung ragen (nie in die Mitte)
+  { const RT=mulberry(4711), SMALLD=['busch','rotpilze','blumen','blutblumen','topf','holz','steine','gras1','gras2'];
+    for(const f of [0.06,0.19,0.31,0.62,0.74,0.88,0.97,1.07,1.18,1.86,1.95]){ const a=f*Math.PI, k=hubRf(a)*0.95, n=1+Math.floor(RT()*3);
+      for(let q=0;q<n;q++){ const aa=a+(RT()-.5)*0.09, inset=10+RT()*30; const x=HUBC.cx+Math.cos(aa)*(HUBC.rx*k-inset), y=HUBC.cy+Math.sin(aa)*(HUBC.ry*k-inset*0.6)+20;
+        if(hubSD(x,y)>-10) continue;
+        if(objs.some(o=>Math.hypot(o.x-x,(o.y-y)*1.3)<(SMALLD.includes(o.nm)?60:150))||Math.hypot(x-POND.x,(y-POND.y)*1.3)<200||Math.hypot(x-CAGE.x,(y-CAGE.y)*1.3)<200||trees.some(t=>t.prom&&Math.hypot(t.x-x,(t.y-y)*1.4)<58)||!trees.some(t=>!t.prom&&Math.hypot(t.x-x,(t.y-y)*1.4)<105)) continue;
+        const big=RT()<0.2, nm=big?(RT()<.5?'baumG2':'baumG3'):SMALL[Math.floor(RT()*4)], sc=big?0.95+RT()*0.2:0.95+RT()*0.3;
+        trees.push({x,y,row:0,nm,big,s:sc,flip:RT()<.5,hue:HUE[Math.floor(RT()*HUE.length)],ha:0.08+RT()*0.1,dark:0.08+RT()*0.06,prom:true});
+        solids.push({x,y:y-2,r:Math.round(15*sc),tree:true}); } } }
+  trees.sort((a,b)=>a.y-b.y);
+  // Bodenschatten: so stehen die Wurzeln wirklich im Boden
+  const shadowT=t=>{ const sz=sprSize(t.nm), rw=sz.w*t.s*(t.big?0.34:0.4), rh=rw*0.3; g.save(); g.translate(t.x,t.y-3); g.scale(1,rh/rw); const gr=g.createRadialGradient(0,0,0,0,0,rw); gr.addColorStop(0,'rgba(2,5,3,.6)'); gr.addColorStop(0.55,'rgba(2,5,3,.32)'); gr.addColorStop(1,'rgba(2,5,3,0)'); g.fillStyle=gr; g.beginPath(); g.arc(0,0,rw,0,TAU); g.fill(); g.restore(); };
+  const drawT=t=>{ const o={s:t.s,flip:t.flip}; if(t.hue){ o.overlay=t.hue; o.overlayA=t.ha; } spr(t.nm,t.x,t.y,o); spr(t.nm,t.x,t.y,{s:t.s,flip:t.flip,tint:'#05080a',alpha:t.dark}); };
+  const behindWall=t=>t.x>=414&&t.x<=1386&&t.y<hubWallBase(t.x)-2;
+  /* Bäume, hinter denen man stehen kann, werden wie Figuren nach der Tiefe sortiert gezeichnet:
+     Steht das Capybara weiter hinten als der Stamm, verdeckt die Krone es. Alle anderen liegen fest im Boden. */
+  for(const t of trees) t.b=hubTreeBox(t);
+  const reach=t=>{ if(behindWall(t)) return false; if(t.prom) return true; if(hubSD(t.x,t.y)>380) return false; const b=t.b, ya=b.y0+8, yb=t.y-8;
+    for(let py=ya;py<yb;py+=14) for(let px=b.x0-18;px<b.x1+18;px+=14) if(hubSD(px,py)<0) return true; return false; };
+  for(const t of trees) t.ys=reach(t);
+  const area=b=>(b.x1-b.x0)*(b.y1-b.y0);
+  for(let i=0;i<trees.length;i++){ const T=trees[i]; if(T.ys||behindWall(T)) continue;
+    for(let j=0;j<i;j++){ const O=trees[j]; if(!O.ys) continue; const ix=Math.min(O.b.x1,T.b.x1)-Math.max(O.b.x0,T.b.x0), iy=Math.min(O.b.y1,T.b.y1)-Math.max(O.b.y0,T.b.y0);
+      if(ix>10&&iy>10&&ix*iy>0.05*Math.min(area(O.b),area(T.b))){ T.ys=true; break; } } }
+  for(const t of trees) shadowT(t);
+  withCtx(g,()=>{ for(const t of trees) if(!t.ys&&behindWall(t)) drawT(t); });
+  hubWall(g);
+  withCtx(g,()=>{ for(const t of trees) if(!t.ys&&!behindWall(t)) drawT(t); });
+  const ysTrees=trees.filter(t=>t.ys); for(const t of ysTrees){ t.ha=Math.round(t.ha/0.05)*0.05; t.dark=Math.round(t.dark/0.04)*0.04; }
   // Gras
   const tufts=[];
   for(let i=0;i<70;i++){ const x=150+R()*1500, y=420+R()*860; if(!inHubBlob(x,y)) continue; if(Math.abs(x-900)<70&&y<780) continue;
+    if(Math.abs(x-CAGE.x)<170&&y>CAGE.y-150&&y<CAGE.y+70) continue; if(((x-POND.x)/190)**2+((y-POND.y-7)/130)**2<1) continue; if(((x-900)/290)**2+((y-775)/150)**2<1) continue;
     let ok=true; for(const so of solids) if(Math.hypot(x-so.x,(y-so.y)*1.3)<so.r+30) ok=false; for(const o of objs) if(Math.hypot(x-o.x,y-o.y)<60) ok=false; if(!ok) continue;
-    const k=3+Math.floor(R()*4); for(let j=0;j<k;j++){ const tx=x+(R()-.5)*60, ty=y+(R()-.5)*24; if(inHubBlob(tx,ty)) tufts.push({x:tx,y:ty,nm:R()<.3?'gras2':'gras1',s:0.75+R()*0.4,ph:R()*TAU,bend:0,flip:R()<.5}); } }
+    const k=3+Math.floor(R()*4); for(let j=0;j<k;j++){ const tx=x+(R()-.5)*60, ty=y+(R()-.5)*24; if(inHubBlob(tx,ty)) if(!(Math.abs(tx-CAGE.x)<150&&ty>CAGE.y-140&&ty<CAGE.y+50)&&((tx-POND.x)/150)**2+((ty-POND.y-7)/100)**2>=1) tufts.push({x:tx,y:ty,nm:R()<.3?'gras2':'gras1',s:0.75+R()*0.4,ph:R()*TAU,bend:0,flip:R()<.5}); } }
   tufts.sort((a,b)=>a.y-b.y);
-  const lv={kind:'hub',allObjs:objs.slice(),allSolids:solids.slice(),allLights:lights.slice(),w,h,ox:HUBX0,oy:0,ground,front,objs,solids,lights,tufts,amb:'rgba(24,10,34,.30)',walk:(x,y)=>hubSD(x,y)<0};
+  const lv={kind:'hub',allObjs:objs.slice(),allSolids:solids.slice(),allLights:lights.slice(),w,h,ox:HUBX0,oy:0,ground,front:null,trees:ysTrees,objs,solids,lights,tufts,amb:'rgba(24,10,34,.30)',walk:(x,y)=>hubSD(x,y)<0&&!inPond(x,y)};
   return lv;
 }
 function drawPortalObj(o){
@@ -10221,7 +10243,7 @@ function campMigrate(){ G.flags=G.flags||{};
     if((G.regionDone&&G.regionDone[0])||(G.village&&VORDER.some(k=>G.village[k]))||G.talked.buildIntro){ G.flags.spellbook=true; G.flags.rituals=true; } }
   if(G.flags.spellbook&&G.flags.rituals===undefined&&((G.village&&VORDER.some(k=>G.village[k]))||G.talked.buildIntro&&!G.camp)) G.flags.rituals=true; }
 function hubStoryVis(o){ const c=!!G.flags.circle, b=!!G.flags.spellbook;
-  if(!G.flags.cageGone&&(o.kind==='sway'||o.kind==='wobble'||o.nm==='busch')&&Math.abs(o.x-CAGE.x)<130&&o.y>CAGE.y-240&&o.y<CAGE.y+60) return false;
+  if(!G.flags.cageGone&&(o.kind==='sway'||o.kind==='wobble'||o.nm==='busch')&&Math.abs(o.x-CAGE.x)<160&&o.y>CAGE.y-240&&o.y<CAGE.y+95) return false;
   if(o.nm==='altar'||o.nm==='pult') return b;
   if(o.nm==='knochenbogen'||o.nm==='fackel'||(o.kind==='banner'&&o.grp!=='fest')) return b;
   if(o.nm==='schale'&&o.pi===undefined) return b;
@@ -10406,7 +10428,7 @@ function ritualsWrite(now){ const go=()=>{ G.flags.rituals=true; SFX.chest(); ba
     say([{who:'verris',text:'Mit diesen Ritualen kannst du die Lichtung Stück für Stück aufbauen. Gold und Material bringst du aus den Portalen mit.'},{who:'verris',text:'Und wer weiß, wer alles hier einzieht, wenn es erst gemütlich ist.'}],()=>{ hint='Pult links vom Altar: Dorf ausbauen.'; setTimeout(()=>{ if(hint.startsWith('Pult')) hint=''; },8000); saveGame(); }); };
   say([{who:'verris',text:now?'Und weil du Hoppel heil zurückgebracht hast, schreibe ich dir gleich die ersten Rituale hinein. *kritzel kritzel kritzel*':'Hoppel ist zurück! Wie versprochen: die ersten Rituale für deine Grimoire. *kritzel kritzel kritzel*'}],go); }
 /* Die Strohpuppe: ein wiedererweckter Wolf im Sack, von Verris' Buch errichtet */
-const DUMMY={x:1000,y:950};
+const DUMMY={x:990,y:1012};
 function dummyCreate(){ const C=R_.camp; if(!C||C.dm) return; C.dm={t:0}; P.lock=true;
   say([{who:'verris',text:'Eins noch. Ihr braucht etwas zum Üben. Und ich habe da noch etwas aufgehoben …'}],()=>{ C.dm.go=true; SFX.rumble(); }); }
 function campDummy(dt){ const C=R_.camp, D=C.dm; if(!D||!D.go) return; D.t+=dt;
@@ -12847,6 +12869,7 @@ function render(){
   }
   for(const c of CRIT){ if(c.kind==='bird') list.push({y:c.y+(c.z>30?400:0),d:()=>drawBird(c)}); else if(c.kind!=='fly'&&vis(c.x,c.y)) list.push({y:c.y,d:()=>drawGroundCritter(c)}); }
   if(L.tufts) for(const t of L.tufts) if(vis(t.x,t.y)) list.push({y:t.y,d:()=>drawTuft(t)});
+  if(scene==='hub'&&L.trees) for(const t of L.trees){ const b=t.b; if(b.x1>cx0-8&&b.x0<cx0+VIEWW+8&&b.y1>cy0-8&&b.y0<cy0+VIEWH+8) list.push({y:t.y,d:()=>drawHubTree(t)}); }
   for(const e of enemies) list.push({y:e.y,d:()=>drawEnemy(e)});
   if(PET&&G.pet&&!R_.fight) list.push({y:PET.y,d:drawPet});
   if(!G.dead||G.deadT<0.2) list.push({y:P.y,d:drawPlayer});
@@ -12886,7 +12909,7 @@ function render(){
   if(R_.summon) drawSummonFx();
   drawParts(false);
   drawSwordShow();
-  if(gw>0&&gh>0) ctx.drawImage(L.front,gx-OX,gy-OY,gw,gh,gx,gy,gw,gh);
+  if(L.front&&gw>0&&gh>0) ctx.drawImage(L.front,gx-OX,gy-OY,gw,gh,gx,gy,gw,gh);
   drawLeaves();
   drawEdgeFade(cx0,cy0);
   if(scene==='room'&&R_.pz&&R_.pz.gl) drawGlockenScreen(R_.pz.gl);
