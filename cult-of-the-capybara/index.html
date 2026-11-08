@@ -2097,7 +2097,7 @@ function buildHub(){
   for(let i=0;i<26;i++){ const a=Math.PI+i/25*Math.PI; mk(900+Math.cos(a)*(540+R()*130),300+Math.sin(a)*(160+R()*90)-20,1,true); }
   for(let i=0;i<10;i++){ const sg=i<5?-1:1; mk(900+sg*(490+R()*170),300+R()*150,0,false); }
   // Tiefer Wald in den Ecken, damit dort kein schwarzes Loch bleibt (eigener Zufall)
-  { const R3=mulberry(31337); for(let gy=20,j=0;gy<CH+230;gy+=56,j++) for(let gx=HUBX0-40+(j&1)*38;gx<HUBX1+60;gx+=74){ const x=gx+(R3()-.5)*32, y=gy+(R3()-.5)*24; if(hubSD(x,y)<150) continue; if(trees.some(t=>Math.abs(t.x-x)<110&&Math.hypot(t.x-x,(t.y-y)*1.4)<(t.big?96:70))) continue;
+  { const R3=mulberry(31337); for(let gy=20,j=0;gy<CH+230;gy+=50,j++) for(let gx=HUBX0-40+(j&1)*33;gx<HUBX1+60;gx+=66){ const x=gx+(R3()-.5)*32, y=gy+(R3()-.5)*24; if(hubSD(x,y)<150) continue; if(trees.some(t=>Math.abs(t.x-x)<110&&Math.hypot(t.x-x,(t.y-y)*1.4)<(t.big?88:62))) continue;
       const big=R3()<0.35; trees.push({x,y,row:2,nm:big?(R3()<.3?'baumG1':R3()<.5?'baumG2':'baumG3'):SMALL[Math.floor(R3()*4)],big,s:big?0.95+R3()*0.2:1.0+R3()*0.3,flip:R3()<.5,hue:HUE[Math.floor(R3()*HUE.length)],ha:0.08+R3()*0.1,dark:0.5+R3()*0.12}); } }
   // Gebäude & Deko als y-sortierte Objekte
   const objs=[], solids=[], lights=[];
@@ -2170,6 +2170,14 @@ function buildHub(){
   for(let i=0;i<trees.length;i++){ const T=trees[i]; if(T.ys||behindWall(T)) continue;
     for(let j=0;j<i;j++){ const O=trees[j]; if(!O.ys) continue; const ix=Math.min(O.b.x1,T.b.x1)-Math.max(O.b.x0,T.b.x0), iy=Math.min(O.b.y1,T.b.y1)-Math.max(O.b.y0,T.b.y0);
       if(ix>10&&iy>10&&ix*iy>0.05*Math.min(area(O.b),area(T.b))){ T.ys=true; break; } } }
+  /* Unterholz: dichtes, dunkles Blätterdach unter den Bäumen, damit zwischen den Kronen
+     nirgends schwarzer Boden durchscheint. Nur dort, wo es die Lichtung nicht berührt. */
+  { const RC=mulberry(9091), can=[];
+    const clear=(x,y,nm,sc)=>{ const f=SPRITES.f[nm], w=f[3]*sc, h=(f[8]-f[6])*sc; for(const [u,v] of [[0,0],[-0.5,-0.5],[0.5,-0.5],[0,-1],[-0.5,-1],[0.5,-1],[-0.5,0],[0.5,0]]) if(hubSD(x+u*w,y+v*h)<14) return false; return true; };
+    for(let gy=-20,j=0;gy<CH+190;gy+=36,j++) for(let gx=HUBX0-60+(j&1)*30;gx<HUBX1+80;gx+=60){ const x=gx+(RC()-.5)*26, y=gy+(RC()-.5)*18, nm=RC()<.55?'krone':'hecke', sc=0.8+RC()*0.5;
+      if(hubSD(x,y)<40||!clear(x,y,nm,sc)) continue; can.push({x,y,nm,s:sc,flip:RC()<.5,dark:0.5+RC()*0.18}); }
+    can.sort((a,b)=>a.y-b.y);
+    withCtx(g,()=>{ for(const c of can){ spr(c.nm,c.x,c.y,{s:c.s,flip:c.flip}); spr(c.nm,c.x,c.y,{s:c.s,flip:c.flip,tint:'#05080a',alpha:c.dark}); } }); }
   for(const t of trees) shadowT(t);
   withCtx(g,()=>{ for(const t of trees) if(!t.ys&&behindWall(t)) drawT(t); });
   hubWall(g);
