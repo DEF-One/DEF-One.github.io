@@ -95,6 +95,9 @@ button.pen:disabled{background:#9aa3b5;cursor:not-allowed;box-shadow:none}
 .solution{margin-top:14px;padding:10px 16px;border:2px dashed var(--green);border-radius:10px;color:#1e5a22;font-size:18px;display:none}
 .solution.show{display:block}
 .fb{font-family:'Caveat';font-size:24px;margin-left:6px}
+.rfb{font-family:'Caveat';font-size:20px;margin-left:4px;white-space:nowrap}
+.sumline{font-family:'Caveat';font-size:20px;color:var(--pencil);margin-top:4px}
+.rowmsg{font-family:'Caveat';font-size:21px}
 .nav{position:absolute;left:96px;right:34px;bottom:26px;display:flex;justify-content:space-between;align-items:center}
 .nav .pg{font-family:'Caveat';font-size:22px;color:var(--pencil)}
 .locked-msg{font-family:'Caveat';font-size:21px;color:var(--red)}
@@ -128,6 +131,7 @@ const KONTEN = {
   "2400":"Forderungen a. LL","2600":"Vorsteuer","2800":"Bank","2880":"Kasse",
   "3000":"Eigenkapital","4250":"Langfr. Bankverbindlichkeiten","4400":"Verbindlichkeiten a. LL","4800":"Umsatzsteuer",
   "5000":"Umsatzerlöse f. eigene Erzeugnisse","5001":"Erlösberichtigungen","5200":"Bestandsveränderungen",
+  "5201":"Bestandsveränd. unfertige Erzeugnisse","5202":"Bestandsveränd. fertige Erzeugnisse","5300":"Aktivierte Eigenleistungen",
   "6000":"Aufwendungen für Rohstoffe","6001":"Bezugskosten Rohstoffe","6002":"Nachlässe Rohstoffe",
   "6020":"Aufwendungen für Hilfsstoffe","6030":"Aufwendungen für Betriebsstoffe",
   "6520":"Abschreibungen auf Sachanlagen","6750":"Kosten des Geldverkehrs","7510":"Zinsaufwendungen"
@@ -177,7 +181,7 @@ tasks:[
   ],
   hints:["Vergleiche AB und SB: Liegt am Jahresende mehr oder weniger im Lager?",
          "Verbrauch = AB + Einkäufe − SB",
-         "Minderbestand = zusätzlicher Verbrauch → der Aufwand muss steigen. Auf welcher Seite steigt ein Aufwandskonto?"],
+         "Wurde zusätzlich etwas aus dem Lager verbraucht, muss der Aufwand steigen. Auf welcher Seite steigt ein Aufwandskonto?"],
   solution:`a) 48.000 + 312.000 − 36.000 = <b>324.000 €</b><br>b) SB &lt; AB → <b>Minderbestand 12.000 €</b><br>c) ${bs([["6000",12000]],[["2000",12000]])}`
  },
  {title:"Aufgabe 1.2",
@@ -187,7 +191,7 @@ tasks:[
    {type:'book',label:'b) Buchungssatz für die Bestandsveränderung:',soll:[["2020",4700]],haben:[["6020",4700]]},
    {type:'num',label:'c) Wie hoch ist der tatsächliche Hilfsstoffverbrauch?',ans:66600,unit:'€'}
   ],
-  hints:["Hier ist der SB größer als der AB.","Mehrbestand → es wurde zu viel Aufwand gebucht → das Aufwandskonto im Haben korrigieren."],
+  hints:["Rechne SB − AB. Ist das Ergebnis positiv oder negativ – und was heißt das?","Liegt am Ende mehr im Lager, war der gebuchte Aufwand zu hoch. Wie korrigierst du ein Aufwandskonto nach unten?"],
   solution:`a) 14.200 − 9.500 = <b>4.700 € Mehrbestand</b><br>b) ${bs([["2020",4700]],[["6020",4700]])}c) 71.300 − 4.700 = <b>66.600 €</b>`
  }
 ]},
@@ -203,13 +207,19 @@ ${bs([["6000",9000],["6001",200],["2600",1748]],[["4400",10948]])}
 <h3>3. Rücksendung an den Lieferer</h3>
 <p>Der Einkauf wird teilweise <b>rückgängig</b> gemacht → ER-Buchung umdrehen:</p>
 ${bs([["4400",1190]],[["6000",1000],["2600",190]])}
+<p style="font-size:16px;color:var(--pencil)">✎ Manche Schulbücher buchen Rücksendungen stattdessen über 6002 – beides wird hier als richtig gewertet. Frag im Zweifel nach, wie es eure Lehrkraft will!</p>
 <h3>4. Nachträgliche Preisnachlässe (Mängelrüge, Bonus, Skonto)</h3>
 <p>Laufen über <b>6002 Nachlässe</b>. Die <b>Vorsteuer</b> muss mit korrigiert werden!</p>
 <div class="box"><b class="t">Skonto rechnen – Schritt für Schritt</b>
 ${calc([["offener Rechnungsbetrag (brutto)","11.900,00 €"],["− 2 % Skonto (brutto)","238,00 €"],["= Überweisungsbetrag","11.662,00 €",1]])}
 Skonto brutto 238,00 ÷ 1,19 = <b>200,00 € netto</b> (→ 6002)<br>238,00 − 200,00 = <b>38,00 € Vorsteuerkorrektur</b> (→ 2600 im Haben)
 ${bs([["4400",11900]],[["2800",11662],["6002",200],["2600",38]])}</div>
-<p class="red">Merke: Skonto immer vom noch offenen Betrag rechnen – also erst Rücksendungen abziehen!</p>`,
+<p class="red">Merke: Skonto immer vom noch offenen Betrag rechnen – also erst Rücksendungen abziehen!</p>
+<h3>5. Abschluss der Unterkonten (Jahresende)</h3>
+<p>6001 und 6002 sind <b>Unterkonten</b> von 6000. Am Jahresende werden sie auf das Hauptkonto übertragen:</p>
+${bs([["6000",0]],[["6001",0]]).replace(/0,00/g,'Saldo')}
+${bs([["6002",0]],[["6000",0]]).replace(/0,00/g,'Saldo')}
+<div class="formula">bereinigter Rohstoffaufwand = Einkäufe (6000) + Bezugskosten − Nachlässe</div>`,
 tasks:[
  {title:"Aufgabe 2.1",
   text:`Eingangsrechnung über Rohstoffe: Listenpreis 20.000 € netto, abzüglich 10 % Sofortrabatt. Der Lieferer berechnet zusätzlich 400 € netto Fracht. Alles zzgl. 19 % USt, Zahlung auf Ziel.`,
@@ -220,9 +230,9 @@ tasks:[
   solution:`20.000 − 2.000 Rabatt = 18.000 €; + Fracht 400 € = 18.400 €; VSt 19 % = 3.496 €; brutto 21.896 €${bs([["6000",18000],["6001",400],["2600",3496]],[["4400",21896]])}`
  },
  {title:"Aufgabe 2.2",
-  text:`Fortsetzung: Ein Teil der Rohstoffe (Warenwert <b>2.000 € netto</b>) ist beschädigt und wird zurückgeschickt. Den Rest der Rechnung bezahlen wir per Banküberweisung unter Abzug von <b>2 % Skonto</b>.`,
+  text:`Fortsetzung: Ein Teil der Rohstoffe (Warenwert <b>2.000 € netto</b>, also schon nach Rabatt) ist beschädigt und wird zurückgeschickt. Den Rest bezahlen wir per Banküberweisung. Der Lieferer gewährt <b>2 % Skonto auf den gesamten noch offenen Rechnungsbetrag</b> (einschließlich Fracht).`,
   parts:[
-   {type:'book',label:'a) Buche die Rücksendung.',soll:[["4400",2380]],haben:[["6000",2000],["2600",380]]},
+   {type:'book',label:'a) Buche die Rücksendung.',soll:[["4400",2380]],haben:[["6000",2000],["2600",380]],alts:[{soll:[["4400",2380]],haben:[["6002",2000],["2600",380]]}]},
    {type:'num',label:'b) Wie hoch ist der Überweisungsbetrag?',ans:19125.68,unit:'€'},
    {type:'book',label:'c) Buche den Zahlungsausgang.',soll:[["4400",19516]],haben:[["2800",19125.68],["6002",328],["2600",62.32]]}
   ],
@@ -232,6 +242,18 @@ tasks:[
   solution:`a) ${bs([["4400",2380]],[["6000",2000],["2600",380]])}
   b) 21.896 − 2.380 = 19.516 € offen; Skonto 2 % = 390,32 € → Überweisung <b>19.125,68 €</b><br>
   c) Skonto netto 390,32 ÷ 1,19 = 328,00 €; VSt-Korrektur 62,32 € ${bs([["4400",19516]],[["2800",19125.68],["6002",328],["2600",62.32]])}`
+ },
+ {title:"Aufgabe 2.3 – Jahresabschluss",
+  text:`Am 31.12. zeigen die Konten folgende Salden:<br>
+  ${calc([["6000 Aufwendungen für Rohstoffe","480.000 €"],["6001 Bezugskosten Rohstoffe","12.500 €"],["6002 Nachlässe Rohstoffe","9.800 €"]])}`,
+  parts:[
+   {type:'book',label:'a) Schließe das Konto 6001 ab.',soll:[["6000",12500]],haben:[["6001",12500]]},
+   {type:'book',label:'b) Schließe das Konto 6002 ab.',soll:[["6002",9800]],haben:[["6000",9800]]},
+   {type:'num',label:'c) Wie hoch ist der bereinigte Rohstoffaufwand auf 6000?',ans:482700,unit:'€'}
+  ],
+  hints:["Unterkonten werden auf ihr Hauptkonto übertragen. Bezugskosten erhöhen den Aufwand, Nachlässe mindern ihn.",
+         "Auf welcher Seite steht der Saldo von 6001 bzw. 6002? Er muss auf die Gegenseite, damit das Konto aufgeht."],
+  solution:`a) ${bs([["6000",12500]],[["6001",12500]])}b) ${bs([["6002",9800]],[["6000",9800]])}c) 480.000 + 12.500 − 9.800 = <b>482.700 €</b>`
  }
 ]},
 /* 3 */ {
@@ -242,6 +264,7 @@ ${bs([["2400",11900]],[["5000",10000],["4800",1900]])}
 <h3>2. Rücksendung durch den Kunden</h3>
 <p>Der Verkauf wird (teilweise) <b>storniert</b> → Verkaufsbuchung umdrehen, direkt auf <b>5000</b>:</p>
 ${bs([["5000",1000],["4800",190]],[["2400",1190]])}
+<p style="font-size:16px;color:var(--pencil)">✎ Manche Schulbücher buchen Rücksendungen über 5001 – auch das wird hier als richtig gewertet.</p>
 <h3>3. Nachträgliche Preisnachlässe & Skonto</h3>
 <p>Preisnachlass wegen Mängelrüge, Bonus, Kundenskonto → Unterkonto <span class="mark">5001 Erlösberichtigungen</span>. Die <b>Umsatzsteuer</b> wird anteilig korrigiert (Soll).</p>
 ${bs([["5001",500],["4800",95]],[["2400",595]])}
@@ -250,13 +273,16 @@ Offene Forderung 5.950 €, Kunde zieht 2 % Skonto ab:<br>
 Skonto brutto = 119,00 € → netto 119 ÷ 1,19 = 100,00 € → USt-Korrektur 19,00 €
 ${bs([["2800",5831],["5001",100],["4800",19]],[["2400",5950]])}</div>
 <p class="red">Merke: Rücksendung → 5000 direkt. Nachlässe/Skonto → 5001. Und die USt immer mit anfassen!</p>
-<p>Spiegelbildlich zur Beschaffung: dort Vorsteuer (2600) im Haben, hier Umsatzsteuer (4800) im Soll.</p>`,
+<p>Spiegelbildlich zur Beschaffung: dort Vorsteuer (2600) im Haben, hier Umsatzsteuer (4800) im Soll.</p>
+<h3>4. Abschluss von 5001 (Jahresende)</h3>
+<p>5001 ist Unterkonto von 5000 und wird darauf übertragen: ${bs([["5000",0]],[["5001",0]]).replace(/0,00/g,'Saldo')}</p>
+<div class="formula">Nettoumsatzerlöse = Umsatzerlöse (5000) − Erlösberichtigungen (5001)</div>`,
 tasks:[
  {title:"Aufgabe 3.1",
   text:`Wir verkaufen eigene Erzeugnisse für <b>30.000 € netto</b> zzgl. 19 % USt auf Ziel. Kurz darauf schickt der Kunde fehlerhafte Teile im Wert von <b>3.000 € netto</b> zurück.`,
   parts:[
    {type:'book',label:'a) Buche die Ausgangsrechnung.',soll:[["2400",35700]],haben:[["5000",30000],["4800",5700]]},
-   {type:'book',label:'b) Buche die Rücksendung.',soll:[["5000",3000],["4800",570]],haben:[["2400",3570]]}
+   {type:'book',label:'b) Buche die Rücksendung.',soll:[["5000",3000],["4800",570]],haben:[["2400",3570]],alts:[{soll:[["5001",3000],["4800",570]],haben:[["2400",3570]]}]}
   ],
   hints:["Bei der Rücksendung drehst du die Verkaufsbuchung um – aber nur für den zurückgeschickten Teil."],
   solution:`a) ${bs([["2400",35700]],[["5000",30000],["4800",5700]])}b) ${bs([["5000",3000],["4800",570]],[["2400",3570]])}`
@@ -269,13 +295,22 @@ tasks:[
    {type:'num',label:'c) Welcher Betrag geht auf unserem Bankkonto ein?',ans:29913.03,unit:'€'},
    {type:'book',label:'d) Buche den Zahlungseingang.',soll:[["2800",29913.03],["5001",513],["4800",97.47]],haben:[["2400",30523.5]]}
   ],
-  hints:["Nachlass und Skonto laufen über 5001 – und die Umsatzsteuer wird mitkorrigiert.",
+  hints:["Ein Preisnachlass macht den Verkauf nicht rückgängig, er berichtigt nur den Erlös. Welches Konto ist dafür da – und was passiert mit der Umsatzsteuer?",
          "Restforderung = 35.700 − Rücksendung brutto − Nachlass brutto",
          "Skonto brutto = 2 % der Restforderung. Netto = ÷ 1,19."],
   solution:`a) 5 % von 27.000 = 1.350 € netto + 256,50 € USt ${bs([["5001",1350],["4800",256.5]],[["2400",1606.5]])}
   b) 35.700 − 3.570 − 1.606,50 = <b>30.523,50 €</b><br>
   c) Skonto 2 % = 610,47 € → Zahlungseingang <b>29.913,03 €</b><br>
   d) Skonto netto 610,47 ÷ 1,19 = 513,00 €; USt 97,47 € ${bs([["2800",29913.03],["5001",513],["4800",97.47]],[["2400",30523.5]])}`
+ },
+ {title:"Aufgabe 3.3 – Jahresabschluss",
+  text:`Am 31.12. weist das Konto 5000 Umsatzerlöse einen Saldo von <b>920.000 €</b> aus, das Konto 5001 Erlösberichtigungen einen Saldo von <b>27.400 €</b>.`,
+  parts:[
+   {type:'book',label:'a) Schließe das Konto 5001 ab.',soll:[["5000",27400]],haben:[["5001",27400]]},
+   {type:'num',label:'b) Wie hoch sind die Nettoumsatzerlöse?',ans:892600,unit:'€'}
+  ],
+  hints:["Erlösberichtigungen stehen auf 5001 im Soll. Um sie auf 5000 zu übertragen, muss 5001 im Haben ausgeglichen werden."],
+  solution:`a) ${bs([["5000",27400]],[["5001",27400]])}b) 920.000 − 27.400 = <b>892.600 €</b>`
  }
 ]},
 /* 4 */ {
@@ -289,18 +324,20 @@ ${bs([["2200",0]],[["5200",0]]).replace(/0,00/g,'Betrag')}
 Es wurde <b>mehr verkauft als produziert</b> (aus dem Lager) → wirkt wie ein <b>Aufwand</b> (Ertragsminderung):
 ${bs([["5200",0]],[["2200",0]]).replace(/0,00/g,'Betrag')}</div>
 <p>Für unfertige Erzeugnisse genauso, nur mit Konto <b>2100</b>.</p>
+<p>Bewertet werden die Bestände mit ihren <span class="mark">Herstellungskosten</span> – nicht mit dem späteren Verkaufspreis. Manche Schulbücher trennen das Konto in <b>5201</b> (unfertige) und <b>5202</b> (fertige Erzeugnisse); das wird hier auch als richtig gewertet.</p>
 <h3>Konto 5200 Bestandsveränderungen</h3>
 <p>Mehrungen stehen im Haben, Minderungen im Soll. Der <b>Saldo</b> geht in die GuV:<br>
 Haben &gt; Soll → insgesamt Bestandsmehrung (Ertrag) &nbsp;|&nbsp; Soll &gt; Haben → Minderung.</p>
 <h3>Gesamtleistung</h3>
-<div class="formula">Gesamtleistung = Umsatzerlöse + Bestandsmehrungen − Bestandsminderungen</div>`,
+<div class="formula">Gesamtleistung = Umsatzerlöse + Bestandsmehrungen − Bestandsminderungen + aktivierte Eigenleistungen</div>
+<p>Aktivierte Eigenleistungen (Konto 5300) sind z. B. selbst gebaute Werkzeuge oder Anlagen für den eigenen Betrieb – kommen sie nicht vor, fallen sie einfach weg.</p>`,
 tasks:[
  {title:"Aufgabe 4.1",
   text:`Inventurwerte der Bubbel Metallbau GmbH:<br>
   ${calc([["Unfertige Erzeugnisse: AB 22.000 €","SB 17.500 €"],["Fertige Erzeugnisse: AB 40.000 €","SB 52.000 €"]])}`,
   parts:[
-   {type:'book',label:'a) Buchung für die unfertigen Erzeugnisse:',soll:[["5200",4500]],haben:[["2100",4500]]},
-   {type:'book',label:'b) Buchung für die fertigen Erzeugnisse:',soll:[["2200",12000]],haben:[["5200",12000]]},
+   {type:'book',label:'a) Buchung für die unfertigen Erzeugnisse:',soll:[["5200",4500]],haben:[["2100",4500]],alts:[{soll:[["5201",4500]],haben:[["2100",4500]]}]},
+   {type:'book',label:'b) Buchung für die fertigen Erzeugnisse:',soll:[["2200",12000]],haben:[["5200",12000]],alts:[{soll:[["2200",12000]],haben:[["5202",12000]]}]},
    {type:'num',label:'c) Um wie viel € erhöht sich insgesamt der Ertrag durch die Bestandsveränderungen?',ans:7500,unit:'€'},
    {type:'choice',label:'d) Was sagt die Mehrung bei den fertigen Erzeugnissen aus?',options:['Es wurde mehr verkauft als produziert.','Es wurde mehr produziert als verkauft.','Es wurden mehr Rohstoffe eingekauft.','Der Gewinn sinkt dadurch automatisch.'],ans:[1]}
   ],
@@ -311,7 +348,7 @@ tasks:[
   c) 12.000 − 4.500 = <b>7.500 €</b> Mehrung (Ertrag)<br>d) Es wurde <b>mehr produziert als verkauft</b>.`
  },
  {title:"Aufgabe 4.2",
-  text:`Umsatzerlöse 800.000 €, Bestandsminderung fertige Erzeugnisse 25.000 €, Bestandsmehrung unfertige Erzeugnisse 5.000 €.`,
+  text:`Umsatzerlöse 800.000 €, Bestandsminderung fertige Erzeugnisse 25.000 €, Bestandsmehrung unfertige Erzeugnisse 5.000 €. Aktivierte Eigenleistungen liegen nicht vor.`,
   parts:[{type:'num',label:'Wie hoch ist die Gesamtleistung?',ans:780000,unit:'€'}],
   hints:["Gesamtleistung = Umsatzerlöse + Mehrungen − Minderungen"],
   solution:`800.000 + 5.000 − 25.000 = <b>780.000 €</b>`
@@ -327,6 +364,8 @@ ${calc([["Listenpreis (netto)",""],["− Rabatt",""],["= Zieleinkaufspreis",""],
 Transport/Fracht, Überführung, Montage, Fundament, Zölle, Zulassung, Inbetriebnahme/Probelauf, bei Grundstücken: Notar, Grundbuch, Grunderwerbsteuer<br>
 <b class="t">✘ gehört NICHT dazu</b><br>
 Vorsteuer (Durchlaufposten!), Finanzierungskosten (Zinsen, Kreditgebühren), laufende Kosten (Wartung, Versicherung, Kfz-Steuer, Kraftstoff), Schulung des Personals</div>
+<p class="red">Achtung Skonto: Er mindert die AK nur, wenn er <b>tatsächlich abgezogen</b> wird – ein bloß angebotener Skonto zählt nicht.</p>
+<p style="font-size:16px;color:var(--pencil)">✎ Wir nutzen die Sammelkonten aus dem Schul-IKR: 0700 Techn. Anlagen und Maschinen, 0840 Fuhrpark, 0860 Büromaschinen, 0870 BGA. Nebenkosten (Transport, Montage …) werden – auch wenn sie extra berechnet werden – <b>ebenfalls auf das Anlagekonto</b> gebucht.</p>
 <h3>Buchungen</h3>
 <p>Eingangsrechnung: ${bs([["0700",50000],["2600",9500]],[["4400",59500]])}</p>
 <p>Zahlung mit 2 % Skonto: Skonto brutto = 2 % von 59.500 = 1.190 € → netto 1.000 €, VSt 190 €.<br>
@@ -335,7 +374,7 @@ ${bs([["4400",59500]],[["2800",58310],["0700",1000],["2600",190]])}
 <div class="formula">Zahlungsbetrag mit Skonto = Rechnungsbetrag brutto × (100 % − Skontosatz)</div>`,
 tasks:[
  {title:"Aufgabe 5.1",
-  text:`Wir kaufen eine CNC-Fräsmaschine. Folgende Posten fallen an (alle netto):<br>
+  text:`Wir kaufen eine CNC-Fräsmaschine. Folgende Posten fallen an (alle netto). Transport, Montage und Fundament stellen andere Firmen separat in Rechnung. Die Maschinenrechnung wird später tatsächlich unter Abzug von Skonto bezahlt.<br>
   ${calc([["Listenpreis","120.000 €"],["Rabatt","5 %"],["Skonto bei Zahlung (auf den Maschinenpreis)","2 %"],["Transportkosten","1.800 €"],["Montage","2.400 €"],["Betonfundament","3.200 €"],["Wartungsvertrag 1. Jahr","1.500 €"],["Schulung der Mitarbeiter","900 €"],["Zinsen für den Kredit","600 €"]])}`,
   parts:[
    {type:'choice',multi:true,label:'a) Welche Nebenkosten gehören zu den Anschaffungskosten? (alle richtigen ankreuzen)',options:['Transportkosten','Montage','Betonfundament','Wartungsvertrag','Schulung der Mitarbeiter','Kreditzinsen','Vorsteuer'],ans:[0,1,2]},
@@ -351,12 +390,16 @@ tasks:[
    {type:'book',label:'a) Buche die Eingangsrechnung.',soll:[["0700",114000],["2600",21660]],haben:[["4400",135660]]},
    {type:'num',label:'b) Zahlungsbetrag ohne Skonto:',ans:135660,unit:'€'},
    {type:'num',label:'c) Zahlungsbetrag mit Skonto:',ans:132946.8,unit:'€'},
-   {type:'book',label:'d) Buche die Zahlung unter Abzug von Skonto per Bank.',soll:[["4400",135660]],haben:[["2800",132946.8],["0700",2280],["2600",433.2]]}
+   {type:'book',label:'d) Buche die Zahlung unter Abzug von Skonto per Bank.',soll:[["4400",135660]],haben:[["2800",132946.8],["0700",2280],["2600",433.2]]},
+   {type:'book',label:'e) Die Rechnungen für Transport, Montage und Fundament (zusammen 7.400 € netto + 19 % USt) gehen ein. Buche sie zusammen.',soll:[["0700",7400],["2600",1406]],haben:[["4400",8806]]},
+   {type:'num',label:'f) Welcher Wert steht nach allen Buchungen auf dem Anlagekonto 0700?',ans:119120,unit:'€'}
   ],
-  hints:["Skonto wird vom Bruttobetrag der Rechnung gerechnet.","Bei Anlagen mindert der Netto-Skonto direkt das Anlagekonto im Haben."],
+  hints:["Skonto wird vom Bruttobetrag der Rechnung gerechnet.","Bei Anlagen mindert der Netto-Skonto direkt das Anlagekonto im Haben. Nebenkosten erhöhen es im Soll."],
   solution:`a) ${bs([["0700",114000],["2600",21660]],[["4400",135660]])}
   b) <b>135.660,00 €</b><br>c) 2 % von 135.660 = 2.713,20 € → <b>132.946,80 €</b><br>
-  d) Skonto netto 2.280 €, VSt-Korrektur 433,20 € ${bs([["4400",135660]],[["2800",132946.8],["0700",2280],["2600",433.2]])}`
+  d) Skonto netto 2.280 €, VSt-Korrektur 433,20 € ${bs([["4400",135660]],[["2800",132946.8],["0700",2280],["2600",433.2]])}
+  e) ${bs([["0700",7400],["2600",1406]],[["4400",8806]])}
+  f) 114.000 − 2.280 + 7.400 = <b>119.120 €</b> – genau die Anschaffungskosten aus 5.1 ✔`
  }
 ]},
 /* 6 */ {
@@ -365,7 +408,7 @@ info:`
 <p>Bei teuren Anlagen (Lkw, große Maschinen) verlangt der Lieferer oft eine <b>Anzahlung</b> vor der Lieferung. Da wir die Anlage noch <b>nicht besitzen</b>, buchen wir die Anzahlung auf ein eigenes Aktivkonto:</p>
 <div class="formula">0900 Geleistete Anzahlungen auf Sachanlagen</div>
 <h3>Schritt 1: Anzahlung leisten</h3>
-<p>Auch auf die Anzahlung fällt schon Umsatzsteuer an → wir haben Vorsteuer.<br>Beispiel: Anzahlung 10.000 € netto + 1.900 € USt per Bank</p>
+<p>Auch auf die Anzahlung fällt schon Umsatzsteuer an → wir haben Vorsteuer. Voraussetzung: Es liegt eine <b>ordnungsgemäße Anzahlungsrechnung</b> vor und die Anzahlung ist <b>bezahlt</b>.<br>Beispiel: Anzahlung 10.000 € netto + 1.900 € USt per Bank</p>
 ${bs([["0900",10000],["2600",1900]],[["2800",11900]])}
 <h3>Schritt 2: Lieferung & Schlussrechnung</h3>
 <p>Kaufpreis 50.000 € netto + 9.500 € USt = 59.500 €. Angezahlt wurden schon 11.900 €.</p>
@@ -381,7 +424,7 @@ ${bs([["0840",50000],["2600",7600]],[["0900",10000],["4400",47600]])}
 Probe: Soll 57.600 = Haben 57.600 ✓</div>`,
 tasks:[
  {title:"Aufgabe 6.1",
-  text:`Wir bestellen einen neuen Lkw für <b>150.000 € netto</b>. Der Händler verlangt bei Bestellung eine Anzahlung von <b>30 % des Nettopreises</b> zzgl. 19 % USt, die wir per Bank überweisen.`,
+  text:`Wir bestellen einen neuen Lkw für <b>150.000 € netto</b>. Der Händler verlangt bei Bestellung eine Anzahlung von <b>30 % des Nettopreises</b> zzgl. 19 % USt. Die ordnungsgemäße Anzahlungsrechnung liegt vor, wir überweisen per Bank.`,
   parts:[
    {type:'num',label:'a) Wie hoch ist die Überweisung (brutto)?',ans:53550,unit:'€'},
    {type:'book',label:'b) Buche die Anzahlung.',soll:[["0900",45000],["2600",8550]],haben:[["2800",53550]]}
@@ -392,10 +435,10 @@ tasks:[
  {title:"Aufgabe 6.2",
   text:`Der Lkw wird geliefert. Die Schlussrechnung lautet über 150.000 € netto + 28.500 € USt = 178.500 €, abzüglich der geleisteten Anzahlung. Der Rest wird später gezahlt.`,
   parts:[
-   {type:'num',label:'a) Wie hoch ist die Restzahlung (brutto)?',ans:124950,unit:'€'},
+   {type:'num',label:'a) Wie hoch ist die verbleibende Restverbindlichkeit (brutto)?',ans:124950,unit:'€'},
    {type:'book',label:'b) Buche die Schlussrechnung.',soll:[["0840",150000],["2600",19950]],haben:[["0900",45000],["4400",124950]]}
   ],
-  hints:["Restzahlung = Gesamtrechnung brutto − Anzahlung brutto.",
+  hints:["Restverbindlichkeit = Gesamtrechnung brutto − Anzahlung brutto.",
          "Vorsteuer in der Schlussrechnung: nur der Teil, der nicht schon bei der Anzahlung gebucht wurde.",
          "Die Anzahlung (0900) wird im Haben aufgelöst."],
   solution:`a) 178.500 − 53.550 = <b>124.950 €</b><br>b) VSt: 28.500 − 8.550 = 19.950 € ${bs([["0840",150000],["2600",19950]],[["0900",45000],["4400",124950]])}`
@@ -416,10 +459,10 @@ ${bs([["6520",5000]],[["0700",5000]])}
 <p>Statt 0700 je nach Anlage: 0840 Fuhrpark, 0860 Büromaschinen, 0870 BGA …</p>
 <h3>Auswirkungen</h3>
 <ul>
-<li><b>GuV:</b> Abschreibung ist Aufwand → <b>Gewinn sinkt</b> → weniger <b>Steuern</b></li>
+<li><b>GuV:</b> Abschreibung ist Aufwand → <b>Gewinn sinkt</b> → weniger <b>Steuern</b> (sofern überhaupt ein steuerpflichtiger Gewinn entsteht)</li>
 <li><b>Bilanz:</b> Anlagevermögen wird mit dem gesunkenen <b>Buchwert</b> ausgewiesen</li>
-<li><b>Liquidität:</b> Abschreibung ist <span class="red">keine Auszahlung</span> – das Geld bleibt im Unternehmen</li>
-<li><b>Kalkulation & Finanzierung:</b> Abschreibungen werden in die Verkaufspreise einkalkuliert und fließen über die Umsatzerlöse zurück → Geld für Ersatzinvestitionen (<b>Finanzierung aus Abschreibungen</b>)</li>
+<li><b>Liquidität:</b> Die Abschreibungsbuchung ist <span class="red">keine Auszahlung</span> – sie erzeugt aber auch selbst kein Geld</li>
+<li><b>Kalkulation & Finanzierung:</b> Abschreibungen werden in die Verkaufspreise einkalkuliert. <b>Wenn</b> die Erzeugnisse verkauft und bezahlt werden, fließt dieser Betrag zurück → Geld für Ersatzinvestitionen (<b>Finanzierung aus Abschreibungen</b>)</li>
 </ul>`,
 tasks:[
  {title:"Aufgabe 7.1",
@@ -439,10 +482,10 @@ tasks:[
   parts:[
    {type:'book',label:'a) Buche die Abschreibung.',soll:[["6520",12000]],haben:[["0700",12000]]},
    {type:'choice',multi:true,label:'b) Welche Aussagen zu den Auswirkungen sind richtig? (alle richtigen ankreuzen)',
-    options:['Der Gewinn sinkt.','Die Steuerlast sinkt.','Das Bankkonto sinkt sofort um 12.000 €.','Der Buchwert der Maschine in der Bilanz sinkt.','Das Eigenkapital steigt.','Über die Verkaufspreise fließt das Geld wieder ins Unternehmen zurück.'],ans:[0,1,3,5]}
+    options:['Der Gewinn sinkt.','Die Steuerlast sinkt, sofern das Unternehmen einen steuerpflichtigen Gewinn erzielt.','Das Bankkonto sinkt sofort um 12.000 €.','Der Buchwert der Maschine in der Bilanz sinkt.','Das Eigenkapital steigt.','Werden die Erzeugnisse verkauft und bezahlt, fließt der einkalkulierte Abschreibungsbetrag über die Umsatzerlöse zurück.','Die Abschreibung bringt selbst Geld auf das Bankkonto.'],ans:[0,1,3,5]}
   ],
   hints:["Abschreibung ist Aufwand – aber fließt dabei Geld vom Konto ab?","Aufwand → Gewinn → Steuern. Und was passiert mit dem Wert der Anlage in der Bilanz?"],
-  solution:`a) ${bs([["6520",12000]],[["0700",12000]])}b) Richtig: Gewinn sinkt, Steuerlast sinkt, Buchwert sinkt, Rückfluss über die Verkaufspreise. Falsch: keine Auszahlung und das EK steigt nicht (es sinkt über den geringeren Gewinn).`
+  solution:`a) ${bs([["6520",12000]],[["0700",12000]])}b) Richtig: Gewinn sinkt, Steuerlast sinkt, Buchwert sinkt, Rückfluss über die Verkaufspreise. Falsch: keine Auszahlung, das EK steigt nicht (es sinkt über den geringeren Gewinn) und die Abschreibung selbst bringt kein Geld.`
  }
 ]},
 /* 8 */ {
@@ -459,6 +502,7 @@ Für bewegliche Anlagegüter, die vom <b>1.7.2025 bis 31.12.2027</b> angeschafft
 höchstens das <b>3-fache des linearen Satzes</b>, aber <b>maximal 30 %</b>.<br>
 Beispiel: ND 5 Jahre → linear 20 % → 3 × 20 % = 60 % → begrenzt auf <b>30 %</b>.</div>
 <p>Weil der Buchwert nie 0 wird, darf man später zur <b>linearen</b> Methode <b>wechseln</b> (umgekehrt nicht).</p>
+<div class="formula">Wechsel lohnt sich, sobald: Restbuchwert ÷ Restnutzungsdauer &gt; degressiver Betrag</div>
 ${calc([["AK","100.000 €"],["− 30 % AfA Jahr 1","30.000 €"],["= Buchwert Ende Jahr 1","70.000 €",1],["− 30 % AfA Jahr 2 (von 70.000!)","21.000 €"],["= Buchwert Ende Jahr 2","49.000 €",1]])}
 <h3>3. Abschreibung nach Leistungseinheiten</h3>
 <p>Für Anlagen mit stark schwankender Nutzung (Lkw, Maschinen).</p>
@@ -493,6 +537,17 @@ tasks:[
   ],
   hints:["Zuerst die Abschreibung pro km: AK ÷ Gesamtleistung."],
   solution:`a) 180.000 ÷ 600.000 = <b>0,30 €/km</b><br>b) 0,30 × 85.000 = <b>25.500 €</b><br>c) 180.000 − 25.500 = <b>154.500 €</b>`
+ },
+ {title:"Aufgabe 8.4 – Wechsel degressiv → linear",
+  text:`Ein Gabelstapler wird im <b>Januar 2026</b> für <b>60.000 €</b> angeschafft, Nutzungsdauer <b>5 Jahre</b>, degressiv mit <b>30 %</b>. Das Unternehmen will so früh wie möglich zur linearen Abschreibung wechseln, wenn diese höher ist.`,
+  parts:[
+   {type:'num',label:'a) Buchwert am Ende des 2. Jahres:',ans:29400,unit:'€'},
+   {type:'num',label:'b) In welchem Nutzungsjahr lohnt sich der Wechsel erstmals?',ans:3,unit:'. Jahr'},
+   {type:'num',label:'c) Wie hoch ist die Abschreibung in diesem Wechseljahr?',ans:9800,unit:'€'}
+  ],
+  hints:["Rechne Jahr für Jahr: degressiven Betrag und den linearen Betrag (Restbuchwert ÷ Restnutzungsdauer) nebeneinander.",
+         "Beispiel Jahr 2: degressiv 30 % von 42.000 – linear 42.000 ÷ 4 Jahre. Welcher ist größer?"],
+  solution:`${calc([["Jahr 1: 30 % von 60.000","18.000 € → BW 42.000 €"],["Jahr 2: degressiv 12.600 € vs. linear 42.000 ÷ 4 = 10.500 €","→ degressiv, BW 29.400 €"],["Jahr 3: degressiv 8.820 € vs. linear 29.400 ÷ 3 = 9.800 €","→ <b>Wechsel!</b>"]])}a) <b>29.400 €</b> · b) im <b>3. Jahr</b> · c) <b>9.800 €</b> (danach jedes Jahr 9.800 €)`
  }
 ]},
 /* 9 */ {
@@ -502,6 +557,8 @@ info:`
 <div class="box"><b class="t">Wichtig:</b> Der <b>Anschaffungsmonat zählt voll</b> mit – egal ob am 1. oder am 30. gekauft.<br>
 Monate im 1. Jahr = 13 − Anschaffungsmonat &nbsp;(z. B. März = 3 → 10 Monate)</div>
 <div class="formula">AfA im Anschaffungsjahr = Jahres-AfA × Monate ÷ 12</div>
+<h3>Welcher Monat zählt?</h3>
+<p>Nicht das Bestelldatum! Maßgeblich ist die <b>Lieferung</b> (ab da gehört uns die Anlage wirtschaftlich). Muss der Verkäufer die Anlage laut Vertrag auch noch <b>montieren</b>, zählt erst der Monat, in dem die <b>Montage abgeschlossen</b> ist.</p>
 <h3>Beispiel linear</h3>
 <p>AK 36.000 €, ND 6 Jahre, gekauft am 20. Oktober → Jahres-AfA 6.000 €, Monate Okt.–Dez. = 3<br>
 AfA 1. Jahr = 6.000 × 3/12 = <b>1.500 €</b> → Buchwert 31.12. = 34.500 €</p>
@@ -529,14 +586,24 @@ tasks:[
    {type:'num',label:'b) Buchwert 31.12.2026:',ans:69750,unit:'€'},
    {type:'num',label:'c) Abschreibung 2027:',ans:20925,unit:'€'}
   ],
-  hints:["Zeitanteilig gilt auch bei degressiv – aber nur im ersten Jahr.","Im Folgejahr: voller Satz vom Buchwert am 31.12."],
+  hints:["Zeitanteilig gilt auch bei degressiv. Wie viele Monate gehört dir die Maschine 2026?","Und 2027 – gehört sie dir da das ganze Jahr? Wovon rechnest du dann die 30 %?"],
   solution:`a) April–Dez. = 9 Monate: 90.000 × 30 % × 9/12 = <b>20.250 €</b><br>b) 90.000 − 20.250 = <b>69.750 €</b><br>c) 69.750 × 30 % = <b>20.925 €</b>`
+ },
+ {title:"Aufgabe 9.3",
+  text:`Eine Schweißanlage (AK <b>48.000 €</b>, ND 8 Jahre, linear) wird am <b>15. März 2026</b> bestellt, am <b>20. Mai</b> geliefert. Laut Kaufvertrag montiert der Lieferer die Anlage; die Montage ist am <b>10. Juni</b> abgeschlossen.`,
+  parts:[
+   {type:'pick',label:'a) Ab welchem Monat wird abgeschrieben?',options:['März','Mai','Juni','Juli'],ans:2},
+   {type:'num',label:'b) Abschreibung 2026:',ans:3500,unit:'€'}
+  ],
+  hints:["Bestellen allein macht die Anlage noch nicht nutzbar. Was schuldet der Lieferer laut Vertrag alles?"],
+  solution:`a) <b>Juni</b> – der Lieferer schuldet auch die Montage, erst dann ist die Anschaffung abgeschlossen.<br>b) 48.000 ÷ 8 = 6.000 € pro Jahr; Juni–Dez. = 7 Monate → 6.000 × 7/12 = <b>3.500 €</b>`
  }
 ]},
 /* 10 */ {
 title:"Kennzahlen zur Beurteilung der Ertragslage",
 info:`
 <p>Der Gewinn allein sagt wenig – erst im <b>Verhältnis</b> zum eingesetzten Kapital oder zum Umsatz wird er vergleichbar. Das sind die <span class="mark">Rentabilitäten</span>.</p>
+<p style="font-size:16px;color:var(--pencil)">✎ „Gewinn" = Jahresüberschuss laut GuV. Wir rechnen – wie in den meisten Schulaufgaben – mit dem Kapital zum Jahresende (manche Bücher nehmen den Durchschnitt aus Anfang und Ende).</p>
 <div class="formula">Eigenkapitalrentabilität = Gewinn × 100 ÷ Eigenkapital</div>
 <p>→ Wie gut verzinst sich das Kapital der Eigentümer? (Vergleich: Zinsen für sichere Geldanlage + Risikozuschlag)</p>
 <div class="formula">Gesamtkapitalrentabilität = (Gewinn + Fremdkapitalzinsen) × 100 ÷ Gesamtkapital</div>
@@ -546,12 +613,15 @@ info:`
 <div class="box"><b class="t">Leverage-Effekt</b><br>
 Ist die <b>Gesamtkapitalrentabilität höher als der FK-Zinssatz</b>, lohnt sich zusätzliches Fremdkapital: Die Eigenkapitalrentabilität steigt.<br>
 FK-Zinssatz = FK-Zinsen × 100 ÷ Fremdkapital<br>
-Ist der FK-Zins höher → negativer Leverage, die EK-Rentabilität sinkt.</div>
+Ist der FK-Zins höher → negativer Leverage, die EK-Rentabilität sinkt.<br>
+Wichtig: Entscheidend ist, was die <b>neue Investition</b> erwirtschaftet – die bisherige Rentabilität ist keine Garantie.</div>
+<div class="box"><b class="t">Prozent ≠ Prozentpunkte</b><br>
+Sinkt die Umsatzrentabilität von 4 % auf 3 %, ist sie um <b>1 Prozentpunkt</b> gesunken – relativ aber um <b>25 %</b> (1 ÷ 4 × 100).</div>
 <p class="red">Beurteilen heißt immer vergleichen: mit dem Vorjahr, mit der Branche oder mit einer sicheren Anlage!</p>`,
 tasks:[
  {title:"Aufgabe 10.1",
   text:`Aus dem Jahresabschluss der Bubbel Metallbau GmbH:<br>
-  ${calc([["Eigenkapital","400.000 €"],["Fremdkapital","600.000 €"],["Jahresgewinn","48.000 €"],["Zinsaufwendungen für FK","32.000 €"],["Umsatzerlöse","1.600.000 €"]])}`,
+  ${calc([["Eigenkapital","400.000 €"],["Fremdkapital","600.000 €"],["Jahresüberschuss (Gewinn)","48.000 €"],["Zinsaufwendungen für FK","32.000 €"],["Umsatzerlöse","1.600.000 €"]])}`,
   parts:[
    {type:'num',label:'a) Eigenkapitalrentabilität:',ans:12,unit:'%'},
    {type:'num',label:'b) Gesamtkapitalrentabilität:',ans:8,unit:'%'},
@@ -564,7 +634,7 @@ tasks:[
   text:`Die Geschäftsführung überlegt, eine neue Halle mit einem weiteren Bankkredit zu finanzieren. Im Vorjahr lag die Umsatzrentabilität bei 4 %.`,
   parts:[
    {type:'num',label:'a) Berechne den bisherigen FK-Zinssatz (auf 2 Nachkommastellen).',ans:5.33,unit:'%',tol:0.006},
-   {type:'choice',label:'b) Welche Aussage stimmt (bei gleichem Zinssatz)?',options:[
+   {type:'choice',label:'b) Angenommen, die Gesamtkapitalrentabilität bleibt bei 8 % und der neue Kredit kostet ebenfalls 5,33 %. Welche Aussage stimmt?',options:[
      'Weiteres FK lohnt sich nicht, weil die EK-Rentabilität immer sinkt.',
      'Weiteres FK lohnt sich, weil die GK-Rentabilität (8 %) über dem FK-Zinssatz liegt → EK-Rentabilität steigt.',
      'Weiteres FK lohnt sich, weil die Umsatzrentabilität gestiegen ist.',
@@ -573,10 +643,88 @@ tasks:[
      'Der Umsatz ist um 1 % gesunken.',
      'Von 100 € Umsatz bleiben nur noch 3 € statt 4 € Gewinn – z. B. weil die Kosten gestiegen sind.',
      'Der Gewinn ist um 1.000 € gesunken.',
-     'Das Eigenkapital ist geschrumpft.'],ans:[1]}
+     'Das Eigenkapital ist geschrumpft.'],ans:[1]},
+   {type:'num',label:'d) Um wie viel Prozent (relativ) ist die Umsatzrentabilität gesunken?',ans:25,unit:'%'},
+   {type:'choice',label:'e) Die neue Halle würde voraussichtlich nur 4 % Rendite bringen, der Kredit kostet 5,33 %. Was gilt dann?',options:[
+     'Der Kredit lohnt sich trotzdem, weil die bisherige GK-Rentabilität 8 % beträgt.',
+     'Der Kredit lohnt sich nicht: Die Investition verdient weniger als die Zinsen kosten → negativer Leverage.',
+     'Das ist egal, Zinsen beeinflussen die Rentabilität nicht.'],ans:[1]}
   ],
   hints:["FK-Zinssatz = FK-Zinsen × 100 ÷ Fremdkapital","Vergleiche den FK-Zinssatz mit der Gesamtkapitalrentabilität (Leverage)."],
-  solution:`a) 32.000 × 100 ÷ 600.000 = <b>5,33 %</b><br>b) GK-Rentabilität 8 % &gt; FK-Zins 5,33 % → <b>positiver Leverage</b>, zusätzliches FK erhöht die EK-Rentabilität.<br>c) Pro 100 € Umsatz bleiben nur noch 3 € Gewinn – die Ertragslage hat sich verschlechtert.`
+  solution:`a) 32.000 × 100 ÷ 600.000 = <b>5,33 %</b><br>b) GK-Rentabilität 8 % &gt; FK-Zins 5,33 % → <b>positiver Leverage</b>, zusätzliches FK erhöht die EK-Rentabilität.<br>c) Pro 100 € Umsatz bleiben nur noch 3 € Gewinn – die Ertragslage hat sich verschlechtert.<br>d) 1 Prozentpunkt ÷ 4 × 100 = <b>25 %</b><br>e) Investitionsrendite 4 % &lt; Kreditzins 5,33 % → <b>lohnt sich nicht</b>.`
+ }
+]}
+,
+/* 11 – gemischte Abschlussklausur */ {
+exam:true,
+title:"Abschlussklausur – alles gemischt",
+info:`
+<p>Jetzt wird's ernst: Das hier ist wie die echte Klausur. Die Aufgaben sind <span class="mark">nicht nach Themen sortiert</span> – du musst selbst erkennen, was gefragt ist.</p>
+<div class="box"><b class="t">Regeln</b>
+<ul>
+<li>Keine Hinweis-Zettel, kein Lösungsweg zwischendurch</li>
+<li>Du gibst <b>einmal am Ende</b> ab, dann wird alles korrigiert</li>
+<li>Zahlen & Ankreuzaufgaben: 1 Punkt · Buchungssätze: 2 Punkte</li>
+<li>Kein Infoblatt – nimm dir am besten eine Uhr: <b>45 Minuten</b></li>
+</ul></div>
+<h3>Notenschlüssel (IHK)</h3>
+${calc([["100 – 92 %","1 sehr gut"],["unter 92 – 81 %","2 gut"],["unter 81 – 67 %","3 befriedigend"],["unter 67 – 50 %","4 ausreichend"],["unter 50 – 30 %","5 mangelhaft"],["unter 30 %","6 ungenügend"]])}
+<p class="red">Viel Erfolg, Bubbel! 🍀</p>`,
+tasks:[
+ {title:"Aufgabe K1 – Neue Laserschneidanlage",
+  text:`Die Bubbel Metallbau GmbH bestellt am <b>10. März 2026</b> eine Laserschneidanlage für <b>200.000 € netto</b>. Laut Vertrag ist eine Anzahlung von <b>20 %</b> (netto) zzgl. 19 % USt fällig; die Anzahlungsrechnung liegt vor und wird sofort per Bank bezahlt. Die Anlage wird am <b>12. Mai</b> geliefert, die vom Lieferer geschuldete Montage ist am <b>8. Juni</b> abgeschlossen. Die Schlussrechnung (200.000 € + 38.000 € USt, abzüglich Anzahlung) wird später bezahlt. Eine Spedition berechnet für den Transport <b>2.500 € netto</b>. Für den Kredit fallen <b>1.200 € Zinsen</b> an.`,
+  parts:[
+   {type:'book',label:'a) Buche die Zahlung der Anzahlung.',soll:[["0900",40000],["2600",7600]],haben:[["2800",47600]]},
+   {type:'book',label:'b) Buche die Schlussrechnung.',soll:[["0700",200000],["2600",30400]],haben:[["0900",40000],["4400",190400]]},
+   {type:'num',label:'c) Wie hoch sind die Anschaffungskosten?',ans:202500,unit:'€'},
+   {type:'pick',label:'d) Ab welchem Monat wird abgeschrieben?',options:['März','Mai','Juni','Juli'],ans:2},
+   {type:'num',label:'e) Lineare Abschreibung 2026 bei 10 Jahren Nutzungsdauer:',ans:11812.5,unit:'€'}
+  ],
+  hints:[],
+  solution:`a) 20 % von 200.000 = 40.000 € + 7.600 € USt ${bs([["0900",40000],["2600",7600]],[["2800",47600]])}
+  b) VSt 38.000 − 7.600 = 30.400 €; Rest 238.000 − 47.600 = 190.400 € ${bs([["0700",200000],["2600",30400]],[["0900",40000],["4400",190400]])}
+  c) 200.000 + 2.500 Transport = <b>202.500 €</b> (Zinsen gehören nicht dazu)<br>
+  d) <b>Juni</b> (Montage durch Lieferer abgeschlossen)<br>
+  e) 202.500 ÷ 10 = 20.250 €/Jahr × 7/12 = <b>11.812,50 €</b>`
+ },
+ {title:"Aufgabe K2 – Kundenzahlung",
+  text:`Ein Kunde begleicht eine Rechnung über <b>23.800 €</b> (20.000 € netto + USt) per Banküberweisung unter Abzug von <b>3 % Skonto</b>.`,
+  parts:[
+   {type:'num',label:'a) Welcher Betrag geht auf unserem Bankkonto ein?',ans:23086,unit:'€'},
+   {type:'book',label:'b) Buche den Zahlungseingang.',soll:[["2800",23086],["5001",600],["4800",114]],haben:[["2400",23800]]}
+  ],
+  hints:[],
+  solution:`a) 3 % von 23.800 = 714 € → <b>23.086 €</b><br>b) Skonto netto 600 €, USt 114 € ${bs([["2800",23086],["5001",600],["4800",114]],[["2400",23800]])}`
+ },
+ {title:"Aufgabe K3 – Jahresabschluss",
+  text:`Zum 31.12. liegen folgende Werte vor:<br>
+  ${calc([["Rohstoffe: Anfangsbestand","30.000 €"],["6000 Aufwendungen für Rohstoffe","250.000 €"],["6001 Bezugskosten","6.000 €"],["6002 Nachlässe","4.000 €"],["Rohstoffe: Schlussbestand lt. Inventur","38.000 €"],["Fertige Erzeugnisse: AB / SB","60.000 € / 45.000 €"]])}`,
+  parts:[
+   {type:'book',label:'a) Schließe das Konto 6001 ab.',soll:[["6000",6000]],haben:[["6001",6000]]},
+   {type:'book',label:'b) Schließe das Konto 6002 ab.',soll:[["6002",4000]],haben:[["6000",4000]]},
+   {type:'book',label:'c) Buche die Bestandsveränderung bei den Rohstoffen.',soll:[["2000",8000]],haben:[["6000",8000]]},
+   {type:'num',label:'d) Wie hoch ist der Rohstoffverbrauch?',ans:244000,unit:'€'},
+   {type:'book',label:'e) Buche die Bestandsveränderung bei den fertigen Erzeugnissen.',soll:[["5200",15000]],haben:[["2200",15000]],alts:[{soll:[["5202",15000]],haben:[["2200",15000]]}]}
+  ],
+  hints:[],
+  solution:`a) ${bs([["6000",6000]],[["6001",6000]])}b) ${bs([["6002",4000]],[["6000",4000]])}
+  c) SB 38.000 > AB 30.000 → Mehrbestand 8.000 € ${bs([["2000",8000]],[["6000",8000]])}
+  d) 250.000 + 6.000 − 4.000 − 8.000 = <b>244.000 €</b> (= 30.000 + 252.000 − 38.000)<br>
+  e) FE: 45.000 − 60.000 = −15.000 → Minderung ${bs([["5200",15000]],[["2200",15000]])}`
+ },
+ {title:"Aufgabe K4 – Ertragslage",
+  text:`Eigenkapital <b>500.000 €</b>, Fremdkapital <b>700.000 €</b>, Jahresüberschuss <b>54.000 €</b>, Zinsaufwendungen <b>42.000 €</b>, Umsatzerlöse <b>1.800.000 €</b>.`,
+  parts:[
+   {type:'num',label:'a) Eigenkapitalrentabilität:',ans:10.8,unit:'%'},
+   {type:'num',label:'b) Gesamtkapitalrentabilität:',ans:8,unit:'%'},
+   {type:'num',label:'c) Umsatzrentabilität:',ans:3,unit:'%'},
+   {type:'choice',label:'d) Eine geplante Investition soll 5 % Rendite bringen und mit einem Kredit zu 6 % finanziert werden. Was gilt?',options:[
+     'Lohnt sich, weil die Gesamtkapitalrentabilität 8 % beträgt.',
+     'Lohnt sich nicht – die Investition verdient weniger als der Kredit kostet (negativer Leverage).',
+     'Lohnt sich, weil Fremdkapital die EK-Rentabilität immer erhöht.'],ans:[1]}
+  ],
+  hints:[],
+  solution:`a) 54.000 × 100 ÷ 500.000 = <b>10,8 %</b><br>b) (54.000 + 42.000) × 100 ÷ 1.200.000 = <b>8 %</b><br>c) 54.000 × 100 ÷ 1.800.000 = <b>3 %</b><br>d) 5 % &lt; 6 % → <b>lohnt sich nicht</b>`
  }
 ]}
 ];
@@ -611,25 +759,28 @@ function render(){
     <div class="doodle">du packst<br>das 💪</div>
     <h2>Probeklausur <u>Rechnungswesen</u></h2>
     <p>So funktioniert's: Zu jedem Thema kommt zuerst ein <span class="mark">Infoblatt</span> – lies es in Ruhe. Danach die Aufgaben. Wenn du nicht weiterkommst, kannst du <b>Hinweis-Zettel</b> aufdecken (immer der Reihe nach). Erst wenn alles richtig ist, geht's zum nächsten Thema.</p>
-    <p>Beträge kannst du ganz normal eingeben, z. B. <b>19.125,68</b> oder <b>19125,68</b>. Bei Buchungssätzen ist die Reihenfolge der Konten egal – mit „+ Zeile" kannst du weitere Konten hinzufügen.</p>
+    <p>Beträge kannst du ganz normal eingeben, z. B. <b>19.125,68</b> oder <b>19125,68</b>. Bei Buchungssätzen ist die Reihenfolge der Konten egal – mit „+ Zeile" kannst du weitere Konten hinzufügen. Unter jedem Buchungssatz siehst du, ob Soll und Haben schon aufgehen.</p>
+    <p>Zum Schluss wartet eine <b>⭐ Abschlussklausur</b>: alles gemischt, ohne Hinweise, mit Punkten und Note – wie in echt.</p>
     <h3>Inhalt</h3><ul class="toc">${TOPICS.map((t,k)=>{const p=1+2*k, ok=p<=S.unlocked, done=isDone(k);
-      return `<li class="${ok?'':'lock'}" data-go="${ok?p:''}"><span class="ic">${done?'✅':ok?'✏️':'🔒'}</span>${k+1}. ${t.title}</li>`}).join('')}</ul>
+      return `<li class="${ok?'':'lock'}" data-go="${ok?p:''}"><span class="ic">${done?'✅':ok?'✏️':'🔒'}</span>${t.exam?'⭐':k+1+'.'} ${t.title}</li>`}).join('')}</ul>
     <div class="nav"><button class="mini" id="reset">↺ alles zurücksetzen</button><button class="pen" data-nav="1">Los geht's →</button></div>`;
   } else if(info.kind==='info'){
     const t=TOPICS[info.t];
-    h+=`<h2><u>Thema ${info.t+1}: ${t.title}</u></h2><p style="font-family:Caveat;font-size:24px;color:var(--pencil);margin-top:0">📒 Infoblatt – erst lesen, dann rechnen</p>${t.info}
-    <div class="nav"><button class="pen" data-nav="-1">← zurück</button><span class="pg">Seite ${i+1} / ${NPAGES}</span><button class="pen" data-nav="1">Zu den Aufgaben →</button></div>`;
+    h+=`<h2><u>${t.exam?'⭐ ':'Thema '+(info.t+1)+': '}${t.title}</u></h2><p style="font-family:Caveat;font-size:24px;color:var(--pencil);margin-top:0">${t.exam?'📝 Vor dem Start bitte lesen':'📒 Infoblatt – erst lesen, dann rechnen'}</p>${t.info}
+    <div class="nav"><button class="pen" data-nav="-1">← zurück</button><span class="pg">Seite ${i+1} / ${NPAGES}</span><button class="pen" data-nav="1">${t.exam?'Klausur starten →':'Zu den Aufgaben →'}</button></div>`;
   } else if(info.kind==='tasks'){
     const t=TOPICS[info.t];
-    h+=`<h2><u>Thema ${info.t+1}: Aufgaben</u></h2>`;
+    h+= t.exam ? `<h2><u>Abschlussklausur</u></h2><p style="font-family:Caveat;font-size:24px;color:var(--pencil);margin-top:0">⏱ 45 Minuten · keine Hilfsmittel außer Taschenrechner</p>` : `<h2><u>Thema ${info.t+1}: Aufgaben</u></h2>`;
     t.tasks.forEach((task,j)=>{ h+=renderTask(info.t,j,task); });
+    if(t.exam) h+=`<div id="examFooter">${S.exam?scoreBox():'<button class="pen red" id="submitExam">📝 Klausur abgeben</button>'}</div>`;
     const done=isDone(info.t);
     h+=`<div class="nav"><button class="pen" data-nav="-1">← Infoblatt</button><span class="pg">Seite ${i+1} / ${NPAGES}</span>
-      ${done?`<button class="pen" data-nav="1">${info.t===TOPICS.length-1?'Fertig! →':'Nächstes Thema →'}</button>`:`<span class="locked-msg">🔒 erst alles richtig lösen</span>`}</div>`;
+      ${done?`<button class="pen" data-nav="1">${info.t===TOPICS.length-1?'Fertig! →':'Nächstes Thema →'}</button>`:`<span class="locked-msg">🔒 ${t.exam?'erst abgeben':'erst alles richtig lösen'}</span>`}</div>`;
   } else {
     h+=`<h1>Geschafft, Bubbel! 🎉</h1><p><span class="stamp">Probeklausur bestanden</span></p>
     <p>Du hast alle ${TOPICS.length} Themen durchgerechnet. Vor der echten Klausur am besten die Themen nochmal anschauen, bei denen du Hinweise gebraucht hast:</p>
-    <ul>${TOPICS.map((t,k)=>{const n=t.tasks.reduce((a,_,j)=>a+(S.hints[k+'-'+j]||0),0);return `<li>${t.title}: ${n? `<span class="red">${n} Hinweis${n>1?'e':''}</span>`:'<span class="ok">ohne Hinweis ✔</span>'}</li>`}).join('')}</ul>
+    <ul>${TOPICS.filter(t=>!t.exam).map((t,k)=>{const n=t.tasks.reduce((a,_,j)=>a+(S.hints[k+'-'+j]||0),0);return `<li>${t.title}: ${n? `<span class="red">${n} Hinweis${n>1?'e':''}</span>`:'<span class="ok">ohne Hinweis ✔</span>'}</li>`}).join('')}</ul>
+    ${S.exam?`<h3>Abschlussklausur: ${S.exam.pts} / ${S.exam.max} Punkte → Note ${note(S.exam.pts/S.exam.max*100)}</h3>`:''}
     <div class="nav"><button class="pen" data-nav="-1">← zurück</button><span class="pg">Seite ${i+1} / ${NPAGES}</span><button class="pen red" id="reset">Nochmal von vorn</button></div>`;
   }
   $page.innerHTML=h; $page.style.animation='none'; void $page.offsetWidth; $page.style.animation='';
@@ -637,21 +788,25 @@ function render(){
 }
 
 function renderTask(ti,j,task){
-  const id=ti+'-'+j, solved=S.solved[id], tries=S.tries[id]||0, opened=S.hints[id]||0;
-  let h=`<div class="task" data-task="${id}"><h3>${task.title} ${solved?'<span class="state ok">✔ richtig!</span>':''}</h3><div class="txt">${task.text}</div>`;
+  const id=ti+'-'+j, ex=TOPICS[ti].exam, res=ex&&S.exam?S.exam.res[id]:null;
+  const solved=ex?!!S.exam:S.solved[id], tries=S.tries[id]||0, opened=S.hints[id]||0;
+  const badge = ex ? (res?`<span class="state ${res.every(x=>x)?'ok':'bad'}">${task.parts.reduce((a,p,k)=>a+(res[k]?pts(p):0),0)} / ${task.parts.reduce((a,p)=>a+pts(p),0)} P.</span>`:`<span class="state" style="color:var(--pencil);font-size:22px">(${task.parts.reduce((a,p)=>a+pts(p),0)} P.)</span>`)
+                   : (solved?'<span class="state ok">✔ richtig!</span>':'');
+  let h=`<div class="task" data-task="${id}"><h3>${task.title} ${badge}</h3><div class="txt">${task.text}</div>`;
   task.parts.forEach((p,k)=>{
-    h+=`<div class="part" data-part="${k}"><div class="lbl">${p.label} <span class="state" data-st></span></div>`;
+    const mk = res ? (res[k]?'<span class="state ok" data-st>✔</span>':'<span class="state bad" data-st>✘</span>') : '<span class="state" data-st></span>';
+    h+=`<div class="part" data-part="${k}"><div class="lbl">${p.label} ${mk}</div>`;
     if(p.type==='num') h+=`<input class="num" inputmode="decimal" autocomplete="off" ${solved?`value="${fmtAns(p)}" disabled`:''}><span class="unit">${p.unit||''}</span>`;
     if(p.type==='choice'){ h+='<div class="choice">'+p.options.map((o,m)=>`<label><input type="${p.multi?'checkbox':'radio'}" name="c${id}-${k}" value="${m}" ${solved&&p.ans.includes(m)?'checked':''} ${solved?'disabled':''}>${o}</label>`).join('')+'</div>'; }
     if(p.type==='pick'){ h+=`<select ${solved?'disabled':''}><option value="">– wählen –</option>${p.options.map((o,m)=>`<option value="${m}" ${solved&&p.ans===m?'selected':''}>${o}</option>`).join('')}</select>`; }
     if(p.type==='book'){
       const side=(name,rows)=>`<div class="side" data-side="${name}"><div class="cap">${name==='s'?'Soll':'Haben'}</div>${rows.map(r=>brow(r)).join('')}${solved?'':'<button class="mini" data-add>+ Zeile</button>'}</div>`;
       const sr=solved?p.soll:[[ '',null]], hr=solved?p.haben:[[ '',null]];
-      h+=`<div class="book">${side('s',sr)}<div class="an">an</div>${side('h',hr)}</div>`;
+      h+=`<div class="book">${side('s',sr)}<div class="an">an</div>${side('h',hr)}</div><div class="sumline" data-sum></div><div class="rowmsg" data-rowmsg></div>`;
     }
     h+='</div>';
   });
-  if(!solved){
+  if(!solved && !ex){
     h+=`<div class="actions"><button class="pen" data-check>✓ Prüfen</button><span class="fb" data-fb></span>
       ${tries>=3?`<button class="mini" data-sol>👀 Lösungsweg ansehen</button>`:''}</div>`;
   }
@@ -662,7 +817,15 @@ function renderTask(ti,j,task){
 function fmtAns(p){ return p.unit==='%'||p.unit==='Monate'||p.ans<1 ? String(p.ans).replace('.',',') : eur(p.ans); }
 function brow(r){ const a=r[1]; return `<div class="brow"><select ${a!=null?'disabled':''}>${kontoOpts(r[0])}</select><input class="num" inputmode="decimal" placeholder="Betrag €" ${a!=null?`value="${eur(a)}" disabled`:''}>${a!=null?'':'<button class="mini" data-del>✕</button>'}</div>`; }
 
-function isDone(ti){ return TOPICS[ti].tasks.every((_,j)=>S.solved[ti+'-'+j]); }
+function isDone(ti){ return TOPICS[ti].exam ? !!S.exam : TOPICS[ti].tasks.every((_,j)=>S.solved[ti+'-'+j]); }
+const pts = p => p.type==='book'?2:1;
+function note(pc){ return pc>=92?'1 (sehr gut)':pc>=81?'2 (gut)':pc>=67?'3 (befriedigend)':pc>=50?'4 (ausreichend)':pc>=30?'5 (mangelhaft)':'6 (ungenügend)'; }
+function scoreBox(){
+  const e=S.exam, pc=Math.round(e.pts/e.max*1000)/10;
+  return `<div class="box" style="text-align:center"><b class="t">Ergebnis: ${e.pts} von ${e.max} Punkten (${String(pc).replace('.',',')} %)</b><br>
+  <span class="stamp" style="margin:8px 0">Note ${note(pc)}</span><br>
+  Schau dir bei den roten ✘ die Lösung unter der Aufgabe an.<br><button class="mini" id="retryExam">↺ Klausur nochmal schreiben</button></div>`;
+}
 
 /* ---------- Prüfen ---------- */
 function readBook(el){
@@ -681,20 +844,74 @@ function sameMap(a,b){
 }
 function toMap(rows){const m={}; rows.forEach(r=>m[r[0]]=(m[r[0]]||0)+r[1]); return m;}
 
+/* Teil bewerten (+ Zeilen-Feedback bei Buchungssätzen) */
+function gradePart(pe,p,detail=true){
+  let ok=false;
+  if(p.type==='num'){ ok=near(parseNum(pe.querySelector('input').value),p.ans,p.tol||0.011); }
+  if(p.type==='choice'){ const sel=[...pe.querySelectorAll('input:checked')].map(x=>+x.value).sort(); ok=sel.join()===[...p.ans].sort().join(); }
+  if(p.type==='pick'){ ok=pe.querySelector('select').value===String(p.ans); }
+  if(p.type==='book'){
+    const variants=[{soll:p.soll,haben:p.haben},...(p.alts||[])];
+    const s=readBook(pe.querySelector('[data-side="s"]')), h=readBook(pe.querySelector('[data-side="h"]'));
+    ok=!!(s&&h&&variants.some(v=>sameMap(s,toMap(v.soll))&&sameMap(h,toMap(v.haben))));
+    if(detail) markRows(pe,variants,ok);
+  }
+  const st=pe.querySelector('[data-st]'); st.textContent=ok?'✔':'✘'; st.className='state '+(ok?'ok':'bad');
+  return ok;
+}
+function sideSums(sideEl){ const m={}; sideEl.querySelectorAll('.brow').forEach(r=>{const k=r.querySelector('select').value,v=parseNum(r.querySelector('input').value); if(k&&!isNaN(v)) m[k]=(m[k]||0)+v;}); return m; }
+function markRows(pe,variants,ok){
+  const sE=pe.querySelector('[data-side="s"]'), hE=pe.querySelector('[data-side="h"]');
+  const got={s:sideSums(sE),h:sideSums(hE)};
+  let best=null;
+  variants.forEach(v=>{
+    const E={s:toMap(v.soll),h:toMap(v.haben)}, marks=[]; let good=0;
+    [['s',sE,'h'],['h',hE,'s']].forEach(([sd,el,ot])=>el.querySelectorAll('.brow').forEach(r=>{
+      const k=r.querySelector('select').value, raw=r.querySelector('input').value.trim();
+      let m='';
+      if(!k&&!raw) m='';
+      else if(!k) m='<span class="bad">Konto fehlt</span>';
+      else if(k in E[sd]) { if(near(got[sd][k],E[sd][k])){m='<span class="ok">✔</span>';good++;} else m='<span class="bad">Betrag prüfen</span>'; }
+      else if(k in E[ot]) m='<span class="bad">↔ falsche Seite</span>';
+      else m='<span class="bad">✘ Konto passt nicht</span>';
+      marks.push([r,m]);
+    }));
+    const missing=['s','h'].reduce((a,sd)=>a+Object.keys(E[sd]).filter(k=>!(k in got.s)&&!(k in got.h)).length,0);
+    if(!best||good>best.good) best={marks,good,missing};
+  });
+  best.marks.forEach(([r,m])=>{ let f=r.querySelector('.rfb'); if(!f){f=document.createElement('span');f.className='rfb';r.appendChild(f);} f.innerHTML=m; });
+  const msg=pe.querySelector('[data-rowmsg]');
+  if(msg) msg.innerHTML = !ok && best.missing>0 ? `<span class="bad">${best.missing===1?'Da fehlt noch ein Konto':'Da fehlen noch '+best.missing+' Konten'} …</span>` : '';
+}
+function updateSums(root){
+  root.querySelectorAll('.part').forEach(pe=>{
+    const line=pe.querySelector('[data-sum]'); if(!line) return;
+    const s=Object.values(sideSums(pe.querySelector('[data-side="s"]'))).reduce((a,b)=>a+b,0);
+    const h=Object.values(sideSums(pe.querySelector('[data-side="h"]'))).reduce((a,b)=>a+b,0);
+    if(!s&&!h){line.innerHTML='';return;}
+    const eq=near(s,h);
+    line.innerHTML=`Σ Soll ${eur(s)} · Σ Haben ${eur(h)} <span class="${eq?'ok':'bad'}">${eq?'✔ ausgeglichen':'≠ geht noch nicht auf'}</span>`;
+  });
+}
+function submitExam(ti){
+  const T=TOPICS[ti]; let p=0,max=0; const res={};
+  T.tasks.forEach((task,j)=>{
+    const id=ti+'-'+j, el=$page.querySelector(`[data-task="${id}"]`);
+    res[id]=task.parts.map((pt,k)=>{ const ok=gradePart(el.querySelector(`[data-part="${k}"]`),pt); max+=pts(pt); if(ok)p+=pts(pt); return ok; });
+    el.querySelectorAll('input,select').forEach(x=>x.disabled=true);
+    el.querySelectorAll('[data-add],[data-del]').forEach(x=>x.remove());
+    el.querySelector('[data-solbox]').classList.add('show');
+  });
+  S.exam={pts:p,max,res}; S.unlocked=NPAGES-1; save();
+  $page.querySelector('#examFooter').innerHTML=scoreBox();
+  $page.querySelector('.locked-msg').outerHTML='<button class="pen" data-nav="1">Fertig! →</button>';
+  bind(); progress();
+  $page.querySelector('#examFooter').scrollIntoView({behavior:'smooth',block:'center'});
+}
+
 function checkTask(ti,j,el){
   const task=TOPICS[ti].tasks[j], id=ti+'-'+j; let all=true;
-  task.parts.forEach((p,k)=>{
-    const pe=el.querySelector(`[data-part="${k}"]`); let ok=false;
-    if(p.type==='num'){ ok=near(parseNum(pe.querySelector('input').value),p.ans,p.tol||0.011); }
-    if(p.type==='choice'){ const sel=[...pe.querySelectorAll('input:checked')].map(x=>+x.value).sort(); ok=sel.join()===[...p.ans].sort().join(); }
-    if(p.type==='pick'){ ok=pe.querySelector('select').value===String(p.ans); }
-    if(p.type==='book'){
-      const s=readBook(pe.querySelector('[data-side="s"]')), h=readBook(pe.querySelector('[data-side="h"]'));
-      ok=!!(s&&h&&sameMap(s,toMap(p.soll))&&sameMap(h,toMap(p.haben)));
-    }
-    const st=pe.querySelector('[data-st]'); st.textContent=ok?'✔':'✘'; st.className='state '+(ok?'ok':'bad');
-    if(!ok) all=false;
-  });
+  task.parts.forEach((p,k)=>{ if(!gradePart(el.querySelector(`[data-part="${k}"]`),p)) all=false; });
   const fb=el.querySelector('[data-fb]');
   if(all){ S.solved[id]=true; save(); fb.innerHTML='<span class="ok">Super, alles richtig! 🎉</span>';
     if(isDone(ti)){ S.unlocked=Math.max(S.unlocked,Math.min(NPAGES-1,2+2*(ti+1))); save(); }
@@ -719,6 +936,8 @@ function bind(){
   });
   $page.querySelectorAll('[data-go]').forEach(li=>li.onclick=()=>{ if(li.dataset.go){S.page=+li.dataset.go; save(); render();} });
   const r=$page.querySelector('#reset'); if(r) r.onclick=()=>{ if(confirm('Wirklich alles zurücksetzen?')){ S={page:0,unlocked:2,solved:{},tries:{},hints:{}}; save(); render(); } };
+  const se=$page.querySelector('#submitExam'); if(se) se.onclick=()=>{ if(confirm('Klausur wirklich abgeben? Danach kannst du nichts mehr ändern.')) submitExam(pageInfo(S.page).t); };
+  const re=$page.querySelector('#retryExam'); if(re) re.onclick=()=>{ delete S.exam; save(); render(); };
   $page.querySelectorAll('.task').forEach(el=>{
     const [ti,j]=el.dataset.task.split('-').map(Number), id=el.dataset.task;
     const c=el.querySelector('[data-check]'); if(c) c.onclick=()=>checkTask(ti,j,el);
@@ -735,10 +954,13 @@ function bind(){
 }
 function bindRows(el){ el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ const side=b.closest('.side'); if(side.querySelectorAll('.brow').length>1) b.closest('.brow').remove(); }); }
 function progress(){
-  const total=TOPICS.reduce((a,t)=>a+t.tasks.length,0), done=Object.keys(S.solved).length;
+  const total=TOPICS.filter(t=>!t.exam).reduce((a,t)=>a+t.tasks.length,0), done=Object.keys(S.solved).length;
   document.getElementById('bar').style.width=(done/total*100)+'%';
-  document.getElementById('tbr').textContent=`${done}/${total} Aufgaben`;
+  document.getElementById('tbr').textContent=`${done}/${total} Aufgaben${S.exam?' · Klausur ✔':''}`;
+  updateSums($page);
 }
+$page.addEventListener('input',()=>updateSums($page));
+$page.addEventListener('change',()=>updateSums($page));
 render();
 </script>
 </body>
