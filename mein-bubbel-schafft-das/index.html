@@ -19,7 +19,7 @@ body{
   font-family:'Kalam',cursive; color:var(--ink); min-height:100vh;
   display:flex; flex-direction:column; align-items:center; padding:18px 10px 40px;
 }
-.topbar{width:100%;max-width:860px;display:flex;gap:10px;align-items:center;margin-bottom:10px;color:#fff;font-family:'Caveat';font-size:22px}
+.topbar{width:100%;max-width:860px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;color:#fff;font-family:'Caveat';font-size:22px}
 .topbar .bar{flex:1;height:10px;background:rgba(255,255,255,.25);border-radius:6px;overflow:hidden}
 .topbar .bar i{display:block;height:100%;background:#ffd54f;width:0;transition:width .5s}
 .page{
@@ -95,6 +95,10 @@ button.pen:disabled{background:#9aa3b5;cursor:not-allowed;box-shadow:none}
 .solution{margin-top:14px;padding:10px 16px;border:2px dashed var(--green);border-radius:10px;color:#1e5a22;font-size:18px;display:none}
 .solution.show{display:block}
 .fb{font-family:'Caveat';font-size:24px;margin-left:6px}
+button.pen.skip{background:#9aa3b5}
+.overlay{position:fixed;inset:0;background:rgba(30,40,60,.6);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.savecard{max-width:560px;width:100%;background:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:20px 20px;padding:24px 28px;border-radius:6px;box-shadow:0 10px 30px rgba(0,0,0,.4);transform:rotate(-.5deg)}
+.savecard .code{font-family:Consolas,'Courier New',monospace;font-size:28px;font-weight:700;letter-spacing:1px;color:var(--red);border:3px dashed var(--red);border-radius:10px;padding:8px 14px;text-align:center;margin:10px 0;word-break:break-all}
 .rfb{font-family:'Caveat';font-size:20px;margin-left:4px;white-space:nowrap}
 .sumline{font-family:'Caveat';font-size:20px;color:var(--pencil);margin-top:4px}
 .rowmsg{font-family:'Caveat';font-size:21px}
@@ -119,7 +123,7 @@ button.pen:disabled{background:#9aa3b5;cursor:not-allowed;box-shadow:none}
 </style>
 </head>
 <body>
-<div class="topbar"><span id="tbl">Fortschritt</span><div class="bar"><i id="bar"></i></div><span id="tbr"></span></div>
+<div class="topbar"><span id="tbl">Fortschritt</span><div class="bar"><i id="bar"></i></div><span id="tbr"></span><button class="pen" id="saveBtn" style="font-size:22px;padding:2px 14px;background:#ffd54f;color:#3a3000">💾 Speichern</button></div>
 <div class="page" id="page"></div>
 
 <script>
@@ -761,8 +765,10 @@ function render(){
     <p>So funktioniert's: Zu jedem Thema kommt zuerst ein <span class="mark">Infoblatt</span> – lies es in Ruhe. Danach die Aufgaben. Wenn du nicht weiterkommst, kannst du <b>Hinweis-Zettel</b> aufdecken (immer der Reihe nach). Erst wenn alles richtig ist, geht's zum nächsten Thema.</p>
     <p>Beträge kannst du ganz normal eingeben, z. B. <b>19.125,68</b> oder <b>19125,68</b>. Bei Buchungssätzen ist die Reihenfolge der Konten egal – mit „+ Zeile" kannst du weitere Konten hinzufügen. Unter jedem Buchungssatz siehst du, ob Soll und Haben schon aufgehen.</p>
     <p>Zum Schluss wartet eine <b>⭐ Abschlussklausur</b>: alles gemischt, ohne Hinweise, mit Punkten und Note – wie in echt.</p>
-    <h3>Inhalt</h3><ul class="toc">${TOPICS.map((t,k)=>{const p=1+2*k, ok=p<=S.unlocked, done=isDone(k);
-      return `<li class="${ok?'':'lock'}" data-go="${ok?p:''}"><span class="ic">${done?'✅':ok?'✏️':'🔒'}</span>${t.exam?'⭐':k+1+'.'} ${t.title}</li>`}).join('')}</ul>
+    <div class="box" style="transform:none"><b class="t">Schon angefangen?</b> Gib deinen Speicher-Code ein:<br>
+      <input class="num" id="codeIn" style="width:260px;text-transform:uppercase" placeholder="B…-…-…" autocomplete="off"> <button class="pen" id="loadCode">Weitermachen</button> <span class="fb" id="codeMsg"></span></div>
+    <h3>Inhalt <span style="font-size:20px;color:var(--pencil)">(du kannst jedes Thema direkt anklicken)</span></h3><ul class="toc">${TOPICS.map((t,k)=>{const p=1+2*k, done=isDone(k);
+      return `<li data-go="${p}"><span class="ic">${done?'✅':'✏️'}</span>${t.exam?'⭐':k+1+'.'} ${t.title}</li>`}).join('')}</ul>
     <div class="nav"><button class="mini" id="reset">↺ alles zurücksetzen</button><button class="pen" data-nav="1">Los geht's →</button></div>`;
   } else if(info.kind==='info'){
     const t=TOPICS[info.t];
@@ -775,11 +781,13 @@ function render(){
     if(t.exam) h+=`<div id="examFooter">${S.exam?scoreBox():'<button class="pen red" id="submitExam">📝 Klausur abgeben</button>'}</div>`;
     const done=isDone(info.t);
     h+=`<div class="nav"><button class="pen" data-nav="-1">← Infoblatt</button><span class="pg">Seite ${i+1} / ${NPAGES}</span>
-      ${done?`<button class="pen" data-nav="1">${info.t===TOPICS.length-1?'Fertig! →':'Nächstes Thema →'}</button>`:`<span class="locked-msg">🔒 ${t.exam?'erst abgeben':'erst alles richtig lösen'}</span>`}</div>`;
+      <button class="pen ${done?'':'skip'}" data-nav="1">${info.t===TOPICS.length-1?(done?'Fertig! →':'Zur Übersicht →'):(done?'Nächstes Thema →':'Überspringen →')}</button></div>`;
   } else {
-    h+=`<h1>Geschafft, Bubbel! 🎉</h1><p><span class="stamp">Probeklausur bestanden</span></p>
-    <p>Du hast alle ${TOPICS.length} Themen durchgerechnet. Vor der echten Klausur am besten die Themen nochmal anschauen, bei denen du Hinweise gebraucht hast:</p>
-    <ul>${TOPICS.filter(t=>!t.exam).map((t,k)=>{const n=t.tasks.reduce((a,_,j)=>a+(S.hints[k+'-'+j]||0),0);return `<li>${t.title}: ${n? `<span class="red">${n} Hinweis${n>1?'e':''}</span>`:'<span class="ok">ohne Hinweis ✔</span>'}</li>`}).join('')}</ul>
+    const all=TOPICS.every((_,k)=>isDone(k));
+    h+= all ? `<h1>Geschafft, Bubbel! 🎉</h1><p><span class="stamp">Probeklausur bestanden</span></p>
+    <p>Du hast alle Themen durchgerechnet. Vor der echten Klausur am besten die Themen nochmal anschauen, bei denen du Hinweise gebraucht hast:</p>`
+    : `<h1>Zwischenstand 📋</h1><p>Noch nicht alles erledigt – klick ein Thema an, um direkt hinzuspringen:</p>`;
+    h+=`<ul class="toc">${TOPICS.filter(t=>!t.exam).map((t,k)=>{const n=t.tasks.reduce((a,_,j)=>a+(S.hints[k+'-'+j]||0),0);return `<li data-go="${1+2*k}"><span class="ic">${isDone(k)?'✅':'✏️'}</span>${t.title}: ${!isDone(k)?'<span class="red">noch offen</span>':n? `<span class="red">${n} Hinweis${n>1?'e':''}</span>`:'<span class="ok">ohne Hinweis ✔</span>'}</li>`}).join('')}</ul>
     ${S.exam?`<h3>Abschlussklausur: ${S.exam.pts} / ${S.exam.max} Punkte → Note ${note(S.exam.pts/S.exam.max*100)}</h3>`:''}
     <div class="nav"><button class="pen" data-nav="-1">← zurück</button><span class="pg">Seite ${i+1} / ${NPAGES}</span><button class="pen red" id="reset">Nochmal von vorn</button></div>`;
   }
@@ -904,7 +912,7 @@ function submitExam(ti){
   });
   S.exam={pts:p,max,res}; S.unlocked=NPAGES-1; save();
   $page.querySelector('#examFooter').innerHTML=scoreBox();
-  $page.querySelector('.locked-msg').outerHTML='<button class="pen" data-nav="1">Fertig! →</button>';
+  const nb=$page.querySelector('.nav [data-nav="1"]'); if(nb){ nb.textContent='Fertig! →'; nb.classList.remove('skip'); }
   bind(); progress();
   $page.querySelector('#examFooter').scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -930,10 +938,15 @@ function checkTask(ti,j,el){
 /* ---------- Events ---------- */
 function bind(){
   $page.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>{
-    const n=S.page+ +b.dataset.nav; if(n<0||n>=NPAGES||n>S.unlocked&&n!==NPAGES-1) return;
-    if(n===NPAGES-1 && !TOPICS.every((_,k)=>isDone(k))) return;
+    const n=S.page+ +b.dataset.nav; if(n<0||n>=NPAGES) return;
     S.page=n; save(); render();
   });
+  const lc=$page.querySelector('#loadCode'); if(lc) lc.onclick=()=>{
+    const msg=$page.querySelector('#codeMsg');
+    if(applyCode($page.querySelector('#codeIn').value)){ msg.innerHTML='<span class="ok">Geladen! ✔</span>'; setTimeout(render,700); }
+    else msg.innerHTML='<span class="bad">Der Code stimmt nicht – vertippt?</span>';
+  };
+  const ci=$page.querySelector('#codeIn'); if(ci) ci.addEventListener('keydown',e=>{ if(e.key==='Enter') lc.click(); });
   $page.querySelectorAll('[data-go]').forEach(li=>li.onclick=()=>{ if(li.dataset.go){S.page=+li.dataset.go; save(); render();} });
   const r=$page.querySelector('#reset'); if(r) r.onclick=()=>{ if(confirm('Wirklich alles zurücksetzen?')){ S={page:0,unlocked:2,solved:{},tries:{},hints:{}}; save(); render(); } };
   const se=$page.querySelector('#submitExam'); if(se) se.onclick=()=>{ if(confirm('Klausur wirklich abgeben? Danach kannst du nichts mehr ändern.')) submitExam(pageInfo(S.page).t); };
@@ -959,6 +972,64 @@ function progress(){
   document.getElementById('tbr').textContent=`${done}/${total} Aufgaben${S.exam?' · Klausur ✔':''}`;
   updateSums($page);
 }
+/* ---------- Speicher-Code ---------- */
+const B36='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+function codeFields(){ // feste Reihenfolge aller gespeicherten Felder
+  const f=[['page',5]];
+  TOPICS.forEach((t,ti)=>{
+    if(t.exam){ f.push(['exam',1]); t.tasks.forEach((task,j)=>task.parts.forEach((_,k)=>f.push(['ex',1,ti+'-'+j,k]))); }
+    else t.tasks.forEach((_,j)=>{ f.push(['sol',1,ti+'-'+j]); f.push(['hin',2,ti+'-'+j]); });
+  });
+  return f;
+}
+function checksum(s){ let c=7; for(let i=0;i<s.length;i++) c=(c*31+B36.indexOf(s[i])*(i+3))%1296; return B36[Math.floor(c/36)]+B36[c%36]; }
+function makeCode(){
+  let n=0n, w=0n;
+  codeFields().forEach(([k,b,id,x])=>{
+    let v=0;
+    if(k==='page') v=S.page; else if(k==='exam') v=S.exam?1:0;
+    else if(k==='ex') v=S.exam&&S.exam.res[id]&&S.exam.res[id][x]?1:0;
+    else if(k==='sol') v=S.solved[id]?1:0; else if(k==='hin') v=Math.min(S.hints[id]||0,3);
+    n|=BigInt(v)<<w; w+=BigInt(b);
+  });
+  const body=n.toString(36).toUpperCase();
+  return ('B'+body+checksum(body)).match(/.{1,4}/g).join('-');
+}
+function applyCode(code){
+  const s=String(code||'').toUpperCase().replace(/[^0-9A-Z]/g,'');
+  if(s.length<4||s[0]!=='B') return false;
+  const body=s.slice(1,-2); if(!body||checksum(body)!==s.slice(-2)) return false;
+  let n=0n; for(const c of body) n=n*36n+BigInt(B36.indexOf(c));
+  const NS={page:0,unlocked:NPAGES-1,solved:{},tries:{},hints:{}}, exRes={}; let exam=false;
+  codeFields().forEach(([k,b,id,x])=>{
+    const v=Number(n&((1n<<BigInt(b))-1n)); n>>=BigInt(b);
+    if(k==='page') NS.page=Math.min(v,NPAGES-1); else if(k==='exam') exam=!!v;
+    else if(k==='ex') (exRes[id]=exRes[id]||[])[x]=!!v;
+    else if(k==='sol'&&v) NS.solved[id]=true; else if(k==='hin'&&v) NS.hints[id]=v;
+  });
+  if(exam){ let p=0,max=0; TOPICS.forEach((t,ti)=>{ if(t.exam) t.tasks.forEach((task,j)=>task.parts.forEach((pt,k)=>{max+=pts(pt); if(exRes[ti+'-'+j][k]) p+=pts(pt);})); }); NS.exam={pts:p,max,res:exRes}; }
+  S=NS; save(); return true;
+}
+function showSave(){
+  const code=makeCode(), link=location.origin+location.pathname+'#code='+code;
+  const ov=document.createElement('div'); ov.className='overlay';
+  ov.innerHTML=`<div class="savecard"><h2 style="margin-top:0">💾 Gespeichert!</h2>
+    <p>Schreib dir diesen Code auf (oder mach ein Foto). Auf dem Deckblatt eintippen → du bist wieder genau hier.</p>
+    <div class="code">${code}</div>
+    <p><button class="pen" data-copy="${code}">Code kopieren</button> <button class="pen" data-copy="${link}">Link kopieren</button> <span class="fb" id="copyMsg"></span></p>
+    <p style="font-size:16px;word-break:break-all;color:var(--pencil)">Oder diesen Link öffnen: <a href="${link}">${link}</a></p>
+    <p><button class="mini" id="closeSave">✕ schließen</button></p></div>`;
+  document.body.appendChild(ov);
+  ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  ov.querySelector('#closeSave').onclick=()=>ov.remove();
+  ov.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{
+    try{ await navigator.clipboard.writeText(b.dataset.copy); ov.querySelector('#copyMsg').innerHTML='<span class="ok">kopiert ✔</span>'; }
+    catch(e){ ov.querySelector('#copyMsg').innerHTML='<span class="bad">bitte von Hand abschreiben</span>'; }
+  });
+}
+document.getElementById('saveBtn').onclick=showSave;
+(function(){ const m=location.hash.match(/code=([0-9A-Za-z-]+)/); if(m && applyCode(m[1])) history.replaceState(null,'',location.pathname); })();
+
 $page.addEventListener('input',()=>updateSums($page));
 $page.addEventListener('change',()=>updateSums($page));
 render();
