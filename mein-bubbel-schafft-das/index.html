@@ -769,6 +769,7 @@ function render(){
       <input class="num" id="codeIn" style="width:260px;text-transform:uppercase" placeholder="B…-…-…" autocomplete="off"> <button class="pen" id="loadCode">Weitermachen</button> <span class="fb" id="codeMsg"></span></div>
     <h3>Inhalt <span style="font-size:20px;color:var(--pencil)">(du kannst jedes Thema direkt anklicken)</span></h3><ul class="toc">${TOPICS.map((t,k)=>{const p=1+2*k, done=isDone(k);
       return `<li data-go="${p}"><span class="ic">${done?'✅':'✏️'}</span>${t.exam?'⭐':k+1+'.'} ${t.title}</li>`}).join('')}</ul>
+    <p style="margin-top:18px"><a href="../mein-bubbel-geschaeftsprozesse/" style="font-family:Caveat;font-size:24px;color:var(--ink2)">📒 Zur Probeklausur Geschäftsprozesse →</a></p>
     <div class="nav"><button class="mini" id="reset">↺ alles zurücksetzen</button><button class="pen" data-nav="1">Los geht's →</button></div>`;
   } else if(info.kind==='info'){
     const t=TOPICS[info.t];
