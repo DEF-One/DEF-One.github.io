@@ -5,72 +5,89 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VZ-Plan-Trainer · Übungssimulation Verkehrszeichenpläne (RSA 21)</title>
 <style>
-:root{--mag:#e20074;--bg:#f3f3f6;--card:#fff;--ink:#1b1b1f;--mut:#686874;--ok:#18794e;--okbg:#e6f4ec;--bad:#c62828;--badbg:#fdecec;--warn:#9a5b00;--warnbg:#fff4e0;--line:#dcdce3}
+:root{--mag:#e20074;--bg:#eef0f3;--card:#fff;--ink:#16161a;--mut:#62626e;--ok:#18794e;--okbg:#e6f4ec;--bad:#c62828;--badbg:#fdecec;--warn:#9a5b00;--warnbg:#fff4e0;--line:#d9dbe1}
 *{box-sizing:border-box}
 html,body{margin:0}
-body{font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
-header{background:#141418;color:#fff;padding:10px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:0;z-index:20}
-header h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.2px}
+body{font:15px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:linear-gradient(90deg,#121216,#24242c);color:#fff;padding:10px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:0;z-index:30;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+header .logo{display:flex;align-items:center;gap:10px}
+header h1{font-size:17px;margin:0;font-weight:800;letter-spacing:.2px}
 header .tag{background:var(--mag);padding:2px 8px;border-radius:4px;font-size:12px;font-weight:700}
 nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
 nav button{background:transparent;color:#cfcfd6;border:0;padding:7px 12px;border-radius:6px;cursor:pointer;font:inherit}
-nav button.on{background:#2c2c33;color:#fff}
-main{padding:14px;max-width:1560px;margin:0 auto}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
-.card h2{font-size:16px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
-.step{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--mag);color:#fff;font-size:13px;align-items:center;justify-content:center;flex:none}
+nav button.on{background:#3a3a44;color:#fff}
+main{padding:14px;max-width:1600px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.card h2{font-size:17px;margin:0 0 10px;display:flex;align-items:center;gap:9px}
+.step{display:inline-flex;min-width:26px;height:26px;padding:0 6px;border-radius:13px;background:var(--mag);color:#fff;font-size:13px;align-items:center;justify-content:center;flex:none}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-select,input[type=number]{font:inherit;padding:6px 8px;border:1px solid #c8c8d0;border-radius:6px;background:#fff}
-button.btn{font:inherit;padding:7px 13px;border-radius:7px;border:1px solid #c8c8d0;background:#fff;cursor:pointer}
-button.btn:hover{border-color:#999}
-button.pri{background:var(--mag);border-color:var(--mag);color:#fff;font-weight:600}
-button.pri:hover{filter:brightness(.95)}
-.auftrag{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}
+select,input[type=number]{font:inherit;padding:7px 9px;border:1px solid #c8c8d0;border-radius:7px;background:#fff}
+button.btn{font:inherit;padding:7px 13px;border-radius:8px;border:1px solid #c8c8d0;background:#fff;cursor:pointer}
+button.btn:hover{border-color:#888}
+button.btn.on{background:#1b1b22;color:#fff;border-color:#1b1b22}
+button.pri{background:var(--mag);border-color:var(--mag);color:#fff;font-weight:700}
+.auftrag{display:grid;grid-template-columns:1.3fr 1fr;gap:18px}
 @media(max-width:900px){.auftrag{grid-template-columns:1fr}}
-.auftrag .brief{background:#fafafc;border-left:4px solid var(--mag);padding:10px 14px;border-radius:6px}
-.auftrag .brief b{color:#000}
+.ticket{display:inline-flex;gap:10px;align-items:center;background:#1b1b22;color:#fff;border-radius:7px;padding:5px 12px;margin-bottom:6px}
+.ticket span{background:var(--mag);border-radius:4px;padding:1px 7px;font-size:12px;font-weight:700}
+#brief p{margin:6px 0}
 table.kv{border-collapse:collapse;width:100%;font-size:14px}
-table.kv td{padding:3px 6px;border-bottom:1px solid #eee}
-table.kv td:first-child{color:var(--mut);width:52%}
+table.kv td{padding:4px 6px;border-bottom:1px solid #eee;vertical-align:top}
+table.kv td:first-child{color:var(--mut);width:48%}
 .quiz{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
-.q{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:#fcfcfd}
-.q label{display:block;font-weight:600;margin-bottom:6px}
+.q{border:1px solid var(--line);border-radius:9px;padding:11px 13px;background:#fbfbfc}
+.q label{display:block;font-weight:650;margin-bottom:6px}
 .q select,.q input{width:100%}
-.q .fb{margin-top:8px;font-size:13.5px;padding:7px 9px;border-radius:6px;display:none}
+.q .fb{margin-top:8px;font-size:13.5px;padding:8px 10px;border-radius:7px;display:none}
 .q.ok .fb{display:block;background:var(--okbg);color:#0f4f30}
 .q.bad .fb{display:block;background:var(--badbg);color:#7a1414}
 .q.ok{border-color:#9bd0b3}.q.bad{border-color:#ecaaaa}
-.editor{display:grid;grid-template-columns:250px minmax(0,1fr);gap:12px}
-@media(max-width:1000px){.editor{grid-template-columns:1fr}}
-.palette{display:flex;flex-direction:column;gap:3px;max-height:760px;overflow:auto;padding-right:4px}
-@media(max-width:1000px){.palette{flex-direction:row;flex-wrap:wrap;max-height:none}}
-.palette .grp{font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);margin:8px 2px 2px;font-weight:700}
-.tool{display:flex;align-items:center;gap:8px;padding:5px 7px;border:1px solid transparent;border-radius:7px;cursor:pointer;background:#fff;text-align:left;font:inherit;font-size:13px;line-height:1.25}
-.tool:hover{background:#f4f4f8}
+.editor{display:grid;grid-template-columns:270px minmax(0,1fr);gap:14px}
+@media(max-width:1050px){.editor{grid-template-columns:1fr}}
+.palette{display:flex;flex-direction:column;gap:2px;max-height:820px;overflow:auto;padding-right:4px}
+@media(max-width:1050px){.palette{flex-direction:row;flex-wrap:wrap;max-height:none}}
+.palette .grp{font-size:11.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--mut);margin:10px 2px 3px;font-weight:800}
+.tool{display:flex;align-items:center;gap:9px;padding:5px 8px;border:1px solid transparent;border-radius:8px;cursor:pointer;background:#fff;text-align:left;font:inherit;font-size:13px;line-height:1.25;width:100%}
+.tool:hover{background:#f3f3f7}
 .tool.on{border-color:var(--mag);background:#fde9f3}
 .tool svg{flex:none}
-.mapwrap{border:1px solid var(--line);border-radius:8px;overflow:auto;background:#e9ece6;position:relative}
+.mapwrap{border:1px solid var(--line);border-radius:10px;overflow:auto;background:#dfe5d3;position:relative;max-height:78vh}
+.mapwrap.night{background:#0d1016}
 #map{display:block;touch-action:none;user-select:none}
-.mapbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.mapbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
 .hint{font-size:13px;color:var(--mut)}
-#hover{font-size:13px;background:#1b1b1f;color:#fff;padding:5px 9px;border-radius:6px;min-height:30px}
-.results{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media(max-width:1000px){.results{grid-template-columns:1fr}}
-.chk{border-radius:7px;padding:8px 10px;margin-bottom:7px;font-size:14px;border:1px solid}
+#hover{font-size:13px;background:#1b1b22;color:#fff;padding:6px 10px;border-radius:7px;min-height:32px}
+.infocard{display:flex;gap:18px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px;background:#fbfbfc;min-height:70px}
+.infocard h3{margin:0 0 4px;font-size:16px}.infocard p{margin:0 0 8px;font-size:14px}
+.ic-sign{flex:none;background:#eef0f3;border-radius:10px;padding:6px}
+.results{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:1050px){.results{grid-template-columns:1fr}}
+.scorebox{display:flex;gap:14px;align-items:center;margin-bottom:10px}
+.score{font-size:34px;font-weight:900}
+.chk{border-radius:8px;padding:8px 11px;margin-bottom:7px;font-size:14px;border:1px solid}
 .chk.ok{background:var(--okbg);border-color:#a6d6bb}
 .chk.bad{background:var(--badbg);border-color:#efb3b3}
 .chk.opt{background:var(--warnbg);border-color:#f0cf98}
-.chk b{display:block}
-.chk small{display:block;color:#444;margin-top:2px}
-.score{font-size:28px;font-weight:800}
-.sol ol{padding-left:20px;margin:6px 0}
-.sol li{margin-bottom:6px}
-.wissen h3{margin:18px 0 6px;font-size:16px}
+.chk b{display:block}.chk small{display:block;color:#333;margin-top:2px;font-size:13px}
+.sol ol{padding-left:20px;margin:6px 0}.sol li{margin-bottom:7px}.sol h3{margin:4px 0 6px}
+.netwrap{position:relative;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#e9ecdf}
+#net{display:block}
+.netlegend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:#333;margin-top:8px}
+.netlegend span{display:inline-flex;gap:6px;align-items:center}
+.netlegend i{display:inline-block;width:26px;height:9px;border-radius:5px;border:2px solid}
+#netInfo{font-size:13.5px;padding:7px 10px;border-radius:7px;background:#f3f3f7;margin:8px 0;transition:background .3s}
+#netInfo.flash{background:#ffe0e0}
+.netgrid{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:12px}@media(max-width:1050px){.netgrid{grid-template-columns:1fr}}
+.pop{background:#fbfbfc;border:1px solid var(--line);border-radius:10px;padding:10px;max-height:560px;overflow:auto}
+.pophead{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:6px;gap:6px}
+.wissen h3{margin:20px 0 6px;font-size:16px}
 .wissen table{border-collapse:collapse;width:100%;font-size:14px;margin:6px 0}
-.wissen th,.wissen td{border:1px solid #ddd;padding:5px 8px;text-align:left;vertical-align:top}
+.wissen th,.wissen td{border:1px solid #ddd;padding:6px 9px;text-align:left;vertical-align:top}
 .wissen th{background:#f5f5f8}
-.note{background:var(--warnbg);border:1px solid #f0cf98;padding:9px 12px;border-radius:7px;font-size:14px}
-.pill{display:inline-block;font-size:12px;padding:1px 7px;border-radius:10px;background:#eee;margin-left:4px}
+.note{background:var(--warnbg);border:1px solid #f0cf98;padding:10px 13px;border-radius:8px;font-size:14px}
+.catalog{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.cat{display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fbfbfc;font-size:13px}
+.cat span{color:var(--mut);font-size:12.5px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--mut);margin-top:6px}
 .hidden{display:none!important}
 a{color:#b0005a}
@@ -78,75 +95,86 @@ a{color:#b0005a}
 </head>
 <body>
 <header>
-  <h1>VZ-Plan-Trainer</h1><span class="tag">RSA 21 · innerorts</span>
+  <div class="logo"><svg width="30" height="30" viewBox="-55 -55 110 110" id="logoSign"></svg><h1>VZ-Plan-Trainer</h1><span class="tag">RSA 21 · innerorts</span></div>
   <nav>
     <button data-view="trainer" class="on">Übung</button>
-    <button data-view="wissen">Wissen &amp; Regeln</button>
+    <button data-view="wissen">Wissen, Regeln &amp; Zeichen</button>
     <button data-view="hilfe">Bedienung</button>
   </nav>
 </header>
 <main>
-
-<!-- ===================== TRAINER ===================== -->
 <section id="v-trainer">
   <div class="card">
     <div class="row" style="justify-content:space-between">
-      <div class="row">
-        <select id="lessonSel"></select>
-        <button class="btn pri" id="btnRandom">Zufällige neue Situation</button>
-      </div>
+      <div class="row"><select id="lessonSel"></select><button class="btn pri" id="btnRandom">Zufällige neue Situation</button></div>
       <span class="hint" id="scoreBadge"></span>
     </div>
   </div>
 
   <div class="card">
     <h2><span class="step">0</span> Auftrag</h2>
-    <div class="auftrag">
-      <div class="brief" id="brief"></div>
-      <table class="kv" id="facts"></table>
-    </div>
+    <div class="auftrag"><div id="brief"></div><table class="kv" id="facts"></table></div>
   </div>
 
   <div class="card">
     <h2><span class="step">1</span> Situation analysieren</h2>
-    <p class="hint" style="margin-top:-4px">Rechne zuerst die Restbreiten aus und entscheide die Verkehrsführung. Erst dann zeichnest du.</p>
+    <p class="hint" style="margin-top:-4px">Erst rechnen und entscheiden, dann zeichnen. Jede Antwort wird mit Rechenweg erklärt.</p>
     <div class="quiz" id="quiz"></div>
     <div class="row" style="margin-top:12px"><button class="btn pri" id="btnQuiz">Antworten prüfen</button><span id="quizScore" class="hint"></span></div>
   </div>
 
   <div class="card">
-    <h2><span class="step">2</span> VZ-Plan zeichnen</h2>
+    <h2><span class="step">2</span> Verkehrszeichenplan zeichnen</h2>
     <div class="editor">
       <div class="palette" id="palette"></div>
-      <div>
+      <div style="min-width:0">
         <div class="mapbar">
           <button class="btn" id="btnUndo" title="Strg+Z">↶ Rückgängig</button>
           <button class="btn" id="btnClear">Alles löschen</button>
           <label class="hint">Zoom <input type="range" id="zoom" min="0.6" max="1.8" step="0.1" value="1"></label>
+          <label class="hint"><input type="checkbox" id="nightChk"> 🌙 Nachtansicht</label>
           <label class="hint"><input type="checkbox" id="showSol"> Musterlösung einblenden</label>
         </div>
-        <div id="hover">Fahr mit der Maus über den Plan: Position und Abstand zur Arbeitsstelle werden hier angezeigt.</div>
-        <div class="mapwrap" style="margin-top:6px"><svg id="map" xmlns="http://www.w3.org/2000/svg"></svg></div>
-        <div class="legend">
-          <span>Maßstab: Länge 1 m ≙ 7 px, Breite 1 m ≙ 26 px (quer überhöht, wie in üblichen VZ-Plänen)</span>
-          <span>Untere Skala: Abstand zur Arbeitsstelle in m</span>
-          <span><b style="color:#18794e">grün</b> = Musterlösung</span>
-        </div>
+        <div id="hover">Fahr mit der Maus über den Plan: Position und Abstand zur Arbeitsstelle erscheinen hier.</div>
+        <div class="mapwrap" id="mapwrap" style="margin-top:6px"><svg id="map" xmlns="http://www.w3.org/2000/svg"></svg></div>
+        <div class="legend"><span>Schilder: Punkt = Fußplatte / Standort, Schild steht rechts in Fahrtrichtung</span><span>Untere Skala: Abstand zur Arbeitsstelle</span><span><b style="color:#18794e">grün</b> = Musterlösung</span></div>
+        <div class="infocard" id="infocard"></div>
       </div>
+    </div>
+  </div>
+
+  <div class="card hidden" id="netCard">
+    <h2><span class="step">2b</span> Umleitungsplan</h2>
+    <p class="hint" style="margin-top:-4px">Die Straße wird voll gesperrt (rot schraffiert zwischen A und B). Lege für <b>jede Fahrtrichtung</b> eine zulässige Umleitung fest und beschildere sie lückenlos. Achte auf Einbahnstraßen, Fußgängerzone, verkehrsberuhigte Bereiche, enge Straßen und Gewichtsverbote.</p>
+    <div class="row">
+      <b>Richtung:</b>
+      <button class="btn" data-ndir="WE">➜ West → Ost (blau)</button>
+      <button class="btn" data-ndir="EW">⬅ Ost → West (violett)</button>
+      <span style="width:12px"></span>
+      <b>Werkzeug:</b>
+      <button class="btn" data-ntool="route">Strecke zeichnen</button>
+      <button class="btn" data-ntool="signs">Schilder setzen</button>
+      <button class="btn" id="netClear">Richtung zurücksetzen</button>
+      <label class="hint"><input type="checkbox" id="netSolChk"> Musterlösung</label>
+    </div>
+    <div id="netInfo"></div>
+    <div class="netgrid"><div class="netwrap" id="netWrap"><svg id="net" xmlns="http://www.w3.org/2000/svg"></svg></div><div class="pop" id="netPop"></div></div>
+    <div class="netlegend">
+      <span><i style="background:#ffe08a;border-color:#b8902a"></i>Hauptverkehrsstraße</span>
+      <span><i style="background:#fff;border-color:#a9a9a9"></i>Wohnstraße</span>
+      <span><i style="background:#efe1c6;border-color:#c8b48a"></i>Fußgängerzone</span>
+      <span><i style="background:#d9efd2;border-color:#8fbf83"></i>Verkehrsberuhigter Bereich</span>
+      <span>🔷 Pfeil = Einbahnstraße</span><span>⭕ 7,5t = Z 262</span><span>▭ 3,80 m = enge Fahrbahn</span>
     </div>
   </div>
 
   <div class="card">
     <h2><span class="step">3</span> Prüfen &amp; Musterlösung</h2>
     <div class="row"><button class="btn pri" id="btnCheck">Plan prüfen</button><button class="btn" id="btnSol">Musterlösung erklären</button></div>
-    <div class="results" style="margin-top:12px">
-      <div id="checks"></div>
-      <div id="solution" class="sol"></div>
-    </div>
+    <div class="results" style="margin-top:12px"><div id="checks"></div><div id="solution" class="sol"></div></div>
   </div>
 </section>
 
-<!-- ===================== WISSEN ===================== -->
 <section id="v-wissen" class="hidden">
 <div class="card wissen">
 <h2>Wissen &amp; Regeln: Absicherung innerorts nach RSA 21 (Teil B)</h2>
@@ -259,8 +287,29 @@ a{color:#b0005a}
 <tr><td>Gehweg 1,30 / 1,00 m, Fahrstreifen 3,00 / 2,85 m, Begegnung 6,00 / 5,70 m, Wechselverkehr 3,00 m, Leitbaken 9 m, S<sub>Q</sub> 0,30 / 0,50 m, Z 131 innerorts</td><td><b>Bestätigt.</b></td></tr>
 </table>
 
+<h3>8a. Umleitung bei Vollsperrung</h3>
+<table>
+<tr><th>Zeichen</th><th>Wo?</th></tr>
+<tr><td><b>Z 457.1</b> Umleitungsankündigung (gelb, „Umleitung“)</td><td>Vor dem Beginn der Umleitung, i. d. R. am Knoten vor der Abzweigung</td></tr>
+<tr><td><b>Z 455.1</b> Ankündigung/Fortsetzung („U“ + Pfeil): -11 hier links, -21 hier rechts, -30 geradeaus</td><td>An <b>jedem</b> Abbiegepunkt; an Kreuzungen, an denen die Route geradeaus weitergeht, als Fortsetzung</td></tr>
+<tr><td><b>Z 454</b> Umleitungswegweiser (pfeilförmig, -10 links / -20 rechts)</td><td>Alternativ zu Z 455.1 an Abbiegepunkten</td></tr>
+<tr><td><b>Z 457.2</b> Ende der Umleitung (roter Schrägbalken)</td><td>Nach dem Wiedereinmünden in die gesperrte Straße hinter der Arbeitsstelle</td></tr>
+<tr><td><b>Z 458</b> Planskizze</td><td>Optional vor größeren Knoten, zeigt den Verlauf schematisch</td></tr>
+</table>
+<ul>
+<li>Jede Fahrtrichtung bekommt eine <b>eigene</b>, vollständig beschilderte Route. Einbahnstraßen können dazu führen, dass Hin- und Rückweg verschieden sind.</li>
+<li>Die Umleitung soll kurz sein und über leistungsfähige Straßen führen. <b>Nicht</b> zulässig sind Fußgängerzonen, verkehrsberuhigte Bereiche und Einbahnstraßen gegen die Fahrtrichtung. Für Bus- und Lkw-Verkehr scheiden auch enge Straßen und Straßen mit Gewichtsverbot (Z 262) aus.</li>
+<li>Bei der Behörde gehört ein eigener <b>Umleitungsplan</b> zum Antrag. Die Strecke vorher abfahren und mit Linienbus- und Entsorgungsbetrieben abstimmen.</li>
+<li>Bei Vollsperrung: Z 123 aus allen Richtungen, auch aus Seitenstraßen mit Zz 1000-11/-21 (Freiburger Leitfaden).</li>
+</ul>
+
+<h3>Zeichenkatalog</h3>
+<div id="catalog" class="catalog"></div>
+
 <h3>Quellen</h3>
 <ul>
+<li><a href="https://www.bussgeldkatalog.org/umleitung/" target="_blank">Bußgeldkatalog.org: Umleitungsschilder (455.1, 457.1)</a></li>
+<li><a href="https://verkehrsblatt.de/pdf/VZ_Kat_Prospekt.pdf" target="_blank">Verkehrsblatt: VzKat-Auszug (Z 454, 455.1, 457.1/2)</a></li>
 <li><a href="https://www.fgsv-verlag.de/pub/media/pdf/Regelplaene_B_Auszug_RSA_2021_FGSV%20370.pdf" target="_blank">FGSV: Regelpläne Teil B (Auszug RSA 2021)</a></li>
 <li><a href="https://www.bgbau.de/fileadmin/bgbau/Uebersicht_wesentliche_Aenderungen_RSA_21.pdf" target="_blank">BG BAU: Übersicht wesentliche Änderungen RSA 21</a></li>
 <li><a href="https://lhm.muenchen.swm.de/dam/jcr:3989c9da-bc3f-4bcb-845a-f972ae6875af/Regelplan-MOR-A-21.pdf" target="_blank">Landeshauptstadt München: Regelplan MOR A 21 (und weitere MOR-Pläne)</a></li>
@@ -275,7 +324,6 @@ a{color:#b0005a}
 </div>
 </section>
 
-<!-- ===================== HILFE ===================== -->
 <section id="v-hilfe" class="hidden">
 <div class="card wissen">
 <h2>Bedienung</h2>
@@ -285,819 +333,19 @@ a{color:#b0005a}
 <li><b>Analysieren:</b> Restbreiten ausrechnen, Verkehrsführung wählen, „Antworten prüfen“. Jede Antwort wird mit Rechenweg erklärt.</li>
 <li><b>Zeichnen:</b> links ein Element wählen und in den Plan klicken. <b>Gitter</b> zieht man mit gedrückter Maustaste als Linie, sie rasten waagerecht oder senkrecht ein.</li>
 <li><b>Verschieben:</b> Werkzeug „Auswählen / Verschieben“, Element ziehen. <b>Löschen:</b> Element anklicken und Entf drücken, oder den Radierer benutzen. Strg+Z macht den letzten Schritt rückgängig.</li>
+<li><b>Nachtansicht:</b> zeigt, ob die Absperrung im Dunkeln lückenlos durch Warnleuchten erkennbar ist.</li>
+<li><b>Umleitungsplan</b> (nur bei Vollsperrung): Richtung wählen, mit „Strecke zeichnen“ von A bzw. B Knoten für Knoten klicken, dann mit „Schilder setzen“ an jedem Knoten die Umleitungszeichen wählen.</li>
 <li><b>Prüfen:</b> zeigt jede Anforderung mit ✓/✗ und Begründung. Danach lässt sich die Musterlösung grün einblenden.</li>
 </ol>
 <p>Verkehrsrichtung: Es gilt Rechtsverkehr. Auf der oberen Fahrbahnhälfte fährt der Verkehr nach <b>links (Westen)</b>, auf der unteren nach <b>rechts (Osten)</b>. Schilder gehören <b>rechts in Fahrtrichtung</b>: für den Verkehr nach Westen also oben, für den Verkehr nach Osten unten.</p>
 </div>
 </section>
 </main>
-
-<script>
-"use strict";
-/* ============================================================
-   Grundlagen
-   ============================================================ */
-const $ = s => document.querySelector(s);
-const fmt = (v, d = 2) => (Math.round(v * 100) / 100).toFixed(d).replace('.', ',');
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-let rnd = Math.random;
-const pick = a => a[Math.floor(rnd() * a.length)];
-const rr = (a, b, st = 0.1) => Math.round((a + rnd() * (b - a)) / st) * st;
-
-const STREETS = ['Lindenstraße','Bahnhofstraße','Schulstraße','Gartenstraße','Hauptstraße','Kirchweg','Rosenstraße','Mühlweg','Bergstraße','Parkstraße','Ahornweg','Talstraße','Uhlandstraße','Schillerstraße','Kepplerstraße'];
-const CITIES = ['70173 Stuttgart','70565 Stuttgart','71032 Böblingen','73728 Esslingen','71634 Ludwigsburg','70806 Kornwestheim','72072 Tübingen'];
-const REASONS = ['Glasfaser-Hausanschluss: Kopfloch an der Fassade','Hausanschlussgrube Glasfaser vor dem Gebäude','Leitungsgraben vom Gebäude bis in die Fahrbahn','Glasfaser-Hausanschluss mit Querung bis zur Trasse','Muffengrube für Glasfaserkabel'];
-
-/* ---------- Lektionen ---------- */
-const LESSONS = [
- {t:'1 · Gehweg-Teilsperrung (Restgehweg reicht)', p:{gN:3.5,pN:0,F:6.5,pS:0,gS:2.5,speed:50,vol:'gering',oneway:false,len:12,wy1:1.8}},
- {t:'2 · Gehweg voll gesperrt → Notweg auf Parkstreifen', p:{gN:2.2,pN:2.0,F:6.5,pS:0,gS:2.5,speed:50,vol:'gering',oneway:false,len:15,wy1:2.2}},
- {t:'3 · Notweg auf breiter Fahrbahn, Begegnungsverkehr', p:{gN:2.0,pN:0,F:8.5,pS:2.0,gS:2.5,speed:50,vol:'hoch',oneway:false,len:10,wy1:2.0}},
- {t:'4 · Engstelle mit Vorrangregelung Z 208 / Z 308', p:{gN:2.5,pN:0,F:6.0,pS:0,gS:2.0,speed:30,vol:'gering',oneway:false,len:20,wy1:3.5}},
- {t:'5 · Wechselverkehr mit Baustellen-LSA', p:{gN:2.5,pN:0,F:6.5,pS:2.0,gS:2.5,speed:50,vol:'hoch',oneway:false,len:35,wy1:3.3}},
- {t:'6 · Schmale Straße → Vollsperrung + Umleitung', p:{gN:2.0,pN:0,F:5.0,pS:0,gS:2.0,speed:30,vol:'gering',oneway:false,len:14,wy1:4.5}},
- {t:'7 · Schmaler Gehweg, Einbahnstraße → Fußgänger gegenüber', p:{gN:1.6,pN:0,F:4.2,pS:0,gS:2.2,speed:30,vol:'gering',oneway:true,len:12,wy1:1.6}},
- {t:'8 · Einbahnstraße mit Parkstreifen, Graben bis in die Fahrbahn', p:{gN:2.5,pN:2.0,F:5.0,pS:0,gS:2.5,speed:30,vol:'gering',oneway:true,len:9,wy1:5.5}},
-];
-
-/* ---------- Elementtypen ---------- */
-const TYPES = {
-  move:{label:'Auswählen / Verschieben', grp:'Werkzeuge'},
-  erase:{label:'Radierer', grp:'Werkzeuge'},
-  z123:{label:'Z 123 Arbeitsstelle', grp:'Verkehrszeichen', sign:true},
-  z208:{label:'Z 208 Vorrang des Gegenverkehrs', grp:'Verkehrszeichen', sign:true},
-  z308:{label:'Z 308 Vorrang vor dem Gegenverkehr', grp:'Verkehrszeichen', sign:true},
-  z283:{label:'Z 283 Haltverbot + Zz (Zeitraum, Anfang/Ende)', grp:'Verkehrszeichen', sign:true},
-  z250:{label:'Z 250 Verbot für Fahrzeuge aller Art', grp:'Verkehrszeichen', sign:true},
-  z259:{label:'Zz 1000-12/-22 „Fußgänger Gehweg gegenüber benutzen“ (am Gitter)', grp:'Verkehrszeichen', sign:true},
-  z121:{label:'Z 121 Einseitig verengte Fahrbahn (optional)', grp:'Verkehrszeichen', sign:true},
-  z274:{label:'Z 274 Höchstgeschwindigkeit (optional)', grp:'Verkehrszeichen', sign:true},
-  uml:{label:'Umleitungsbeschilderung', grp:'Verkehrszeichen', sign:true},
-  lsa:{label:'Signalgeber Baustellen-LSA (mit Haltebalken)', grp:'Lichtsignal / Querung'},
-  flsa:{label:'Fußgänger-LSA / sichere Querungsstelle', grp:'Lichtsignal / Querung'},
-  bake:{label:'Leitbake Z 605', grp:'Absperrung'},
-  bakewl:{label:'Leitbake Z 605 + gelbe Warnleuchte', grp:'Absperrung'},
-  g100:{label:'Absperrschrankengitter 100 mm + Tastleiste (Gehweg) – ziehen', grp:'Absperrung', line:true},
-  g250:{label:'Absperrschrankengitter 250 mm (Fahrbahn) – ziehen', grp:'Absperrung', line:true},
-  wlg:{label:'Warnleuchte gelb (Dauerlicht)', grp:'Leuchten'},
-  wlr:{label:'Warnleuchte rot (Dauerlicht)', grp:'Leuchten'},
-};
-
-function glyph(t, s = 1) {
-  const g = (inner) => `<g transform="scale(${s})">${inner}</g>`;
-  switch (t) {
-    case 'z123': return g(`<path d="M0-11 L10.5 7.5 L-10.5 7.5Z" fill="#fff" stroke="#d40000" stroke-width="2.6" stroke-linejoin="round"/><circle cx="-1.5" cy="-3" r="1.6"/><path d="M-5 5 L-1.5 -0.5 L1.8 5 M-1.5 -0.5 L3 -1.5 L5 4.5" stroke="#000" stroke-width="1.4" fill="none"/><path d="M-6 5.5 h4" stroke="#000" stroke-width="1.6"/>`);
-    case 'z121': return g(`<path d="M0-11 L10.5 7.5 L-10.5 7.5Z" fill="#fff" stroke="#d40000" stroke-width="2.6" stroke-linejoin="round"/><path d="M-3 5 V-1 L-1 -4 V-6 M3 5 V-6" stroke="#000" stroke-width="1.5" fill="none"/>`);
-    case 'z208': return g(`<circle r="10" fill="#fff" stroke="#d40000" stroke-width="2.6"/><path d="M-3.5 6 V-5 M-6 -2 L-3.5 -6 L-1 -2" stroke="#000" stroke-width="1.8" fill="none"/><path d="M3.5 -6 V5 M1 2 L3.5 6 L6 2" stroke="#d40000" stroke-width="1.8" fill="none"/>`);
-    case 'z308': return g(`<rect x="-10" y="-10" width="20" height="20" rx="2" fill="#1d5fb4" stroke="#fff" stroke-width="1"/><path d="M-3.5 7 V-6 M-6.5 -2.5 L-3.5 -7 L-0.5 -2.5" stroke="#fff" stroke-width="2.4" fill="none"/><path d="M4 -5 V4 M2 1.5 L4 5 L6 1.5" stroke="#d40000" stroke-width="1.5" fill="none"/>`);
-    case 'z283': return g(`<circle r="10" fill="#1d5fb4" stroke="#d40000" stroke-width="2.8"/><path d="M-6.5-6.5 L6.5 6.5 M6.5-6.5 L-6.5 6.5" stroke="#d40000" stroke-width="2.8"/>`);
-    case 'z250': return g(`<circle r="10" fill="#fff" stroke="#d40000" stroke-width="3"/>`);
-    case 'z259': return g(`<rect x="-11" y="-7" width="22" height="14" rx="1.5" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="-6" cy="-3.5" r="1.3"/><path d="M-6 -2 V2 M-6 2 L-8 5.5 M-6 2 L-4 5.5 M-8.5 0 H-3.5" stroke="#000" stroke-width="1.2" fill="none"/><path d="M-1 4 C3 4 6 2 6 -3 M3.5 -1 L6 -4 L8.5 -1" stroke="#000" stroke-width="1.4" fill="none"/>`);
-    case 'z274': return g(`<circle r="10" fill="#fff" stroke="#d40000" stroke-width="2.6"/><text y="3.8" text-anchor="middle" font-size="10" font-weight="700" font-family="Arial">30</text>`);
-    case 'uml': return g(`<rect x="-11" y="-7" width="22" height="14" rx="1.5" fill="#ffd200" stroke="#000" stroke-width="1"/><text x="-5" y="4" text-anchor="middle" font-size="9" font-weight="800" font-family="Arial">U</text><path d="M0 0 H8 M5 -3 L8 0 L5 3" stroke="#000" stroke-width="1.6" fill="none"/>`);
-    case 'lsa': return g(`<rect x="-4.5" y="-11" width="9" height="20" rx="2" fill="#222"/><circle cy="-6" r="2.3" fill="#e33"/><circle cy="-1" r="2.3" fill="#fb0"/><circle cy="4" r="2.3" fill="#2c3"/>`);
-    case 'flsa': return g(`<rect x="-4.5" y="-11" width="9" height="20" rx="2" fill="#222"/><circle cy="-5" r="2.6" fill="#e33"/><circle cy="3" r="2.6" fill="#2c3"/><path d="M-11 9 h22" stroke="#fff" stroke-width="2" stroke-dasharray="2 2"/>`);
-    case 'bake': return g(`<rect x="-3.5" y="-10" width="7" height="20" fill="#fff" stroke="#c00" stroke-width="1"/><path d="M-3.5 -6 L3.5 -10 M-3.5 0 L3.5 -4 M-3.5 6 L3.5 2 M-3.5 10 L3.5 8" stroke="#d40000" stroke-width="2.4"/>`);
-    case 'bakewl': return g(`<rect x="-3.5" y="-8" width="7" height="18" fill="#fff" stroke="#c00" stroke-width="1"/><path d="M-3.5 -4 L3.5 -8 M-3.5 2 L3.5 -2 M-3.5 8 L3.5 4" stroke="#d40000" stroke-width="2.4"/><circle cy="-11" r="3.4" fill="#ffc400" stroke="#6b5000" stroke-width="1"/>`);
-    case 'wlg': return g(`<circle r="4.2" fill="#ffc400" stroke="#6b5000" stroke-width="1.1"/>`);
-    case 'wlr': return g(`<circle r="4.2" fill="#e31b1b" stroke="#600" stroke-width="1.1"/>`);
-    case 'g100': return g(`<rect x="-11" y="-3" width="22" height="6" fill="url(#rw)" stroke="#900" stroke-width=".6"/>`);
-    case 'g250': return g(`<rect x="-11" y="-4.5" width="22" height="9" fill="url(#rw)" stroke="#900" stroke-width=".9"/>`);
-    case 'move': return `<path d="M-6-8 L6 2 L1 2.5 L4 8 L1.5 9 L-1 3.5 L-5 7Z" fill="#333"/>`;
-    case 'erase': return `<path d="M-8 3 L1-7 L8 0 L-1 9 H-5Z" fill="#f4a" stroke="#333"/>`;
-  }
-  return '';
-}
-const SHORT = {z123:'123',z208:'208',z308:'308',z283:'283',z250:'250',z259:'1000-12',z121:'121',z274:'274',uml:'U',lsa:'LSA',flsa:'F-LSA'};
-
-/* ============================================================
-   Szenario & Löser
-   ============================================================ */
-let S = null, R = null, items = [], undoStack = [], sel = null, tool = 'move', lessonIdx = 0;
-
-function makeScenario(p) {
-  const s = Object.assign({}, p);
-  s.street = s.street || pick(STREETS);
-  s.nr = s.nr || (2 + Math.floor(rnd() * 60));
-  s.city = s.city || pick(CITIES);
-  s.reason = s.reason || pick(REASONS);
-  s.days = s.days || (2 + Math.floor(rnd() * 12));
-  s.wy1 = Math.round(s.wy1 * 100) / 100;
-  s.x0 = 72; s.x1 = s.x0 + s.len; s.L = s.x1 + 72;
-  s.r0 = s.gN + s.pN; s.r1 = s.r0 + s.F;
-  s.yEnd = s.r1 + s.pS + s.gS;
-  return s;
-}
-
-function randomParams() {
-  const type = pick(['teil','park','fahrbahn','wechsel','wechsel','voll','eng','oneway']);
-  const p = {speed: pick([30, 50, 50]), vol: pick(['gering','hoch']), oneway:false, pS: pick([0,0,2.0]), gS: rr(1.8, 3.5)};
-  switch (type) {
-    case 'teil': p.gN = rr(2.8,4.5); p.pN = pick([0,2.0]); p.F = rr(5.5,8.5); p.wy1 = rr(0.8, p.gN-1.0); p.len = rr(6,25,1); break;
-    case 'park': p.gN = rr(1.8,2.6); p.pN = 2.0; p.F = rr(5.5,7.5); p.wy1 = p.gN; p.len = rr(8,30,1); break;
-    case 'fahrbahn': p.gN = rr(1.8,2.6); p.pN = 0; p.F = rr(7.6,9.5); p.wy1 = p.gN; p.len = rr(6,25,1); break;
-    case 'wechsel': p.gN = rr(2.0,3.0); p.pN = pick([0,0,2.0]); p.F = rr(5.8,7.0); p.wy1 = p.gN + p.pN + rr(0.4,1.6); p.len = rr(8,70,1); break;
-    case 'voll': p.gN = rr(1.8,2.5); p.pN = 0; p.F = rr(4.5,5.6); p.wy1 = p.gN + rr(2.0,3.0); p.len = rr(6,20,1); break;
-    case 'eng': p.gN = rr(1.5,1.9); p.pN = 0; p.F = rr(4.0,4.5); p.wy1 = p.gN; p.oneway = true; p.len = rr(6,20,1); break;
-    case 'oneway': p.oneway = true; p.gN = rr(2.0,3.0); p.pN = pick([0,2.0]); p.F = rr(4.5,6.0); p.wy1 = p.gN + p.pN + rr(0,1.2); p.len = rr(6,30,1); break;
-  }
-  return p;
-}
-
-const PED_OPTS = {
-  'rest':'Restgehweg reicht (≥ 1,30 m)',
-  'rest-eng':'Restgehweg als kurze Engstelle (≥ 1,00 m, max. ca. 10 m lang)',
-  'notweg-park':'Notweg auf dem Parkstreifen',
-  'notweg-fahrbahn':'Notweg auf der Fahrbahn',
-  'andere-seite':'Fußgänger auf die andere Straßenseite (Zz 1000-12/-22, sichere Querung)'
-};
-const VEH_OPTS = {
-  'frei':'Fahrbahn bleibt voll nutzbar (nur Abgrenzung am Parkstreifen / keine Maßnahme)',
-  'begegnung':'Begegnungsverkehr bleibt möglich (Restfahrbahn ≥ 6,00 m)',
-  'begegnung-ausnahme':'Begegnungsverkehr nur ausnahmsweise (5,70 – 6,00 m)',
-  'einstreifig':'Einbahnstraße bleibt einstreifig befahrbar (≥ 3,00 m)',
-  'vorrang':'Wechselverkehr mit Vorrangregelung Z 208 / Z 308',
-  'lsa':'Wechselverkehr mit Baustellen-Lichtsignalanlage',
-  'voll':'Vollsperrung (Z 250) mit Umleitung'
-};
-
-function z123Range(s) {
-  if (s.speed < 50) return {a:10, b:30, why:'Tabelle B-1 der RSA 21: bei zul. Höchstgeschwindigkeit unter 50 km/h 10–30 m'};
-  if (s.vol === 'gering') return {a:30, b:50, why:'Regelplan B I/1 (Straße mit geringer Verkehrsstärke): 30–50 m'};
-  return {a:50, b:70, why:'Tabelle B-1 der RSA 21: Straße mit zwei Fahrstreifen 50–70 m'};
-}
-function solve(s) {
-  const SQ = s.speed >= 50 ? 0.5 : 0.3;
-  const r0 = s.r0, r1 = s.r1;
-  const intr = b => (b == null ? 0 : Math.max(0, b - r0));
-  const r = {SQ, ex:{}};
-  const workOut = s.wy1 > s.gN + 0.001;
-  const bake0 = workOut ? s.wy1 + SQ : null;
-  const rest0 = +(s.F - intr(bake0)).toFixed(2);
-  const restG = +Math.max(0, s.gN - s.wy1).toFixed(2);
-  r.restG = restG;
-  const voll = rest0 < 3.0;
-  let ped;
-  const bN = s.wy1 + 1.55;
-  if (restG >= 1.30) ped = 'rest';
-  else if (restG >= 1.00 && s.len <= 10) ped = 'rest-eng';
-  else if (voll) ped = 'andere-seite';
-  else if (bN <= r0 + 0.001) ped = 'notweg-park';
-  else if (s.F - intr(bN) >= 3.0) ped = 'notweg-fahrbahn';
-  else ped = 'andere-seite';
-  r.ped = ped;
-  const notweg = ped.startsWith('notweg');
-  r.notweg = notweg;
-  r.bakeLine = notweg ? bN : bake0;
-  r.intr = +intr(r.bakeLine).toFixed(2);
-  r.rest = voll ? rest0 : +(s.F - r.intr).toFixed(2);
-  let veh;
-  if (voll) veh = 'voll';
-  else if (r.intr <= 0) veh = 'frei';
-  else if (s.oneway) veh = 'einstreifig';
-  else if (r.rest >= 6.0) veh = 'begegnung';
-  else if (r.rest >= 5.7) veh = 'begegnung-ausnahme';
-  else veh = (s.len <= 50 && s.vol === 'gering') ? 'vorrang' : 'lsa';
-  r.veh = veh;
-  r.needBaken = r.bakeLine != null && veh !== 'voll';
-  r.needHV = s.pN > 0 && (s.wy1 > s.gN + 0.001 || (r.bakeLine != null && r.bakeLine > s.gN));
-  r.needZ123 = r.bakeLine != null || veh === 'voll';
-  r.size = s.speed < 50 ? 'mix' : '2';
-  r.z = z123Range(s);
-  r.dirs = s.oneway ? ['E'] : ['W','E'];
-  r.approach = s.oneway ? 'x0' : 'x1';
-
-  /* --- Erklärtexte --- */
-  const wIn = Math.max(0, s.wy1 - s.r0);
-  r.ex.restG = restG > 0
-    ? `Gehweg ${fmt(s.gN)} m − Arbeitsbereich ${fmt(s.wy1)} m = <b>${fmt(restG)} m</b> Restgehweg.`
-    : `Der Arbeitsbereich (${fmt(s.wy1)} m ab Hauswand) ist mindestens so breit wie der Gehweg (${fmt(s.gN)} m). Restgehweg = <b>0,00 m</b>, der Gehweg ist komplett gesperrt.`;
-  const pedEx = {
-    'rest': `Restgehweg ${fmt(restG)} m ≥ 1,30 m (Regelmaß RSA 21, Teil B 2.4). Fußgänger bleiben auf dem Gehweg. Absperrung: Gitter 100 mm mit Tastleiste quer und längs, gelbe Warnleuchten.`,
-    'rest-eng': `Restgehweg ${fmt(restG)} m liegt unter 1,30 m, aber über 1,00 m. Die Engstelle ist nur ${s.len} m lang (kurze Engstelle), das geht ausnahmsweise. Mit der Behörde abstimmen.`,
-    'notweg-park': `Der Gehweg ist zu (Rest ${fmt(restG)} m < 1,30 m). Der Parkstreifen (${fmt(s.pN)} m) nimmt den Notweg auf: 1,30 m + 0,25 m Gitter/Leitbake = ${fmt(1.55)} m passen hinein. Dafür ist ein <b>Haltverbot Z 283</b> nötig, Bordstein mit Anrampung.`,
-    'notweg-fahrbahn': `Der Gehweg ist zu (Rest ${fmt(restG)} m < 1,30 m). Der Notweg (1,30 m) liegt auf der Fahrbahn, abgegrenzt mit Gitter 100 mm und Leitbaken. Es bleiben ${fmt(s.F - Math.max(0, bN - s.r0))} m ≥ 3,00 m für den Fahrverkehr, also ist der Notweg möglich.`,
-    'andere-seite': voll
-      ? `Die Fahrbahn wird voll gesperrt und der Gehweg ist zu. Fußgänger werden auf den gegenüberliegenden Gehweg geleitet: Zusatzzeichen 1000-12/-22 „Gehweg gegenüber benutzen“ am Absperrschrankengitter am letzten sicheren Querungspunkt, dazu eine sichere Querungsstelle. Ein Notweg auf der gesperrten Fahrbahn ist in Absprache mit der Behörde auch denkbar.`
-      : `Der Gehweg ist zu, und ein Notweg (1,55 m inkl. Absperrung) würde die Restfahrbahn unter 3,00 m drücken (${fmt(s.F - Math.max(0, bN - s.r0))} m). Fußgänger müssen deshalb auf die <b>andere Straßenseite</b>: Zusatzzeichen 1000-12/-22 „Gehweg gegenüber benutzen“ an beiden Enden am Gitter. Eine <b>Überquerungshilfe ist zu prüfen</b> (RSA 21, B 2.4.5), je nach Verkehr z. B. Fußgänger-LSA. Einige Länder (z. B. Bayern) leiten aus den Regelplänen dann eine LSA ab.`
-  };
-  r.ex.ped = pedEx[ped];
-  let restEx;
-  if (r.bakeLine == null) restEx = `Die Arbeitsstelle bleibt auf dem Gehweg. Die Fahrbahn bleibt voll: <b>${fmt(s.F)} m</b>.`;
-  else {
-    const parts = [];
-    if (notweg) parts.push(`Arbeitsbereich bis ${fmt(s.wy1)} m + Notweg 1,30 m + 0,25 m Gitter/Leitbake → Leitbakenlinie bei ${fmt(r.bakeLine)} m ab Hauswand`);
-    else parts.push(`Arbeitsbereich bis ${fmt(s.wy1)} m + Sicherheitsabstand S<sub>Q</sub> ${fmt(SQ)} m (ASR A5.2 bei ${s.speed} km/h) → Leitbakenlinie bei ${fmt(bake0)} m ab Hauswand`);
-    parts.push(`Fahrbahn beginnt bei ${fmt(s.r0)} m (Gehweg${s.pN ? ' + Parkstreifen' : ''}) → Eingriff in die Fahrbahn ${fmt(voll ? intr(bake0) : r.intr)} m`);
-    parts.push(`Restfahrbahn = ${fmt(s.F)} − ${fmt(voll ? intr(bake0) : r.intr)} = <b>${fmt(r.rest)} m</b>`);
-    restEx = parts.join('<br>');
-  }
-  r.ex.restF = restEx;
-  const vehEx = {
-    'frei': r.bakeLine != null ? `Die Fahrbahn wird nicht eingeengt (Leitbakenlinie im Parkstreifen). Zur Fahrbahn trotzdem Leitbaken (max. 9 m Abstand) und eine Querabsperrung mit Leitbaken und gelben Warnleuchten.` : `Kein Eingriff in die Fahrbahn. Für den Fahrverkehr sind keine Maßnahmen nötig.`,
-    'begegnung': `Restfahrbahn ${fmt(r.rest)} m ≥ 6,00 m (2 × 3,00 m Fahrstreifen). Begegnungsverkehr bleibt möglich.`,
-    'begegnung-ausnahme': `Restfahrbahn ${fmt(r.rest)} m liegt zwischen 5,70 und 6,00 m. Begegnungsverkehr ist nur ausnahmsweise möglich (2 × 2,85 m), mit der Behörde abstimmen.`,
-    'einstreifig': `Einbahnstraße: Restfahrbahn ${fmt(r.rest)} m ≥ 3,00 m reicht für einen Fahrstreifen.`,
-    'vorrang': `Restfahrbahn ${fmt(r.rest)} m: weniger als 5,70 m, also kein Begegnungsverkehr, aber ≥ 3,00 m, also einstreifiger Wechselverkehr. Die Engstelle ist ${s.len} m lang (≤ 50 m), aus beiden Richtungen überschaubar, und bei ${s.vol}em Verkehr ist kein nennenswerter Rückstau zu erwarten. Deshalb reicht eine Vorrangregelung (RSA 21, B 2.3.4): <b>Z 208</b> für die Richtung mit dem Hindernis (Verkehr nach Westen, obere Seite), <b>Z 308</b> für die Gegenrichtung.`,
-    'lsa': `Restfahrbahn ${fmt(r.rest)} m: unter 5,70 m, also kein Begegnungsverkehr, aber ≥ 3,00 m, also Wechselverkehr. ${s.len > 50 ? `Engstelle ${s.len} m lang (> ca. 50 m)` : `${s.vol === 'hoch' ? 'Hohe Verkehrsstärke' : ''}`}, deshalb <b>Baustellen-LSA</b> statt Vorrangschildern (Vorrang nur bei ≤ 50 m, überschaubar, ohne nennenswerten Rückstau). Z 131 ist innerorts nach RSA 21 nicht mehr nötig.`,
-    'voll': `Restfahrbahn ${fmt(r.rest)} m < 3,00 m (Mindestbreite Wechselverkehr). Es bleibt nur die <b>Vollsperrung</b>: Querabsperrung mit Gitter 250 mm und mind. 5 <b>roten</b> Warnleuchten, Z 250, Z 123 aus beiden Richtungen, Umleitungsbeschilderung und Umleitungsplan.`
-  };
-  r.ex.veh = vehEx[veh];
-  r.ex.hv = r.needHV
-    ? `Ja. Der Parkstreifen wird von ${notweg && !workOut ? 'Notweg / Leitbaken' : 'der Arbeitsstelle'} belegt. Vor und hinter dem Bereich je ein Z 283 mit Zusatzzeichen (Zeitraum, Anfang/Ende). In vielen Städten mind. 72 h vorher aufstellen.`
-    : (s.pN > 0 ? 'Nein. Der Parkstreifen wird nicht gebraucht.' : 'Nein. Auf der Arbeitsseite gibt es keinen Parkstreifen.');
-  r.ex.size = s.speed < 50
-    ? `Bei ${s.speed} km/h gelten nach VwV-StVO unterschiedliche Größen je Form. <b>Dreiecke</b> (z. B. Z 123, Z 121) haben unter 50 km/h <b>Größe 1 = 630 mm</b>. <b>Ronden</b> (z. B. Z 283, Z 250, Z 208) haben über 20 bis 80 km/h <b>Größe 2 = 600 mm</b>.`
-    : `Bei ${s.speed} km/h gilt für Dreiecke (50–100 km/h) und Ronden (über 20 bis 80 km/h) <b>Größe 2</b>: Z 123 als Dreieck 900 mm, Ronden 600 mm.`;
-  r.ex.z123 = `${r.z.why}. Gemessen wird ab Beginn der Einengung, rechts in Fahrtrichtung, für <b>jede</b> Anfahrrichtung${s.oneway ? ' (hier Einbahnstraße: nur von Westen)' : ''}. Abweichungen von ±10 % sind laut RSA tolerierbar. Unterkante ≥ 2,20 m über dem Gehweg.${r.needZ123 ? '' : ' Bei reinen Gehwegarbeiten ist Z 123 nicht zwingend, viele Behörden verlangen es trotzdem.'}`;
-  return r;
-}
-
-/* ---------- Anforderungen (für Prüfung & Musterlösung) ---------- */
-function requirements(s, r) {
-  const L = [];
-  const qTop = Math.min(s.wy1, s.gN);
-  if (r.ped === 'rest' || r.ped === 'rest-eng') {
-    L.push({t:'g100',o:'v',c:s.x0,a:0,b:s.wy1,name:'Querabsperrung Gehweg (West)',wl:1});
-    L.push({t:'g100',o:'v',c:s.x1,a:0,b:s.wy1,name:'Querabsperrung Gehweg (Ost)',wl:1});
-    L.push({t:'g100',o:'h',c:s.wy1,a:s.x0,b:s.x1,name:'Längsabsperrung zum Restgehweg',wlGap:9});
-  } else if (r.notweg) {
-    L.push({t:'g100',o:'v',c:s.x0,a:0,b:qTop,name:'Querabsperrung Gehweg (West)',wl:1});
-    L.push({t:'g100',o:'v',c:s.x1,a:0,b:qTop,name:'Querabsperrung Gehweg (Ost)',wl:1});
-    L.push({t:'g100',o:'h',c:s.wy1,a:s.x0,b:s.x1,name:'Längsabsperrung Arbeitsbereich ↔ Notweg',wlGap:9});
-    L.push({t:'g100',o:'h',c:s.wy1+1.3,a:s.x0,b:s.x1,name:'Längsabsperrung Notweg ↔ Fahrbahn (Gitter 100 mm)'});
-  } else if (r.ped === 'andere-seite') {
-    L.push({t:'g100',o:'v',c:s.x0,a:0,b:s.gN,name:'Querabsperrung Gehweg volle Breite (West)',wl:1});
-    L.push({t:'g100',o:'v',c:s.x1,a:0,b:s.gN,name:'Querabsperrung Gehweg volle Breite (Ost)',wl:1});
-  }
-  if (r.veh === 'voll') {
-    L.push({t:'g250',o:'v',c:s.x0-3,cMin:s.x0-15,cMax:s.x0,a:s.r0,b:s.r1,name:'Vollsperrung Fahrbahn (West)',wlr:5});
-    L.push({t:'g250',o:'v',c:s.x1+3,cMin:s.x1,cMax:s.x1+15,a:s.r0,b:s.r1,name:'Vollsperrung Fahrbahn (Ost)',wlr:5});
-  }
-  return L;
-}
-
-/* ============================================================
-   Musterlösung (Elemente)
-   ============================================================ */
-function buildSolution(s, r) {
-  const out = [];
-  const P = (t, x, y) => out.push({t, x:+x.toFixed(2), y:+y.toFixed(2)});
-  const ySouthSign = s.r1 + s.pS + Math.min(0.6, s.gS * 0.4);
-  const yNorthSign = s.gN * 0.75;
-  // Gitter
-  for (const q of requirements(s, r)) {
-    if (q.o === 'v') out.push({t:q.t, x1:q.c, y1:q.a, x2:q.c, y2:q.b});
-    else out.push({t:q.t, x1:q.a, y1:q.c, x2:q.b, y2:q.c});
-    if (q.wl) P('wlg', q.c, q.b);
-    if (q.wlr) { const n = Math.max(5, Math.ceil((q.b - q.a) / 1.0)); for (let i = 0; i < n; i++) P('wlr', q.c, q.a + (i + 0.5) * (q.b - q.a) / n); }
-    if (q.wlGap) { const n = Math.ceil((q.b - q.a) / q.wlGap); for (let i = 1; i < n; i++) P('wlg', q.a + i * (q.b - q.a) / n, q.c); P('wlg', q.b, q.c); P('wlg', q.a, q.c); }
-  }
-  // Leitbaken
-  if (r.needBaken) {
-    const bl = r.bakeLine, yI = s.gN + 0.2;
-    const n = Math.ceil(s.len / 9);
-    for (let i = 0; i <= n; i++) P(i % 2 ? 'bake' : 'bakewl', s.x0 + i * s.len / n, bl);
-    const k = Math.max(3, Math.ceil((bl - yI) / 0.9) + 1);
-    for (let i = 1; i <= k; i++) {
-      const y = bl - (i - 1) * (bl - yI) / (k - 1);
-      P('bakewl', s.x1 + 0.3 + i * 1.5, y);
-      P('bakewl', s.x0 - 0.3 - i * 1.5, y);
-    }
-  }
-  // Z 123
-  const zm = (r.z.a + r.z.b) / 2;
-  if (r.dirs.includes('W')) P('z123', s.x1 + zm, yNorthSign);
-  if (r.dirs.includes('E')) P('z123', s.x0 - zm, ySouthSign);
-  if (r.veh === 'vorrang') { P('z208', s.x1 + 6, yNorthSign); P('z308', s.x0 - 6, ySouthSign); }
-  if (r.veh === 'lsa') { P('lsa', s.x1 + 10, Math.max(0.3, s.r0 - 0.4)); P('lsa', s.x0 - 10, s.r1 + 0.4); }
-  if (r.needHV) { P('z283', s.x0 - 12, s.gN * 0.9); P('z283', s.x1 + 12, s.gN * 0.9); }
-  if (r.veh === 'voll') {
-    P('z250', s.x0 - 6, ySouthSign); P('z250', s.x1 + 9, yNorthSign);
-    P('uml', 22, ySouthSign); P('uml', s.L - 22, yNorthSign);
-  }
-  if (r.ped === 'andere-seite') {
-    P('z259', s.x0 - 1.5, s.gN * 0.35); P('z259', s.x1 + 1.5, s.gN * 0.35);
-    P('flsa', s.x0 - 20, (s.r0 + s.r1) / 2);
-  }
-  return out;
-}
-
-function solutionText(s, r) {
-  const st = [];
-  st.push(`<b>Fußgänger:</b> ${r.ex.ped}`);
-  st.push(`<b>Fahrverkehr:</b> ${r.ex.restF}<br>${r.ex.veh}`);
-  if (r.needBaken) st.push(`<b>Leitbaken:</b> Längsabsperrung entlang der Linie ${fmt(r.bakeLine)} m ab Hauswand, Abstand ≤ 9 m (${s.len} m Länge → mind. ${Math.ceil(s.len / 9) + 1} Leitbaken). Querabsperrung an ${s.oneway ? 'beiden Enden (Anfahrt von Westen)' : 'beiden Enden'}: mind. 3 einseitige Leitbaken schräg gestaffelt (längs 1–2 m, quer 0,6–1 m), jede mit gelber Warnleuchte.`);
-  if (r.ped !== 'andere-seite' || true) st.push(`<b>Gehweg-Absperrung:</b> Absperrschrankengitter <b>100 mm mit Tastleiste</b>, denn blinde Fußgänger müssen es mit dem Langstock ertasten. Gelbe Warnleuchten an jeder Querabsperrung und längs i. d. R. alle 9 m. Flatterband ist nicht zulässig.`);
-  if (r.dirs) st.push(`<b>Z 123 (${s.speed < 50 ? 'Größe 1, Dreieck 630 mm' : 'Größe 2, Dreieck 900 mm'}):</b> ${r.ex.z123}`);
-  if (r.veh === 'vorrang') st.push(`<b>Vorrang:</b> Z 208 für den Verkehr nach Westen (Hindernis auf seiner Seite, er wartet), Z 308 für den Verkehr nach Osten. Beide 0–10 m vor der Engstelle (Tabelle B-1), so dass man die Engstelle überblickt.`);
-  if (r.veh === 'lsa') st.push(`<b>LSA:</b> je ein Signalgeber mit Haltebalken vor der Engstelle, rechts in Fahrtrichtung. Im echten Plan den Abstand der Haltebalken (hier ca. ${s.len + 20} m) angeben und die Räumzeit beachten.`);
-  if (r.needHV) st.push(`<b>Haltverbot:</b> ${r.ex.hv}`);
-  if (r.veh === 'voll') st.push(`<b>Vollsperrung:</b> Gitter 250 mm über die volle Fahrbahnbreite an beiden Enden, je mind. 5 <b>rote</b> Warnleuchten, Z 250 an der Sperrstelle, Umleitungsbeschilderung an den Knotenpunkten und ein eigener Umleitungsplan.`);
-  if (r.ped === 'andere-seite') st.push(`<b>Querung:</b> Zusatzzeichen 1000-12 / 1000-22 „Fußgänger Gehweg gegenüber benutzen“ an beiden Enden am Absperrschrankengitter. Überquerungshilfe prüfen und vorsehen (Fußgänger-LSA / Querungshilfe; bei Vollsperrung ggf. an den Knoten).`);
-  st.push(`<b>Größe der Schilder:</b> ${r.ex.size}`);
-  return '<h3 style="margin:0 0 6px">Musterlösung erklärt</h3><ol>' + st.map(x => `<li>${x}</li>`).join('') + '</ol>';
-}
-
-/* ============================================================
-   Prüfung
-   ============================================================ */
-function pts(types) { return items.filter(i => types.includes(i.t) && i.x != null); }
-function lines(t) { return items.filter(i => i.t === t && i.x1 != null); }
-
-function coverage(q, t) {
-  const tol = q.o === 'h' ? 0.5 : 1.5;
-  const cMin = q.cMin != null ? q.cMin : q.c - tol, cMax = q.cMax != null ? q.cMax : q.c + tol;
-  const iv = [];
-  let found = null;
-  for (const l of lines(t)) {
-    const hor = Math.abs(l.y1 - l.y2) < 0.01;
-    if ((q.o === 'h') !== hor) continue;
-    const c = hor ? l.y1 : l.x1;
-    if (c < cMin || c > cMax) continue;
-    let a = hor ? Math.min(l.x1, l.x2) : Math.min(l.y1, l.y2);
-    let b = hor ? Math.max(l.x1, l.x2) : Math.max(l.y1, l.y2);
-    a = Math.max(a, q.a); b = Math.min(b, q.b);
-    if (b > a) { iv.push([a, b]); found = c; }
-  }
-  iv.sort((u, v) => u[0] - v[0]);
-  let tot = 0, cur = null;
-  for (const [a, b] of iv) {
-    if (!cur) cur = [a, b];
-    else if (a <= cur[1]) cur[1] = Math.max(cur[1], b);
-    else { tot += cur[1] - cur[0]; cur = [a, b]; }
-  }
-  if (cur) tot += cur[1] - cur[0];
-  return {f: tot / Math.max(0.01, q.b - q.a), c: found};
-}
-
-function maxGap(xs, a, b) {
-  const arr = [a, ...xs.filter(x => x >= a - 0.01 && x <= b + 0.01).sort((u, v) => u - v), b];
-  let g = 0; for (let i = 1; i < arr.length; i++) g = Math.max(g, arr[i] - arr[i - 1]);
-  return g;
-}
-
-function runChecks() {
-  const s = S, r = R, C = [];
-  const add = (ok, title, detail, opt = false) => C.push({ok, title, detail, opt});
-  const top = i => i.y < s.r0, bot = i => i.y > s.r1;
-
-  // Z 123
-  for (const d of r.dirs) {
-    const za = r.z.a * 0.9, zb = r.z.b * 1.1;
-    const want = d === 'W' ? [s.x1 + za, s.x1 + zb] : [s.x0 - zb, s.x0 - za];
-    const side = d === 'W' ? top : bot;
-    const all = pts(['z123']);
-    const good = all.filter(i => side(i) && i.x >= want[0] && i.x <= want[1]);
-    const dirTxt = d === 'W' ? 'Verkehr nach Westen (kommt von Osten, Schild oben)' : 'Verkehr nach Osten (kommt von Westen, Schild unten)';
-    let detail;
-    if (good.length) detail = `Steht ${fmt(d === 'W' ? good[0].x - s.x1 : s.x0 - good[0].x, 1)} m vor der Arbeitsstelle, richtige Seite.`;
-    else {
-      const near = all.filter(side);
-      if (near.length) { const dist = d === 'W' ? near[0].x - s.x1 : s.x0 - near[0].x; detail = `Ein Z 123 steht auf der richtigen Seite, aber ${fmt(dist, 1)} m vor der Arbeitsstelle. Hier gefordert: <b>${r.z.a}–${r.z.b} m</b> (${r.z.why}).`; }
-      else if (all.length) detail = 'Z 123 steht auf der falschen Straßenseite. Schilder gehören rechts in Fahrtrichtung.';
-      else detail = 'Fehlt. Jede Anfahrrichtung braucht ein Z 123.';
-    }
-    if (r.needZ123) add(good.length > 0, `Z 123 für ${dirTxt}`, detail);
-    else add(good.length > 0 ? true : null, `Z 123 für ${dirTxt} (empfohlen)`, good.length ? detail : 'Bei reinen Gehwegarbeiten nicht zwingend. Viele Behörden verlangen es trotzdem.', true);
-  }
-
-  // Gitter
-  for (const q of requirements(s, r)) {
-    const cv = coverage(q, q.t);
-    const other = coverage(q, q.t === 'g100' ? 'g250' : 'g100');
-    let ok = cv.f >= 0.85, detail;
-    if (ok) detail = `Abgedeckt (${Math.round(Math.min(1, cv.f) * 100)} %).`;
-    else if (other.f >= 0.85) detail = `Die Lage stimmt, aber der Gittertyp ist falsch: hier gehört <b>${q.t === 'g100' ? 'Gitter 100 mm mit Tastleiste (Gehweg/Notweg)' : 'Gitter 250 mm (Fahrbahn)'}</b> hin.`;
-    else if (cv.f > 0) detail = `Nur ${Math.round(cv.f * 100)} % der nötigen Länge (${fmt(q.b - q.a, 1)} m) sind abgedeckt.`;
-    else detail = q.o === 'v'
-      ? `Fehlt. Senkrechte Linie ${q.c < s.x0 + 1 ? 'am Westende' : 'am Ostende'} der Arbeitsstelle, von ${fmt(q.a)} bis ${fmt(q.b)} m ab Hauswand.`
-      : `Fehlt. Waagerechte Linie bei ${fmt(q.c)} m ab Hauswand, über die ganze Länge der Arbeitsstelle.`;
-    add(ok, q.name + (q.t === 'g250' ? ' – Gitter 250 mm' : ' – Gitter 100 mm'), detail);
-    const xC = cv.c != null ? cv.c : q.c;
-    if (q.wl) {
-      const n = pts(['wlg','bakewl']).filter(i => Math.abs(i.x - xC) <= 1.2 && i.y >= q.a - 0.6 && i.y <= q.b + 0.6).length;
-      add(n >= q.wl, `Gelbe Warnleuchte an „${q.name}“`, n >= q.wl ? `${n} vorhanden.` : 'Fehlt. An jede Querabsperrung gehört mindestens eine gelbe Warnleuchte (AlD, Nacht).');
-    }
-    if (q.wlr) {
-      const n = pts(['wlr']).filter(i => Math.abs(i.x - xC) <= 1.5 && i.y >= q.a - 0.6 && i.y <= q.b + 0.6).length;
-      const ng = pts(['wlg','bakewl']).filter(i => Math.abs(i.x - xC) <= 1.5 && i.y >= q.a - 0.6 && i.y <= q.b + 0.6).length;
-      add(n >= 5, `Rote Warnleuchten an „${q.name}“`, n >= 5 ? `${n} rote Warnleuchten.` : (ng && !n ? 'Bei Vollsperrung sind <b>rote</b> Warnleuchten nötig, nicht gelbe.' : `Nur ${n} rote Warnleuchten. Bei Vollsperrung mind. 5 rote Dauerlicht-Warnleuchten auf der Absperrung (RSA 21, A 3.5.4).`));
-    }
-    if (q.wlGap) {
-      const xs = pts(['wlg','bakewl']).filter(i => Math.abs(i.y - q.c) <= 0.6).map(i => i.x);
-      const g = maxGap(xs, q.a, q.b);
-      add(g <= q.wlGap + 0.6, `Warnleuchten längs „${q.name}“ (Abstand ≤ 9 m)`, g <= q.wlGap + 0.6 ? `Größte Lücke ${fmt(g, 1)} m.` : `Größte Lücke ${fmt(g, 1)} m. Längs i. d. R. alle 9 m eine gelbe Warnleuchte, auch an den Ecken.`);
-    }
-  }
-
-  // Leitbaken
-  if (r.needBaken) {
-    const bl = r.bakeLine;
-    const bk = pts(['bake','bakewl']);
-    const long = bk.filter(i => Math.abs(i.y - bl) <= 0.6 && i.x >= s.x0 - 1 && i.x <= s.x1 + 1).map(i => i.x);
-    const g = maxGap(long, s.x0, s.x1);
-    const wrongY = bk.filter(i => i.x >= s.x0 && i.x <= s.x1 && Math.abs(i.y - bl) > 0.6);
-    add(g <= 9.3, 'Längsabsperrung mit Leitbaken (Abstand ≤ 9 m)',
-      g <= 9.3 ? `${long.length} Leitbaken auf der Linie ${fmt(bl)} m, größte Lücke ${fmt(g, 1)} m.`
-               : (long.length ? `Größte Lücke ${fmt(g, 1)} m. Innerorts max. 9 m (RSA 21, früher 10 m).` : `Fehlt. Leitbaken gehören auf die Linie ${fmt(bl)} m ab Hauswand${wrongY.length ? ` (deine stehen bei ${fmt(wrongY[0].y)} m, also falsche Breite)` : ''}.`));
-    const ends = [{n:'Ostende', a:s.x1 - 0.5, b:s.x1 + 15, appr: r.approach === 'x1'}, {n:'Westende', a:s.x0 - 15, b:s.x0 + 0.5, appr: r.approach === 'x0'}];
-    for (const e of ends) {
-      const z = bk.filter(i => i.x >= e.a && i.x <= e.b && i.y >= s.gN - 0.5 && i.y <= bl + 0.8);
-      const wl = pts(['bakewl','wlg']).filter(i => i.x >= e.a && i.x <= e.b && i.y >= s.gN - 0.5 && i.y <= bl + 0.8).length;
-      const need = (e.appr || !s.oneway) ? 3 : 1;
-      add(z.length >= need && wl >= need, `Querabsperrung zur Fahrbahn am ${e.n}${e.appr ? ' (Anfahrseite)' : ''}`,
-        (z.length >= need && wl >= need) ? `${z.length} Leitbaken, ${wl} gelbe Warnleuchten.` :
-        `${z.length} Leitbaken / ${wl} Warnleuchten gefunden. Nötig: mind. ${need} einseitige Leitbaken schräg gestaffelt vom Bordstein bis zur Leitbakenlinie (längs 1–2 m, quer 0,6–1 m), jede mit gelber Warnleuchte.`);
-    }
-  }
-
-  // Vorrang / LSA
-  if (r.veh === 'vorrang') {
-    const a = pts(['z208']).filter(i => top(i) && i.x >= s.x1 - 0.5 && i.x <= s.x1 + 11);
-    const b = pts(['z308']).filter(i => bot(i) && i.x >= s.x0 - 11 && i.x <= s.x0 + 0.5);
-    const swapped = pts(['z308']).some(top) || pts(['z208']).some(bot);
-    add(a.length > 0, 'Z 208 für den Verkehr nach Westen (Hindernis auf seiner Seite)', a.length ? 'Richtig.' : (swapped ? 'Z 208 und Z 308 sind vertauscht. Warten muss, wer das Hindernis auf seiner Fahrbahnseite hat.' : 'Fehlt oder falscher Abstand. Laut Tabelle B-1 steht Z 208 0–10 m vor der Engstelle: oben, östlich.'));
-    add(b.length > 0, 'Z 308 für den Verkehr nach Osten', b.length ? 'Richtig.' : 'Fehlt oder falscher Abstand. Laut Tabelle B-1 steht Z 308 0–10 m vor der Engstelle: unten, westlich.');
-  }
-  if (r.veh === 'lsa') {
-    const a = pts(['lsa']).filter(i => top(i) && i.x >= s.x1 + 1 && i.x <= s.x1 + 30);
-    const b = pts(['lsa']).filter(i => bot(i) && i.x >= s.x0 - 30 && i.x <= s.x0 - 1);
-    add(a.length > 0, 'Signalgeber LSA für den Verkehr nach Westen', a.length ? 'Richtig.' : 'Fehlt. Rechts in Fahrtrichtung (oben), kurz vor der Engstelle auf der Ostseite.');
-    add(b.length > 0, 'Signalgeber LSA für den Verkehr nach Osten', b.length ? 'Richtig.' : 'Fehlt. Unten, kurz vor der Engstelle auf der Westseite.');
-  }
-  // Haltverbot
-  if (r.needHV) {
-    const a = pts(['z283']).filter(i => top(i) && i.x >= s.x0 - 25 && i.x <= s.x0 - 2);
-    const b = pts(['z283']).filter(i => top(i) && i.x >= s.x1 + 2 && i.x <= s.x1 + 25);
-    add(a.length > 0 && b.length > 0, 'Haltverbot Z 283 (Anfang und Ende)', (a.length && b.length) ? 'Richtig, der Bereich ist auf beiden Seiten begrenzt.' : 'Es fehlt Z 283 mit Zusatzzeichen vor und/oder hinter dem Bereich auf der Parkstreifenseite (je 2–25 m außerhalb der Arbeitsstelle, wegen der Querabsperrung).');
-  }
-  // Vollsperrung
-  if (r.veh === 'voll') {
-    const a = pts(['z250']).filter(i => i.x >= s.x0 - 20 && i.x <= s.x0);
-    const b = pts(['z250']).filter(i => i.x >= s.x1 && i.x <= s.x1 + 20);
-    add(a.length && b.length, 'Z 250 an beiden Sperrstellen', (a.length && b.length) ? 'Richtig.' : 'Fehlt. An jeder Sperrstelle ein Z 250 (ggf. mit Zusatzzeichen, z. B. Anlieger frei bis Baustelle).');
-    const u1 = pts(['uml']).filter(i => i.x <= 26), u2 = pts(['uml']).filter(i => i.x >= s.L - 26);
-    add(u1.length && u2.length, 'Umleitungsbeschilderung an beiden Knotenpunkten', (u1.length && u2.length) ? 'Richtig. Im echten Antrag gehört ein eigener Umleitungsplan dazu.' : 'Fehlt. An den Einmündungen links und rechts muss die Umleitung ausgeschildert werden.');
-  }
-  // Fußgänger gegenüber
-  if (r.ped === 'andere-seite') {
-    const a = pts(['z259']).filter(i => i.y < s.gN + 0.5 && i.x >= s.x0 - 30 && i.x <= s.x0);
-    const b = pts(['z259']).filter(i => i.y < s.gN + 0.5 && i.x >= s.x1 && i.x <= s.x1 + 30);
-    add(a.length && b.length, 'Zz 1000-12/-22 „Gehweg gegenüber benutzen“ an beiden Enden', (a.length && b.length) ? 'Richtig.' : 'Fehlt. Auf dem gesperrten Gehweg an beiden Enden ans Absperrschrankengitter (bzw. am letzten sicheren Querungspunkt).');
-    const f = pts(['flsa']).filter(i => i.y > s.r0 - 0.5 && i.y < s.r1 + 0.5 && i.x >= s.x0 - 40 && i.x <= s.x1 + 40);
-    add(f.length > 0, 'Sichere Querungsstelle für Fußgänger', f.length ? 'Vorhanden.' : 'Fehlt. Wenn kein Notweg möglich ist, ist eine Überquerungshilfe zu prüfen (RSA 21, B 2.4.5), z. B. Fußgänger-LSA. In der Übung wird sie immer verlangt.');
-  }
-  // Überflüssiges
-  const extra = [];
-  if (r.veh !== 'lsa' && pts(['lsa']).length) extra.push('Baustellen-LSA (hier nicht nötig)');
-  if (r.veh !== 'vorrang' && pts(['z208','z308']).length) extra.push('Z 208/308 (hier keine Vorrangregelung nötig)');
-  if (r.veh !== 'voll' && pts(['z250']).length) extra.push('Z 250 (keine Vollsperrung)');
-  if (r.veh !== 'voll' && lines('g250').some(l => Math.abs(l.x1 - l.x2) < .01 && Math.abs(l.y2 - l.y1) > s.F * 0.8)) extra.push('Gitter über die volle Fahrbahn (keine Vollsperrung)');
-  if (!r.needHV && pts(['z283']).length) extra.push('Z 283 Haltverbot (nicht nötig)');
-  if (r.ped !== 'andere-seite' && pts(['z259']).length) extra.push('Zz „Gehweg gegenüber benutzen“ (Fußgänger bleiben auf ihrer Seite)');
-  if (r.veh !== 'voll' && pts(['wlr']).length) extra.push('rote Warnleuchten (nur bei Vollsperrung)');
-  add(extra.length === 0, 'Keine überflüssigen oder falschen Elemente', extra.length ? 'Bitte entfernen: ' + extra.join(', ') + '. Überflüssige Schilder schwächen die Wirkung der nötigen und werden von der Behörde gestrichen.' : 'Sauber.');
-  return C;
-}
-
-/* ============================================================
-   Darstellung Karte
-   ============================================================ */
-const SX = 7, SY = 26, PADX = 12, YTOP = -6.5;
-let svgH = 0, svgW = 0, zoom = 1;
-const px = x => PADX + x * SX;
-const py = y => (y - YTOP) * SY;
-const wx = X => (X - PADX) / SX;
-const wy = Y => Y / SY + YTOP;
-
-function zoneName(y) {
-  const s = S;
-  if (y < 0) return 'Gebäude Nord';
-  if (y < s.gN) return 'Gehweg Nord';
-  if (y < s.r0) return 'Parkstreifen Nord';
-  if (y < s.r1) return y < (s.r0 + s.r1) / 2 && !s.oneway ? 'Fahrbahn, Fahrstreifen nach Westen ←' : (s.oneway ? 'Fahrbahn (Einbahn nach Osten →)' : 'Fahrbahn, Fahrstreifen nach Osten →');
-  if (y < s.r1 + s.pS) return 'Parkstreifen Süd';
-  if (y < s.yEnd) return 'Gehweg Süd';
-  return 'Gebäude Süd';
-}
-
-function drawBase() {
-  const s = S;
-  svgW = px(s.L) + PADX; svgH = py(s.yEnd + 6.5);
-  const W = svgW, H = svgH;
-  let o = `<defs>
-    <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#f6c88f"/><line x1="0" y1="0" x2="0" y2="8" stroke="#c87814" stroke-width="3"/></pattern>
-    <pattern id="rw" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="5" height="10" fill="#e30613"/><rect x="5" width="5" height="10" fill="#fff"/></pattern>
-    <pattern id="paving" width="12" height="12" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="#d9d6cf"/><path d="M0 0H12V12" fill="none" stroke="#c9c5bc" stroke-width="1"/></pattern>
-  </defs>`;
-  o += `<rect width="${W}" height="${H}" fill="#e7eadf"/>`;
-  const band = (y0, y1, fill) => `<rect x="${px(0)}" y="${py(y0)}" width="${px(s.L) - px(0)}" height="${py(y1) - py(y0)}" fill="${fill}"/>`;
-  // Gebäude
-  o += `<rect x="${px(0)}" y="${py(-5.5)}" width="${px(s.L) - px(0)}" height="${py(0) - py(-5.5)}" fill="#cfcac0"/>`;
-  o += `<rect x="${px(0)}" y="${py(s.yEnd)}" width="${px(s.L) - px(0)}" height="${py(s.yEnd + 5.5) - py(s.yEnd)}" fill="#cfcac0"/>`;
-  // Hausfassaden
-  const houses = [];
-  for (let x = 20; x < s.L - 20; x += 16) houses.push(x);
-  houses.forEach((x, i) => {
-    o += `<rect x="${px(x)}" y="${py(-5)}" width="${14 * SX}" height="${py(-0.05) - py(-5)}" fill="#b8b1a4" stroke="#8d867a"/>`;
-    o += `<rect x="${px(x)}" y="${py(s.yEnd + 0.05)}" width="${14 * SX}" height="${py(s.yEnd + 5) - py(s.yEnd + 0.05)}" fill="#b8b1a4" stroke="#8d867a"/>`;
-  });
-  // Zielgebäude
-  const hx = s.x0 - 4, hw = s.len + 8;
-  o += `<rect x="${px(hx)}" y="${py(-5.2)}" width="${hw * SX}" height="${py(-0.05) - py(-5.2)}" fill="#8aa0c4" stroke="#3b4f74" stroke-width="1.5"/>`;
-  o += `<text x="${px(hx + hw / 2)}" y="${py(-2.2)}" text-anchor="middle" font-size="13" font-weight="700" fill="#10213f">${s.street} ${s.nr}</text>`;
-  // Bänder
-  o += band(0, s.gN, 'url(#paving)');
-  if (s.pN) o += band(s.gN, s.r0, '#b9b9b9');
-  o += band(s.r0, s.r1, '#8e9196');
-  if (s.pS) o += band(s.r1, s.r1 + s.pS, '#b9b9b9');
-  o += band(s.r1 + s.pS, s.yEnd, 'url(#paving)');
-  // Bordsteine
-  const curb = y => `<line x1="${px(0)}" x2="${px(s.L)}" y1="${py(y)}" y2="${py(y)}" stroke="#f2f2f2" stroke-width="2"/>`;
-  o += curb(s.gN) + curb(s.r1 + s.pS);
-  if (s.pN) o += `<line x1="${px(0)}" x2="${px(s.L)}" y1="${py(s.r0)}" y2="${py(s.r0)}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3 5"/>`;
-  if (s.pS) o += `<line x1="${px(0)}" x2="${px(s.L)}" y1="${py(s.r1)}" y2="${py(s.r1)}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3 5"/>`;
-  // Mittellinie
-  if (!s.oneway && s.F >= 5.5) o += `<line x1="${px(0)}" x2="${px(s.L)}" y1="${py((s.r0 + s.r1) / 2)}" y2="${py((s.r0 + s.r1) / 2)}" stroke="#fff" stroke-width="2" stroke-dasharray="18 22"/>`;
-  // Querstraßen
-  for (const cx of [11, s.L - 11]) {
-    o += `<rect x="${px(cx - 5)}" y="0" width="${10 * SX}" height="${H}" fill="#8e9196"/>`;
-    o += `<rect x="${px(cx - 7)}" y="0" width="${2 * SX}" height="${py(0)}" fill="url(#paving)"/><rect x="${px(cx + 5)}" y="0" width="${2 * SX}" height="${py(0)}" fill="url(#paving)"/>`;
-    o += `<rect x="${px(cx - 7)}" y="${py(s.yEnd)}" width="${2 * SX}" height="${H - py(s.yEnd)}" fill="url(#paving)"/><rect x="${px(cx + 5)}" y="${py(s.yEnd)}" width="${2 * SX}" height="${H - py(s.yEnd)}" fill="url(#paving)"/>`;
-    o += `<text x="${px(cx)}" y="${py(-3)}" text-anchor="middle" font-size="11" fill="#fff" transform="rotate(-90 ${px(cx)} ${py(-3)})">${cx < 30 ? 'Querstraße West' : 'Querstraße Ost'}</text>`;
-  }
-  // Richtungspfeile
-  const arrow = (x, y, dir) => { const d = dir * 22; return `<path d="M${px(x) - d} ${py(y)} H${px(x) + d} M${px(x) + d - dir * 8} ${py(y) - 6} L${px(x) + d} ${py(y)} L${px(x) + d - dir * 8} ${py(y) + 6}" stroke="#fff" stroke-width="3" fill="none" opacity=".75"/>`; };
-  for (const x of [32, s.L - 32]) {
-    if (s.oneway) o += arrow(x, (s.r0 + s.r1) / 2, 1);
-    else { o += arrow(x, s.r0 + s.F * 0.25, -1); o += arrow(x, s.r0 + s.F * 0.75, 1); }
-  }
-  // Arbeitsbereich
-  o += `<rect x="${px(s.x0)}" y="${py(0)}" width="${s.len * SX}" height="${py(s.wy1) - py(0)}" fill="url(#hatch)" stroke="#a35d00" stroke-width="1.5"/>`;
-  o += `<text x="${px(s.x0 + s.len / 2)}" y="${py(s.wy1 / 2) + 4}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#5a3000">Arbeitsbereich ${fmt(s.len, 1)} × ${fmt(s.wy1)} m</text>`;
-  // Bemaßung Breiten
-  const dimX = 40;
-  const dim = (y0, y1, label) => {
-    if (y1 - y0 < 0.05) return '';
-    const X = px(dimX);
-    return `<g font-size="11" fill="#111"><line x1="${X}" x2="${X}" y1="${py(y0) + 1}" y2="${py(y1) - 1}" stroke="#111"/><line x1="${X - 4}" x2="${X + 4}" y1="${py(y0) + 1}" y2="${py(y0) + 1}" stroke="#111"/><line x1="${X - 4}" x2="${X + 4}" y1="${py(y1) - 1}" y2="${py(y1) - 1}" stroke="#111"/>
-      <text x="${X + 6}" y="${(py(y0) + py(y1)) / 2 + 4}" paint-order="stroke" stroke="#fff" stroke-width="3">${label} ${fmt(y1 - y0)} m</text></g>`;
-  };
-  o += dim(0, s.gN, 'Gehweg');
-  if (s.pN) o += dim(s.gN, s.r0, 'Parkstr.');
-  o += dim(s.r0, s.r1, 'Fahrbahn');
-  if (s.pS) o += dim(s.r1, s.r1 + s.pS, 'Parkstr.');
-  o += dim(s.r1 + s.pS, s.yEnd, 'Gehweg');
-  // Skala
-  const sy = py(s.yEnd + 5.8);
-  o += `<line x1="${px(0)}" x2="${px(s.L)}" y1="${sy}" y2="${sy}" stroke="#333"/>`;
-  for (let d = 0; d <= 70; d += 10) {
-    for (const x of [s.x0 - d, s.x1 + d]) {
-      if (x < 0 || x > s.L) continue;
-      o += `<line x1="${px(x)}" x2="${px(x)}" y1="${sy - 5}" y2="${sy + 5}" stroke="#333"/><text x="${px(x)}" y="${sy - 8}" text-anchor="middle" font-size="10.5" fill="#222">${d} m</text>`;
-    }
-  }
-  o += `<text x="${px(4)}" y="${py(-6)}" font-size="12" font-weight="700" fill="#333">N ↑</text>`;
-  return o;
-}
-
-function drawItem(it, cls = '') {
-  const isSol = cls === 'sol';
-  if (it.x1 != null) {
-    const th = it.t === 'g250' ? 7 : 4.5;
-    const x1 = px(it.x1), y1 = py(it.y1), x2 = px(it.x2), y2 = py(it.y2);
-    const hor = Math.abs(it.y1 - it.y2) < 0.01;
-    const x = Math.min(x1, x2) - (hor ? 0 : th / 2), y = Math.min(y1, y2) - (hor ? th / 2 : 0);
-    const w = hor ? Math.abs(x2 - x1) : th, h = hor ? th : Math.abs(y2 - y1);
-    return `<g class="it ${cls}" data-id="${it.id || ''}"><rect x="${x}" y="${y}" width="${Math.max(w, 2)}" height="${Math.max(h, 2)}" fill="${isSol ? '#2fa36b' : 'url(#rw)'}" stroke="${isSol ? '#0b5d36' : (sel === it.id ? '#0057ff' : '#7a0000')}" stroke-width="${sel === it.id ? 2 : 0.8}" ${isSol ? 'opacity=".55"' : ''}/>${it.t === 'g100' && !isSol ? `<line x1="${hor ? x : x + w + 1}" y1="${hor ? y + h + 1 : y}" x2="${hor ? x + w : x + w + 1}" y2="${hor ? y + h + 1 : y + h}" stroke="#222" stroke-width="1"/>` : ''}</g>`;
-  }
-  const X = px(it.x), Y = py(it.y);
-  const lab = SHORT[it.t] ? `<text y="${it.t === 'uml' ? 17 : 21}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${isSol ? '#0b5d36' : '#111'}" paint-order="stroke" stroke="#fff" stroke-width="2.5">${SHORT[it.t]}</text>` : '';
-  const ring = sel === it.id ? `<circle r="14" fill="none" stroke="#0057ff" stroke-width="2"/>` : '';
-  const solRing = isSol ? `<circle r="13" fill="#2fa36b" opacity=".18" stroke="#0b5d36" stroke-dasharray="3 2"/>` : '';
-  return `<g class="it ${cls}" data-id="${it.id || ''}" transform="translate(${X} ${Y})" ${isSol ? 'opacity=".9"' : ''}>${solRing}${glyph(it.t, TYPES[it.t] && TYPES[it.t].sign ? 0.95 : 1)}${lab}${ring}</g>`;
-}
-
-let baseSVG = '';
-function render(preview) {
-  const svg = $('#map');
-  svg.setAttribute('viewBox', `0 0 ${svgW} ${svgH}`);
-  svg.setAttribute('width', svgW * zoom);
-  svg.setAttribute('height', svgH * zoom);
-  let o = baseSVG;
-  if ($('#showSol').checked) o += `<g>${buildSolution(S, R).map(i => drawItem(i, 'sol')).join('')}</g>`;
-  const ls = items.filter(i => i.x1 != null), ps = items.filter(i => i.x1 == null);
-  o += ls.map(i => drawItem(i)).join('') + ps.map(i => drawItem(i)).join('');
-  if (preview) o += drawItem(preview).replace('class="it', 'opacity=".6" class="it');
-  svg.innerHTML = o;
-}
-
-/* ============================================================
-   Interaktion
-   ============================================================ */
-let nextId = 1, drag = null;
-function snapshot() { undoStack.push(JSON.stringify(items)); if (undoStack.length > 80) undoStack.shift(); }
-function toWorld(e) {
-  const svg = $('#map'); const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
-  const p = pt.matrixTransform(svg.getScreenCTM().inverse());
-  return {x: Math.round(wx(p.x) * 2) / 2, y: Math.round(wy(p.y) * 10) / 10, X: p.x, Y: p.y};
-}
-function hit(X, Y) {
-  let best = null, bd = 14;
-  for (const it of items) {
-    let d;
-    if (it.x1 != null) {
-      const hor = Math.abs(it.y1 - it.y2) < 0.01;
-      if (hor) { const xa = Math.min(px(it.x1), px(it.x2)), xb = Math.max(px(it.x1), px(it.x2)); d = (X >= xa - 4 && X <= xb + 4) ? Math.abs(Y - py(it.y1)) : 99; }
-      else { const ya = Math.min(py(it.y1), py(it.y2)), yb = Math.max(py(it.y1), py(it.y2)); d = (Y >= ya - 4 && Y <= yb + 4) ? Math.abs(X - px(it.x1)) : 99; }
-    } else d = Math.hypot(X - px(it.x), Y - py(it.y));
-    if (d < bd) { bd = d; best = it; }
-  }
-  return best;
-}
-function hoverInfo(w) {
-  const s = S;
-  let rel;
-  if (w.x < s.x0) rel = `${fmt(s.x0 - w.x, 1)} m <b>westlich</b> vor der Arbeitsstelle`;
-  else if (w.x > s.x1) rel = `${fmt(w.x - s.x1, 1)} m <b>östlich</b> hinter der Arbeitsstelle`;
-  else rel = `im Bereich der Arbeitsstelle (${fmt(w.x - s.x0, 1)} m ab Westende)`;
-  $('#hover').innerHTML = `${rel} · ${fmt(Math.max(0, w.y), 1)} m ab Hauswand Nord · <b>${zoneName(w.y)}</b>`;
-}
-
-function initMapEvents() {
-  const svg = $('#map');
-  svg.addEventListener('pointerdown', e => {
-    const w = toWorld(e);
-    svg.setPointerCapture(e.pointerId);
-    if (tool === 'move') {
-      const h = hit(w.X, w.Y);
-      sel = h ? h.id : null;
-      if (h) { snapshot(); drag = {mode:'move', it:h, sx:w.x, sy:w.y, orig: JSON.parse(JSON.stringify(h))}; }
-      render(); return;
-    }
-    if (tool === 'erase') {
-      const h = hit(w.X, w.Y);
-      if (h) { snapshot(); items = items.filter(i => i !== h); render(); }
-      return;
-    }
-    if (TYPES[tool].line) { drag = {mode:'line', x1:w.x, y1:w.y}; return; }
-    snapshot();
-    items.push({id: nextId++, t: tool, x: w.x, y: w.y});
-    render();
-  });
-  svg.addEventListener('pointermove', e => {
-    const w = toWorld(e);
-    hoverInfo(w);
-    if (!drag) return;
-    if (drag.mode === 'move') {
-      const dx = w.x - drag.sx, dy = w.y - drag.sy, o = drag.orig, it = drag.it;
-      if (it.x1 != null) { it.x1 = o.x1 + dx; it.x2 = o.x2 + dx; it.y1 = +(o.y1 + dy).toFixed(2); it.y2 = +(o.y2 + dy).toFixed(2); }
-      else { it.x = o.x + dx; it.y = +(o.y + dy).toFixed(2); }
-      render();
-    } else if (drag.mode === 'line') render(lineFrom(drag, w));
-  });
-  svg.addEventListener('pointerup', e => {
-    if (!drag) return;
-    const w = toWorld(e);
-    if (drag.mode === 'line') {
-      const l = lineFrom(drag, w);
-      const len = Math.abs(l.x2 - l.x1) + Math.abs(l.y2 - l.y1);
-      if (len >= 0.3) { snapshot(); l.id = nextId++; items.push(l); }
-    }
-    drag = null; render();
-  });
-  svg.addEventListener('pointerleave', () => { $('#hover').textContent = 'Fahr mit der Maus über den Plan: Position und Abstand zur Arbeitsstelle werden hier angezeigt.'; });
-}
-function lineFrom(d, w) {
-  const hor = Math.abs(w.x - d.x1) * SX >= Math.abs(w.y - d.y1) * SY;
-  return hor ? {t: tool, x1: d.x1, y1: d.y1, x2: w.x, y2: d.y1} : {t: tool, x1: d.x1, y1: d.y1, x2: d.x1, y2: w.y};
-}
-document.addEventListener('keydown', e => {
-  if (['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) return;
-  if ((e.key === 'Delete' || e.key === 'Backspace') && sel) { snapshot(); items = items.filter(i => i.id !== sel); sel = null; render(); e.preventDefault(); }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { undo(); e.preventDefault(); }
-});
-function undo() { if (undoStack.length) { items = JSON.parse(undoStack.pop()); sel = null; render(); } }
-
-function buildPalette() {
-  let o = '', grp = '';
-  for (const [k, v] of Object.entries(TYPES)) {
-    if (v.grp !== grp) { grp = v.grp; o += `<div class="grp">${grp}</div>`; }
-    o += `<button class="tool ${k === tool ? 'on' : ''}" data-t="${k}" title="${v.label}"><svg width="28" height="28" viewBox="-14 -14 28 28">${glyph(k, k === 'g100' || k === 'g250' ? 1 : 0.95)}</svg><span>${v.label}</span></button>`;
-  }
-  $('#palette').innerHTML = o;
-  $('#palette').querySelectorAll('.tool').forEach(b => b.onclick = () => { tool = b.dataset.t; buildPalette(); });
-}
-
-/* ============================================================
-   Auftrag & Quiz
-   ============================================================ */
-function renderBrief() {
-  const s = S;
-  const wIn = s.wy1 - s.gN;
-  let where;
-  if (wIn <= 0.001) where = `auf dem Gehweg vor dem Gebäude, <b>${fmt(s.len, 1)} m lang</b> und <b>${fmt(s.wy1)} m breit</b> (gemessen ab Hauswand)`;
-  else if (s.pN && s.wy1 <= s.r0 + 0.001) where = `über den ganzen Gehweg bis in den Parkstreifen: <b>${fmt(s.len, 1)} m lang</b>, <b>${fmt(s.wy1)} m breit</b> ab Hauswand (davon ${fmt(s.wy1 - s.gN)} m im Parkstreifen)`;
-  else where = `vom Gebäude über den Gehweg${s.pN ? ' und den Parkstreifen' : ''} bis <b>${fmt(Math.max(0, s.wy1 - s.r0))} m in die Fahrbahn</b>: insgesamt <b>${fmt(s.len, 1)} m lang</b>, <b>${fmt(s.wy1)} m breit</b> ab Hauswand`;
-  $('#brief').innerHTML = `<b>Auftrag VAO · ${s.street} ${s.nr}, ${s.city}</b><br>
-  Maßnahme: ${s.reason}. Dauer ca. ${s.days} Arbeitstage, die Grube bleibt über Nacht offen (<b>AlD</b>).<br><br>
-  Der Arbeitsbereich liegt ${where}.<br><br>
-  Erstelle einen RSA-21-konformen Verkehrszeichenplan: Fußgänger- und Fahrzeugführung, alle Verkehrszeichen mit Standort, Absperrgeräte und Warnleuchten.`;
-  const rows = [
-    ['Straße', `${s.oneway ? 'Einbahnstraße (Fahrtrichtung Osten →)' : 'Zweirichtungsverkehr'}`],
-    ['Zul. Höchstgeschwindigkeit', `${s.speed} km/h`],
-    ['Verkehrsstärke', s.vol === 'hoch' ? 'hoch (Linienbus, Lieferverkehr)' : 'gering (Wohnstraße)'],
-    ['Gehweg Nord (Baustellenseite)', fmt(s.gN) + ' m'],
-    ['Parkstreifen Nord', s.pN ? fmt(s.pN) + ' m (längs, bewirtschaftet)' : '–'],
-    ['Fahrbahn', fmt(s.F) + ' m'],
-    ['Parkstreifen Süd', s.pS ? fmt(s.pS) + ' m' : '–'],
-    ['Gehweg Süd', fmt(s.gS) + ' m'],
-    ['Arbeitsbereich (L × B ab Hauswand)', `${fmt(s.len, 1)} × ${fmt(s.wy1)} m`],
-  ];
-  $('#facts').innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td><b>${r[1]}</b></td></tr>`).join('');
-}
-
-let QUIZ = [];
-function shuffle(a) { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; }
-function renderQuiz() {
-  const s = S, r = R;
-  QUIZ = [
-    {id:'restG', type:'num', q:'Restgehwegbreite neben dem Arbeitsbereich (m)', ans:r.restG, ex:r.ex.restG},
-    {id:'ped', type:'sel', q:'Wie werden die Fußgänger geführt?', opts:PED_OPTS, ans:r.ped, ex:r.ex.ped},
-    {id:'restF', type:'num', q:'Restfahrbahnbreite für den Fahrverkehr (m)', ans:r.rest, ex:r.ex.restF, tol:0.15},
-    {id:'veh', type:'sel', q:'Wie wird der Fahrverkehr geführt?', opts:VEH_OPTS, ans:r.veh, ex:r.ex.veh},
-    {id:'hv', type:'sel', q:'Ist ein Haltverbot (Z 283) nötig?', opts:{ja:'Ja', nein:'Nein'}, ans:r.needHV ? 'ja' : 'nein', ex:r.ex.hv},
-    {id:'size', type:'sel', q:'Welche Verkehrszeichengrößen sind hier richtig?', opts:{'1':'Alles Größe 1 – Ronde 420 mm / Dreieck 630 mm','mix':'Dreiecke Größe 1 (630 mm), Ronden Größe 2 (600 mm)','2':'Alles Größe 2 – Ronde 600 mm / Dreieck 900 mm','3':'Alles Größe 3 – Ronde 750 mm / Dreieck 1260 mm'}, ans:r.size, ex:r.ex.size},
-    {id:'z123', type:'sel', q:'In welchem Abstand vor der Arbeitsstelle steht Z 123 hier?', opts:{a:'10–30 m', b:'30–50 m', c:'50–70 m', d:'70–100 m'}, ans:{10:'a',30:'b',50:'c'}[r.z.a], ex:r.ex.z123},
-  ];
-  $('#quiz').innerHTML = QUIZ.map(q => {
-    let inp;
-    if (q.type === 'num') inp = `<input type="number" step="0.05" id="q_${q.id}" placeholder="z. B. 1,30">`;
-    else { const keys = Object.keys(q.opts); inp = `<select id="q_${q.id}"><option value="">– bitte wählen –</option>${keys.map(k => `<option value="${k}">${q.opts[k]}</option>`).join('')}</select>`; }
-    return `<div class="q" id="qq_${q.id}"><label>${q.q}</label>${inp}<div class="fb"></div></div>`;
-  }).join('');
-  $('#quizScore').textContent = '';
-}
-function checkQuiz() {
-  let ok = 0;
-  for (const q of QUIZ) {
-    const el = $('#qq_' + q.id), v = $('#q_' + q.id).value;
-    let good;
-    if (q.type === 'num') good = v !== '' && Math.abs(parseFloat(v.replace(',', '.')) - q.ans) <= (q.tol || 0.06);
-    else good = v === q.ans;
-    el.classList.toggle('ok', good); el.classList.toggle('bad', !good);
-    const right = q.type === 'num' ? `Richtig: <b>${fmt(q.ans)} m</b>. ` : (good ? '' : `Richtig: <b>${q.opts[q.ans]}</b>. `);
-    el.querySelector('.fb').innerHTML = (good ? '✓ ' : '✗ ') + right + q.ex;
-    if (good) ok++;
-  }
-  $('#quizScore').innerHTML = `<b>${ok} / ${QUIZ.length}</b> richtig`;
-}
-
-function showChecks() {
-  const C = runChecks();
-  const req = C.filter(c => !c.opt);
-  const passed = req.filter(c => c.ok).length;
-  const pct = Math.round(100 * passed / Math.max(1, req.length));
-  const col = pct >= 90 ? 'var(--ok)' : pct >= 60 ? 'var(--warn)' : 'var(--bad)';
-  $('#checks').innerHTML = `<div class="score" style="color:${col}">${pct} %</div><div class="hint" style="margin-bottom:8px">${passed} von ${req.length} Anforderungen erfüllt${pct >= 90 ? ' – so könnte der Plan zur Behörde.' : ''}</div>` +
-    C.map(c => `<div class="chk ${c.opt ? 'opt' : (c.ok ? 'ok' : 'bad')}"><b>${c.opt ? 'ℹ' : (c.ok ? '✓' : '✗')} ${c.title}</b><small>${c.detail}</small></div>`).join('');
-  $('#scoreBadge').textContent = `Letzte Prüfung: ${pct} %`;
-}
-
-/* ============================================================
-   Ablauf
-   ============================================================ */
-function load(p) {
-  S = makeScenario(p); R = solve(S);
-  items = []; undoStack = []; sel = null; nextId = 1;
-  baseSVG = drawBase();
-  renderBrief(); renderQuiz(); render();
-  $('#checks').innerHTML = '<p class="hint">Noch nicht geprüft.</p>';
-  $('#solution').innerHTML = '';
-  $('#showSol').checked = false;
-  $('#scoreBadge').textContent = '';
-}
-
-function init() {
-  $('#lessonSel').innerHTML = LESSONS.map((l, i) => `<option value="${i}">${l.t}</option>`).join('') + '<option value="rand">Zufallssituation</option>';
-  $('#lessonSel').onchange = e => { if (e.target.value === 'rand') load(randomParams()); else load(LESSONS[+e.target.value].p); };
-  $('#btnRandom').onclick = () => { $('#lessonSel').value = 'rand'; load(randomParams()); };
-  $('#btnQuiz').onclick = checkQuiz;
-  $('#btnCheck').onclick = showChecks;
-  $('#btnSol').onclick = () => { $('#solution').innerHTML = solutionText(S, R); $('#showSol').checked = true; render(); };
-  $('#btnUndo').onclick = undo;
-  $('#btnClear').onclick = () => { if (items.length) { snapshot(); items = []; render(); } };
-  $('#showSol').onchange = () => render();
-  $('#zoom').oninput = e => { zoom = +e.target.value; render(); };
-  document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
-    document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
-    ['trainer','wissen','hilfe'].forEach(v => $('#v-' + v).classList.toggle('hidden', v !== b.dataset.view));
-  });
-  buildPalette(); initMapEvents();
-  load(LESSONS[0].p);
-}
-init();
-</script>
+<script src="signs.js"></script>
+<script src="core.js"></script>
+<script src="network.js"></script>
+<script src="plan.js"></script>
+<script src="app.js"></script>
+<script>document.getElementById('logoSign').innerHTML = SIGNS.z123.svg;</script>
 </body>
 </html>
