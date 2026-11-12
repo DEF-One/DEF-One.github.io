@@ -2082,7 +2082,8 @@ function drawExits(){
       const sealed=sealFlag(d);
       if(sealed) glowAt('seal',px,py,32,14,'#ff2a3a',()=>{ ctx.strokeStyle='rgb(255,60,70)'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(0,0,26,0,TAU); ctx.stroke(); capyGlyph(0,0,1.2,'rgb(255,80,90)',3); },p); // Runensiegel
       else glowAt('xseal',px,py,18,14,'#ff2a3a',()=>line(()=>{ctx.moveTo(-12,-12);ctx.lineTo(12,12);ctx.moveTo(12,-12);ctx.lineTo(-12,12);},'rgb(255,60,70)',5),p);
-      // Dornenwand
+      // Dornenwand (im Sumpfheiligtum: Kultabsperrung aus Seil und Stofffetzen)
+      if(R_&&R_.sumpf&&typeof swDrawCordon==='function'){ swDrawCordon(d,px,py); continue; }
       ctx.save(); ctx.globalAlpha=0.9;
       const horiz=d==='N'||d==='S';
       for(let k=-2;k<=2;k++){ const ox=horiz?k*18:0, oy=horiz?0:k*16; spr('dornen',px+ox,py+oy+(horiz?18:10),{s:0.9,flip:k%2===0}); }
@@ -4159,7 +4160,7 @@ function drawQuakWater(){
     for(let i=0;i<70;i++){ const h=Math.sin(i*91.7)*43758.5, f=h-Math.floor(h), h2=Math.sin(i*33.1)*12345.6, f2=h2-Math.floor(h2); const ang=-0.25+f*(Math.PI+0.5), r0=0.55+f2*0.25, r=r0+((T*(D.drain!==undefined?0.3:0.09)*(0.6+f))%0.5);
       const x=c.x+Math.cos(ang)*L.rx*r, y=c.y+Math.sin(ang)*L.ry*r; ctx.fillRect(Math.round(x),Math.round(y),6+Math.round(f2*8),2); }
     ctx.restore(); }
-  ctx.save(); ctx.beginPath(); polyPath(ctx,L.walkPts); ctx.clip(); ctx.beginPath(); quakDryPath(ctx,D,c.x,c.y); ctx.lineWidth=2+D.m; ctx.strokeStyle=`rgba(230,255,250,${0.22+D.m*0.3})`; ctx.setLineDash([10,8]); ctx.lineDashOffset=-T*20; ctx.stroke(); ctx.restore();
+  ctx.save(); ctx.beginPath(); polyPath(ctx,L.walkPts); ctx.clip(); ctx.beginPath(); quakDryPath(ctx,D,c.x,c.y); ctx.lineWidth=1.5; ctx.strokeStyle=`rgba(102,117,106,${0.12+D.m*0.14})`; ctx.setLineDash([14,9,5,12,22,10,7,15]); ctx.lineDashOffset=-T*20; ctx.stroke(); ctx.restore();
 }
 /* Wasserfälle über die Kante: Bäche schwappen über den Rand und stürzen senkrecht hinunter.
    Breite, Abstand und Tempo der Bäche sind fest ausgewürfelt, damit nichts flackert. */
@@ -4221,7 +4222,7 @@ function sumpfGround(){ if(!L.ground||L.ground._sumpf) return; L.ground._sumpf=t
   for(let y=y0;y<y1;y+=PX) for(let x=x0;x<x1;x+=PX){ const r=sumpfR(x,y); const n=swFbm(x/90,y/90,1), m=swFbm(x/70,y/70,9), w=swFbm(x/55,y/55,21), d=swHash(x,y,3);
     let col;
     if(w>0.66&&r<0.9&&r>0.3) col=d<0.06?'#4e6a5e':SUMPF_PAL.wet[n>0.5?1:0];                     // nasse Stellen
-    else if(m>0.58+r*0.04) col=SUMPF_PAL.moss[Math.min(4,Math.floor((m-0.5)*7+(d-0.5)*1.2+n*0.8))]; // Moos
+    else if(m>0.58+r*0.04+(swHash(x>>3,y>>3,13)-0.5)*0.05) col=SUMPF_PAL.moss[Math.min(4,Math.floor((m-0.5)*7+(d-0.5)*1.2+n*0.8))]; // Moos
     else col=SUMPF_PAL.mud[Math.max(0,Math.min(4,Math.floor(n*4.2+(d-0.5)*1.1)))];               // Matsch
     if(r>0.84){ const k=Math.min(1,(r-0.84)/0.16); if(swHash(x,y,5)<k*0.75) col=k>0.6?SUMPF_PAL.wet[0]:SUMPF_PAL.moss[0]; }       // feuchter Rand
     g.fillStyle=col; g.fillRect(x,y,PX,PX); }
@@ -4312,7 +4313,7 @@ function drawSumpfGround(){ const S=R_.sumpf; if(!S) return; const c=R_.qc, q=en
     ctx.save(); ctx.translate(x,y); ctx.rotate(dir); ctx.scale(1,0.55); ctx.beginPath(); ctx.ellipse(0,0,13,5,0,0,TAU); ctx.fill(); ctx.beginPath(); ctx.moveTo(-12,0); ctx.lineTo(-20,-5+Math.sin(T*9+f.ph)*3); ctx.lineTo(-20,5+Math.sin(T*9+f.ph)*3); ctx.fill(); ctx.restore(); }
   ctx.restore();
   // Wellenringe (Quaker, Aufprall, Frösche)
-  ctx.save(); for(const r of S.rip){ const k=r.t/r.life, R=r.r0+r.sp*r.t; ctx.globalAlpha=0.5*(1-k); ctx.strokeStyle=r.col; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(r.x,r.y,R,R*0.42,0,0,TAU); ctx.stroke(); if(R>40){ ctx.globalAlpha=0.25*(1-k); ctx.beginPath(); ctx.ellipse(r.x,r.y,R*0.78,R*0.33,0,0,TAU); ctx.stroke(); } } ctx.restore();
+  ctx.save(); for(const r of S.rip){ const k=r.t/r.life, R=r.r0+r.sp*r.t, soft=r.col==='#cfeee4'; ctx.globalAlpha=(soft?0.26:0.5)*(1-k)*(1-k*0.3); ctx.strokeStyle=soft?'#93a898':r.col; ctx.lineWidth=2; ctx.setLineDash(soft?[18,7,6,9,26,8]:[]); ctx.beginPath(); ctx.ellipse(r.x,r.y,R,R*0.42,0,0,TAU); ctx.stroke(); if(R>40){ ctx.globalAlpha=(soft?0.12:0.25)*(1-k); ctx.beginPath(); ctx.ellipse(r.x,r.y,R*0.78,R*0.33,0,0,TAU); ctx.stroke(); } } ctx.restore();
 }
 /* ---------- Zeichnen: Objekte (nach Tiefe sortiert) ---------- */
 function drawSumpfObj(list){ const S=R_.sumpf; if(!S) return; const q=enemies.find(e=>e.type==='quak'); const angry=q&&(q.state==='rage'||q.phase===2)&&S.calm<0.5;
@@ -4321,17 +4322,19 @@ function drawSumpfObj(list){ const S=R_.sumpf; if(!S) return; const q=enemies.fi
       const gust=Math.sin(T*1.6+p.ph)*0.5+Math.sin(T*3.7+p.ph*2)*0.25+S.wind*Math.sin(T*9+p.ph)*1.2;
       if(p.backdrop){ swDrawBackdrop(p); return; } if(p.gate){ swDrawGate(p,angry); return; } if(p.post){ swDrawPost(p); return; }
       if(!p.flat&&!p.back&&!p.bigtree) shadowE(p.x,p.y,18*p.s,5*p.s,0.3);
-      if(p.bell||p.bigtree){ if(p.dim){ spr(p.nm,p.x,p.y,{s:p.s,flip:p.flip,skew:-(gust*0.008)}); spr(p.nm,p.x,p.y,{s:p.s,flip:p.flip,skew:-(gust*0.008),tint:'#0c0a08',alpha:0.55}); } else spr(p.nm,p.x,p.y,{s:p.s,flip:p.flip,rot:p.sunk?0.22:0,skew:-(gust*(p.bell?0.03:0.012))}); if(p.bell){ const bx=p.x+(p.flip?-1:1)*20*p.s, by=p.y-104*p.s; if(Math.sin(T*0.7+p.ph)>0.985){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.5; ctx.drawImage(fireSprite('255,220,140'),bx-10,by-10,20,20); ctx.restore(); } } }
+      if(p.bell||p.bigtree){ if(p.dim){ spr(p.nm,p.x,p.y,{s:p.s,flip:p.flip,skew:-(gust*0.008)}); spr(p.nm,p.x,p.y,{s:p.s,flip:p.flip,skew:-(gust*0.008),tint:'#0c0a08',alpha:0.55}); } else { if(p.sunk) swBase(p.x,p.y,24,true); if(p.bigtree) swBase(p.x,p.y,46*p.s,false); spr(p.nm,p.x,p.y,{s:p.s,flip:p.flip,rot:p.sunk?0.22:0,skew:-(gust*(p.bell?0.03:0.012))}); if(p.sunk||p.bigtree){ ctx.save(); ctx.beginPath(); ctx.rect(p.x-120*p.s,p.y-(p.sunk?26:30)*p.s,240*p.s,40*p.s); ctx.clip(); spr(p.nm,p.x,p.y,{s:p.s,flip:p.flip,rot:p.sunk?0.22:0,tint:'#120d08',alpha:0.45}); ctx.restore(); } } if(p.bell){ const bx=p.x+(p.flip?-1:1)*20*p.s, by=p.y-104*p.s; if(Math.sin(T*0.7+p.ph)>0.985){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.5; ctx.drawImage(fireSprite('255,220,140'),bx-10,by-10,20,20); ctx.restore(); } } }
       else
-      if(p.banner&&SPRITES.A['qbanner:sway:south']){ const fr=charFrame('qbanner','sway','south',T*(angry?1.6:1)+p.ph,angry?11:7); spr(fr.name,p.x,p.y,{s:p.s,foot:fr.foot,flip:p.flip,sy:1-S.calm*0.04}); }
+      if(p.banner&&SPRITES.A['qbanner:sway:south']){ const fr=charFrame('qbanner','sway','south',T*(angry?1.6:1)+p.ph,angry?11:7); spr(fr.name,p.x,p.y,{s:p.s,foot:fr.foot,flip:p.flip,sy:1-S.calm*0.04,overlay:'#1a0a08',overlayA:0.22}); }
       else if(p.reed){ spr(p.nm,p.x,p.y,{s:p.s,flip:p.flip,skew:-(gust*0.09)*(1+S.red*0.6)}); }
-      else spr(p.nm,p.x,p.y,{s:p.s,flip:p.flip});
+      else { const grounded=/q_ruin|q_totem|q_statue|riesenpilz|q_tusks/.test(p.nm); if(grounded) swBase(p.x,p.y,(p.nm==='riesenpilz'?22:30)*p.s,false); if(p.mound) swBase(p.x,p.y+2,40*p.s,true);
+        spr(p.nm,p.x,p.y,{s:p.s,flip:p.flip,overlay:p.nm==='leuchtpilze'?'#5a3a3a':null,overlayA:0.18});
+        if(grounded||p.mound){ const hh=(p.nm==='riesenpilz'?18:12)*p.s; ctx.save(); ctx.beginPath(); ctx.rect(p.x-100*p.s,p.y-hh,200*p.s,hh+4); ctx.clip(); spr(p.nm,p.x,p.y,{s:p.s,flip:p.flip,tint:p.mound?'#0c0f0a':'#1a120c',alpha:p.mound?0.55:0.42}); ctx.restore(); } }
       if(p.candles){ const n=p.nm==='q_ruin'?5:3; for(let k=0;k<n;k++){ const fx=p.x+((swHash(k,p.x,3)-0.5)*56+(p.flip?-4:4))*p.s, fy=p.y-(p.nm==='q_ruin'?(34+swHash(k,p.y,4)*26):(62+swHash(k,p.y,4)*14))*p.s; const fl=0.55+Math.sin(T*(angry?20:8)+p.ph+k)*0.2+Math.random()*0.1;
           ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=fl*(1-S.calm*0.3); ctx.drawImage(fireSprite(angry?'255,90,60':'255,180,100'),fx-12,fy-14,24,24); ctx.restore(); } }
       if(p.mound&&S.calm<0.9){ const bl=((T*0.6+p.ph)%4)<0.12; if(!bl){ const ex=p.x+(p.flip?6:-6)*p.s, ey=p.y-20*p.s; ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.45+Math.sin(T*2+p.ph)*0.15+S.red*0.3; ctx.drawImage(fireSprite('255,40,40'),ex-14,ey-10,28,20); ctx.restore(); }
         if(Math.random()<0.015) addPart({x:p.x+rand(-20,20),y:p.y-6,vx:0,vy:-rand(10,25),life:.8,size:rand(2,4),color:'#c8f060',kind:'spark',g:-5}); }
       if(p.totem||p.lantern){ const fx=p.x+(p.lantern?(p.flip?-6:6):0)*p.s, fy=p.y-(p.lantern?62:70)*p.s; const fl=0.6+Math.sin(T*(angry?22:9)+p.ph)*0.2+Math.random()*0.1;
-        ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=fl*(1-S.calm*0.35); ctx.drawImage(fireSprite(angry&&S.red>0.5?'255,90,60':'255,190,110'),fx-22,fy-22,44,44); ctx.restore(); }
+        ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=fl*0.72*(1-S.calm*0.35); ctx.drawImage(fireSprite(angry&&S.red>0.5?'255,90,60':'255,190,110'),fx-17,fy-17,34,34); ctx.restore(); }
     }}); }
   // vier Kerzen am Runenaltar
   { const c=R_.qc; for(let i=0;i<4;i++){ const a=i/4*TAU+Math.PI/4; const x=c.x+Math.cos(a)*190, y=c.y-40+Math.sin(a)*86; list.push({y,d:()=>{ spr('kerze',x,y,{s:0.75});
@@ -4431,10 +4434,11 @@ function swPaintWorld(g){ const PX=3, P=L.walkPts, c=R_.qc, OX=L.ox||0, OY=L.oy|
     g.fillStyle='#3a4a2a'; g.fillRect(X-PX,Y-PX,PX*2,PX); if(R()<0.2){ g.fillStyle='#c8a8b0'; g.fillRect(X,Y-PX*2,PX,PX); } }
   // Holzsteg im Süden: Bohlen quer, unterschiedlich lang, einige schief oder gebrochen
   if(lay.pier){ const p=lay.pier; for(let y=p.y0;y<p.y1;y+=15){ const j=Math.floor(y/15), sh=Math.round((swHash(j,3,7)-0.5)*8/PX)*PX, br=swHash(j,9,7);
-      const xa=p.x1+sh+(br<0.12?18:0), xb=p.x2+sh-(br>0.9?22:0); g.fillStyle=SW_PAL.gap; g.fillRect(xa-PX,y-PX,xb-xa+PX*2,15+PX);
+      if(br>0.45&&br<0.52&&y>p.y0+60) continue; const xa=p.x1+sh+(br<0.18?Math.round(10+br*60):0)-(swHash(j,4,7)<0.3?6:0), xb=p.x2+sh-(br>0.85?Math.round(14+(1-br)*80):0)+(swHash(j,6,7)<0.3?6:0); g.fillStyle=SW_PAL.gap; g.fillRect(xa-PX,y-PX,xb-xa+PX*2,15+PX);
       g.fillStyle=SW_PAL.plank[1+Math.floor(swHash(j,5,7)*3)]; g.fillRect(xa,y,xb-xa,12); g.fillStyle=SW_PAL.plank[3]; g.fillRect(xa,y,xb-xa,PX); g.fillStyle=SW_PAL.plank[0]; g.fillRect(xa,y+9,xb-xa,PX);
       for(let k=0;k<4;k++){ const gx=xa+Math.floor(swHash(j,k,8)*(xb-xa-12)); g.fillStyle=SW_PAL.plank[0]; g.fillRect(Math.round(gx/PX)*PX,y+PX*2,PX*3,1); }
-      g.fillStyle='#8a7a60'; g.fillRect(xa+PX*2,y+PX*2,2,2); g.fillRect(xb-PX*3,y+PX*2,2,2); }
+      g.fillStyle='#8a7a60'; g.fillRect(xa+PX*2,y+PX*2,2,2); g.fillRect(xb-PX*3,y+PX*2,2,2);
+      if(swHash(j,10,7)<0.35){ g.fillStyle='#34402a'; g.fillRect(xa,y+9,PX*(2+Math.floor(swHash(j,11,7)*4)),PX); } if(swHash(j,12,7)<0.25){ g.fillStyle='rgba(0,0,0,.25)'; g.fillRect(xa,y,xb-xa,12); } }
     // Wasser direkt neben dem Steg etwas heller, damit die Silhouette steht
     g.globalAlpha=0.13; g.fillStyle='#8a7a5a'; for(const sx of [-1,1]) g.fillRect(sx<0?p.x1-42:p.x2+6,p.y0+20,36,p.y1-p.y0); g.globalAlpha=1;
     // Längsträger unter dem Steg sichtbar an den Seiten
@@ -4461,10 +4465,12 @@ function swInit(S){ const P=L.walkPts, c=R_.qc, lay=R_.swLay||swLayout(); R_.swL
   const out=(x,y)=>!pointInPoly(x,y,P);
   // keine Insel-Abdunklung unten, keine Busch-Kugeln im Wasser
   if(L.front){ const fg=L.front.getContext('2d'); fg.clearRect(0,0,L.front.width,L.front.height); }
+  L.puddles=[];
   if(L.deco) L.deco=L.deco.filter(o=>pointInPoly(o.x,o.y-2,P)&&swPolyDist(o.x,o.y,P)>6);
   if(L.props) L.props=L.props.filter((o,i)=>pointInPoly(o.x,o.y-2,P)&&(i%2===0||o.nm==='alge'));
   if(L.tufts) L.tufts=L.tufts.filter(t=>{ const side=(t.x>c.x+L.rx*0.35)||(t.x<c.x-L.rx*0.45&&Math.abs(t.y-c.y)<L.ry*0.4); return swHash(t.x,t.y,91)>(side?0.48:0.32)&&sumpfR(t.x,t.y)>0.34; });
   S.props=S.props.filter((p,i)=>!(p.reed&&!p.world&&i%3===0));
+  { const big=(L.props||[]).concat(S.props).filter(o=>o.nm==='riesenpilz'); if(L.tufts) L.tufts=L.tufts.filter(t=>!big.some(o=>Math.abs(t.x-o.x)<46&&t.y>o.y-30&&t.y<o.y+40)); }
   // Platz fürs Tor: alte Banner/Totems/Ruinen direkt davor weg
   if(lay.gate) S.props=S.props.filter(p=>!(Math.abs(p.x-lay.gate.x)<210&&p.y<lay.gate.y+80&&!p.pad));
   if(lay.pier) S.props=S.props.filter(p=>!(p.x>lay.pier.x1-40&&p.x<lay.pier.x2+40&&p.y>lay.pier.y0-30));
@@ -4491,30 +4497,33 @@ function swInit(S){ const P=L.walkPts, c=R_.qc, lay=R_.swLay||swLayout(); R_.swL
     add({nm:RN[i%5],x,y,s:0.9+swHash(i,63)*0.5,reed:true,flip:i%2===1}); }
   // Schwerpunkt Nordwest: dichter Pilz- und Wurzelhain; Nordost: Ruinen, Knochenpfähle, Schilf
   for(const [x,y,n,s] of [[250,215,'riesenpilz',1.5],[300,190,'riesenpilz',1.1],[205,250,'riesenpilz',0.9],[340,205,'leuchtpilze',1.2],[230,195,'leuchtpilze',1.0],[280,240,'leuchtpilze',0.9],[180,215,'leuchtpilze',1.1],[320,230,'leuchtpilze',0.8]]) add({nm:n,x,y,s,shroom:true,flip:x>260});
-  for(const [x,y,n,s,o] of [[1265,225,'q_ruin',1.3,{candles:true}],[1320,260,'q_totem2',1.3,{totem:true}],[1215,205,'q_tusks',1.1,{}],[1345,300,'q_reeds3',1.2,{reed:true}],[1290,200,'q_reeds',1.0,{reed:true}],[1230,250,'q_reeds5',1.1,{reed:true}]]) add(Object.assign({nm:n,x,y,s,flip:true},o));
+  for(const [x,y,n,s,o] of [[1265,225,'q_ruin',1.3,{candles:true}],[1345,300,'q_reeds3',1.2,{reed:true}],[1215,215,'q_tusks',1.05,{}]]) add(Object.assign({nm:n,x,y,s,flip:true},o));
   // Pilzhain links (Westen), Kultsteine rechts (Osten)
   for(let i=0;i<9;i++){ const x=40+swHash(i,71)*150, y=520+swHash(i,72)*240; if(out(x,y)) add({nm:i%3?'leuchtpilze':'riesenpilz',x,y,s:0.8+swHash(i,73)*0.6,shroom:true}); }
-  for(const [x,y,n] of [[1450,470,'q_ruin2'],[1470,700,'q_ruin'],[120,250,'q_ruin2']]) if(out(x,y)) add({nm:n,x,y,s:1.2,candles:true,flip:x>c.x});
+  for(const [x,y,n] of [[1470,700,'q_ruin']]) if(out(x,y)) add({nm:n,x,y,s:1.2,candles:true,flip:x>c.x});
   for(const [x,y] of [[1400,880],[190,860],[1500,820]]) if(out(x,y)) add({nm:'q_tusks',x,y,s:1.2,flip:x>c.x});
   // Licht: rotes Rituallicht am Tor, Kerzen am Steg, Sumpfleuchten an Tümpeln
   if(lay.gate) L.lights.push({x:lay.gate.x,y:lay.gate.y-150,r:340,i:.9,c:'rgba(255,50,40,.42)',flick:0,sumpf:true});
   if(lay.pier) for(const sx of [-1,1]) for(const dy of [10,95,180]) L.lights.push({x:sx<0?lay.pier.x1-6:lay.pier.x2+6,y:lay.pier.y0+dy-34,r:110,i:.7,c:'rgba(255,150,80,.32)',flick:1,sumpf:true});
-  for(const [x,y] of [[120,520],[1440,500],[260,900],[1300,900],[420,90],[1140,90],[60,160],[1500,150]]) L.lights.push({x,y,r:260,i:.42,c:'rgba(150,140,100,.10)',flick:0,sumpf:true});
+  for(const [x,y] of [[120,520],[1440,500],[260,900],[1300,900],[420,90],[1140,90],[60,160],[1500,150]]) L.lights.push({x,y,r:240,i:.26,c:'rgba(150,140,100,.08)',flick:0,sumpf:true});
   for(const p of (R_.swPools||[])) L.lights.push({x:p.x,y:p.y,r:120,i:.5,c:'rgba(170,255,80,.22)',flick:0,sumpf:true});
-  for(const p of S.props) if(p.world&&p.candles) L.lights.push({x:p.x,y:p.y-50,r:150,i:.7,c:'rgba(255,150,80,.32)',flick:1,sumpf:true});
+  for(const p of S.props) if(p.world&&p.candles) L.lights.push({x:p.x,y:p.y-50,r:130,i:.52,c:'rgba(255,150,80,.32)',flick:1,sumpf:true});
   S.bubbles=[]; S.wfog=[]; for(let i=0;i<7;i++) S.wfog.push({y:swHash(i,81)*L.h,x:swHash(i,82)*L.w,sp:4+swHash(i,83)*6,w:300+swHash(i,84)*260});
 }
 function swBossHalo(){ const q=enemies.find(e=>e.type==='quak'); const S=R_.sumpf; if(!q||!S) return; const x=q.x, y=q.y-150*(q.infl||1);
-  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=(0.22+Math.sin(T*1.1)*0.04+S.red*0.15)*(1-S.calm*0.7); ctx.drawImage(fireSprite('255,110,60'),x-210,y-170,420,300); ctx.restore(); }
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=(0.22+Math.sin(T*1.1)*0.04+S.red*0.15)*(1-S.calm*0.7); ctx.drawImage(fireSprite('255,110,60'),x-210,y-170,420,300); ctx.restore();
+  if((q.z||0)<10){ const ek=q.infl||1; ctx.save(); ctx.fillStyle='rgba(10,6,4,.32)'; ctx.beginPath(); ctx.ellipse(q.x,q.y+2,74*ek,16*ek,0,0,TAU); ctx.fill(); ctx.fillStyle='rgba(255,140,80,.08)'; ctx.beginPath(); ctx.ellipse(q.x,q.y+14,100*ek,22*ek,0,0,TAU); ctx.fill(); ctx.restore(); } }
 /* Tor: gemaltes Licht hinter der Augenscheibe, Spieler dahinter -> Tor halb durchsichtig */
 function swDrawGate(p,angry){ const near=P.y<p.y-4&&Math.abs(P.x-(p.x+8*p.s))<170; const S=R_.sumpf;
 
   const dx=p.x+(115-112)*p.s, dy=p.y-(176-75)*p.s; const pulse=0.55+Math.sin(T*1.3)*0.08+(S&&S.red||0)*0.35;
   ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=pulse*0.55; ctx.drawImage(fireSprite('255,40,30'),dx-170,dy-150,340,300); ctx.restore();
   ctx.save(); if(near) ctx.globalAlpha=0.5; spr('q_gate',p.x,p.y,{s:p.s}); ctx.restore();
+  { const ax=p.x+(120-112)*p.s, ay=p.y-14*p.s; ctx.save(); if(near) ctx.globalAlpha=0.5; for(let k=0;k<3;k++){ ctx.fillStyle=`rgba(8,4,3,${0.35-k*0.08})`; ctx.fillRect(Math.round(ax-(16+k*7)*p.s),Math.round(ay+k*5*p.s),Math.round((32+k*14)*p.s),Math.round(2*p.s)); } ctx.fillStyle='rgba(255,70,50,.10)'; ctx.fillRect(Math.round(ax-12*p.s),Math.round(ay-22*p.s),Math.round(24*p.s),Math.round(20*p.s)); ctx.fillStyle='rgba(4,2,2,.6)'; ctx.fillRect(Math.round(ax-12*p.s),Math.round(ay-3*p.s),Math.round(24*p.s),Math.round(2*p.s)); ctx.fillStyle='rgba(255,170,110,.18)'; ctx.fillRect(Math.round(ax-14*p.s),Math.round(ay-1*p.s),Math.round(28*p.s),Math.round(1*p.s)); ctx.restore(); }
   ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=pulse*0.5; ctx.drawImage(fireSprite(angry?'255,60,40':'255,70,50'),dx-70,dy-70,140,140); ctx.restore();
   // Kerzen auf dem Tor flackern
   for(let k=0;k<7;k++){ const fx=p.x+((swHash(k,11,5)-0.5)*170)*p.s/1.45, fy=p.y-(30+swHash(k,12,5)*120)*p.s/1.45; const fl=0.45+Math.sin(T*8+k*1.9)*0.18+Math.random()*0.1; ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=fl; ctx.drawImage(fireSprite('255,180,100'),fx-9,fy-11,18,18); ctx.restore(); } }
+function swBase(x,y,w,water){ ctx.save(); ctx.fillStyle='rgba(12,9,6,.55)'; ctx.beginPath(); ctx.ellipse(x,y+1,w,w*0.32,0,0,TAU); ctx.fill(); if(water){ const k=(T*0.5+x*0.01)%1; ctx.globalAlpha=0.4*(1-k)*(1-k*0.4); ctx.strokeStyle='#8a9a7a'; ctx.lineWidth=1.5; ctx.setLineDash([6+(x%5),4+(y%4),10,6]); ctx.lineDashOffset=x%13; ctx.beginPath(); ctx.ellipse(x,y+2,w*(1+k*0.7),w*0.32*(1+k*0.7),0,0,TAU); ctx.stroke(); } ctx.restore(); }
 function swDrawBackdrop(p){ const near=P.y<p.fy&&Math.abs(P.x-p.x)<240; ctx.save(); ctx.globalAlpha=near?0.4:0.85; spr('q_gate',p.x,p.fy,{s:p.s}); spr('q_gate',p.x,p.fy,{s:p.s,tint:'#120806',alpha:0.7}); ctx.restore(); }
 function swDrawPost(p){ const x=Math.round(p.x), y=Math.round(p.y);
   if(p.stub){ const h=p.stub; ctx.fillStyle=OUT; ctx.fillRect(x-5,y-h-2,10,h+2); ctx.fillStyle='#3a2a1c'; ctx.fillRect(x-3,y-h,6,h); ctx.fillStyle='#56412a'; ctx.fillRect(x-3,y-h,2,h); ctx.fillStyle='#2b3320'; ctx.fillRect(x-3,y-6,6,3);
@@ -4543,6 +4552,15 @@ function swDrawWater(){ const S=R_.sumpf; if(!S||!S.bubbles) return; const P=L.w
 function swDrawFog(){ const S=R_.sumpf; if(!S||!S.wfog) return; const P=L.walkPts;
   ctx.save(); for(const f of S.wfog){ const x=((f.x+T*f.sp)%(L.w+f.w))-f.w/2; const inA=pointInPoly(x,f.y,P), d=inA?0:swPolyDist(x,f.y,P); const a=inA?0.05:Math.min(0.28,0.1+d/600);
     ctx.globalAlpha=a; ctx.drawImage(fireSprite('150,140,120'),x-f.w/2,f.y-36,f.w,72); } ctx.restore(); }
+
+/* Gesperrter Ausgang im Sumpfheiligtum: zwei Pflöcke, durchhängendes rotes Seil, Augen-Stofffetzen, Knochen */
+function swDrawCordon(d,px,py){ const horiz=d==='N'||d==='S'; if(!horiz) return; const y=py+(d==='S'?12:6), x0=px-50, x1=px+50;
+  for(const x of [x0,x1]){ ctx.fillStyle=OUT; ctx.fillRect(x-5,y-36,10,38); ctx.fillStyle='#4a3622'; ctx.fillRect(x-3,y-34,6,34); ctx.fillStyle='#64503a'; ctx.fillRect(x-3,y-34,2,34); ctx.fillStyle='#efe4cc'; ctx.fillRect(x-4,y-40,8,6); ctx.fillStyle=OUT; ctx.fillRect(x-2,y-38,1,1); ctx.fillRect(x+1,y-38,1,1); }
+  ctx.fillStyle='rgba(8,5,3,.35)'; for(const t of [0.25,0.5,0.75]){ const x=Math.round(px-50+100*t); ctx.fillRect(x-5,y+2,12,3); } ctx.fillRect(px-54,y+1,10,3); ctx.fillRect(px+46,y+1,10,3);
+  const sag=t=>y-30+Math.sin(t*Math.PI)*12+Math.sin(T*1.5)*1.2;
+  for(let i=0;i<=40;i++){ const t=i/40, x=x0+(x1-x0)*t; ctx.fillStyle=OUT; ctx.fillRect(Math.round(x)-1,Math.round(sag(t))-1,3,4); ctx.fillStyle='#a8303a'; ctx.fillRect(Math.round(x),Math.round(sag(t)),2,2); }
+  for(const t of [0.25,0.5,0.75]){ const x=Math.round(x0+(x1-x0)*t), yy=Math.round(sag(t))+2, sw=Math.round(Math.sin(T*2+t*9)*1.5); ctx.fillStyle=OUT; ctx.fillRect(x-6+sw,yy,12,16); ctx.fillStyle='#7a1e24'; ctx.fillRect(x-5+sw,yy+1,10,14); ctx.fillStyle='#1a0a0a'; ctx.fillRect(x-2+sw,yy+6,4,3); ctx.fillStyle='#e8d8b0'; ctx.fillRect(x-1+sw,yy+7,2,1); ctx.fillStyle='#7a1e24'; ctx.fillRect(x-5+sw,yy+15,3,2); ctx.fillRect(x+2+sw,yy+15,3,2); }
+}
 
 /* ======================================================================
    QUAKBERT – DETAILS UND LEBEN
@@ -14817,7 +14835,8 @@ function cutTufts(x,y,rad){
   for(const t of L.tufts){ if(Math.hypot(t.x-x,(t.y-20)-y)<rad){ t.dead=true; cut=true; for(let i=0;i<5;i++) addPart({x:t.x+rand(-8,8),y:t.y-14,vx:rand(-140,140),vy:rand(-230,-70),life:rand(.5,.9),size:rand(5,9),color:Math.random()<.5?'#86c84a':'#4e8a34',kind:'blade',g:520,rot:rand(0,TAU)}); } }
   if(cut){ L.tufts=L.tufts.filter(t=>!t.dead); noise(0.08,0.12,3500); }
 }
-function drawTuft(t){ spr(t.nm,t.x,t.y,{s:t.s,flip:t.flip,skew:-(Math.sin(T*1.7+t.ph)*0.12+t.bend)}); }
+function drawTuft(t){ const sw=R_&&R_.sumpf; if(sw){ ctx.save(); ctx.fillStyle='rgba(10,8,5,.32)'; const o=((t.x*7)|0)%5-2; ctx.fillRect(Math.round(t.x-9*t.s+o),Math.round(t.y-1),Math.round(15*t.s),2); ctx.fillRect(Math.round(t.x-4*t.s-o),Math.round(t.y+1),Math.round(10*t.s),2); ctx.fillRect(Math.round(t.x+5*t.s),Math.round(t.y),3,1); ctx.restore(); }
+  spr(t.nm,t.x,t.y,{s:t.s,flip:t.flip,skew:-(Math.sin(T*1.7+t.ph)*0.12+t.bend),overlay:sw?'#2a2414':null,overlayA:0.22}); }
 
 /* ---------------- Dorf-Logik ---------------- */
 function nearest(list,rad,oy){ let best=null,bd=rad; for(const o of list){ const d=Math.hypot(o.x-P.x,(o.y+(oy||0))-P.y); if(d<bd){bd=d;best=o;} } return best; }
@@ -15318,7 +15337,7 @@ let MMA=1;
 function drawMinimap(){
   const reg=REGIONS[G.region]; if(!reg){ drawMinimap0(); return; }
   const ws=o=>({x:(o.x-cam.x)/VIEWW*W,y:(o.y-cam.y)/VIEWH*H}); const who=[P]; if(typeof moActive==='function'&&moActive()) who.push(MO); if(R_&&R_.pz&&R_.pz.hw&&R_.pz.hw.fox) who.push(R_.pz.hw.fox);
-  const xs=reg.rooms.map(r=>r.gx), ys=reg.rooms.map(r=>r.gy); const mw=(Math.max(...xs)-Math.min(...xs)+1)*60+14, mh=(Math.max(...ys)-Math.min(...ys)+1)*44+40; const mx=W-mw-14;
+  const xs=reg.rooms.map(r=>r.gx), ys=reg.rooms.map(r=>r.gy); const mw=(Math.max(...xs)-Math.min(...xs)+1)*52+12, mh=(Math.max(...ys)-Math.min(...ys)+1)*38+38; const mx=W-mw-14;
   const under=who.some(o=>{ const p=ws(o); return p.x>mx-30&&p.y-90<14+mh+10&&p.y>0; });
   MMA+=((under?0.28:1)-MMA)*0.12; ctx.save(); ctx.globalAlpha*=MMA; drawMinimap0(); ctx.restore();
 }
@@ -15326,10 +15345,10 @@ function drawMinimap0(){
   const reg=REGIONS[G.region]; const rooms=reg.rooms;
   const xs=rooms.map(r=>r.gx), ys=rooms.map(r=>r.gy);
   const minx=Math.min(...xs), maxx=Math.max(...xs), miny=Math.min(...ys), maxy=Math.max(...ys);
-  const cw=46, ch=30, gap=14;
+  const cw=40, ch=26, gap=12;
   const mw=(maxx-minx+1)*(cw+gap)+gap, mh=(maxy-miny+1)*(ch+gap)+gap+26;
   const mx=W-mw-14, my=14;
-  ctx.beginPath(); prr(mx,my,mw,mh,10); ctx.fillStyle='rgba(16,8,12,.86)'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle=OUT; ctx.stroke();
+  ctx.beginPath(); prr(mx,my,mw,mh,10); ctx.fillStyle='rgba(16,8,12,.64)'; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=OUT; ctx.stroke();
   textO(reg.name,mx+mw/2,my+15,17,FD,'#f3e7cf','center',0,700);
   const pos=r=>({x:mx+gap+(r.gx-minx)*(cw+gap)+cw/2,y:my+26+gap+(r.gy-miny)*(ch+gap)+ch/2});
   const known=r=>G.visited[r.id]||reg.links.some(([a,b])=>(a===r.id&&G.visited[b])||(b===r.id&&G.visited[a]));
