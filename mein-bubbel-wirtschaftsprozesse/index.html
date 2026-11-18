@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mein Bubbel schafft das – Probeklausur Wirtschaftsprozesse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1d3a8f; --ink2:#2a4fb8; --red:#c62828; --green:#2e7d32; --pencil:#555;
+  --paper:#fdfdf6; --grid:#c9dcef; --margin:#e57373; --marker:rgba(255,235,59,.55);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#6d7b8a radial-gradient(circle at 30% 20%,#8a97a5,#55606c);
+  font-family:'Kalam',cursive; color:var(--ink); min-height:100vh;
+  display:flex; flex-direction:column; align-items:center; padding:18px 10px 40px;
+}
+.topbar{width:100%;max-width:860px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;color:#fff;font-family:'Caveat';font-size:22px}
+.topbar .bar{flex:1;height:10px;background:rgba(255,255,255,.25);border-radius:6px;overflow:hidden}
+.topbar .bar i{display:block;height:100%;background:#ffd54f;width:0;transition:width .5s}
+.page{
+  position:relative; width:100%; max-width:860px; min-height:1120px;
+  background-color:var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:20px 20px;
+  box-shadow:0 10px 30px rgba(0,0,0,.35), 0 1px 0 #fff inset;
+  padding:34px 34px 90px 96px; border-radius:2px;
+  animation:flip .45s ease;
+}
+.page:before{ /* Rand */
+  content:""; position:absolute; top:0; bottom:0; left:72px; width:2px; background:var(--margin); opacity:.8;
+}
+.page .holes{position:absolute;left:22px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:space-around;padding:120px 0}
+.page .holes span{width:20px;height:20px;border-radius:50%;background:#55606c;box-shadow:inset 0 2px 4px rgba(0,0,0,.5)}
+@keyframes flip{from{opacity:0;transform:translateX(40px) rotate(.6deg)}to{opacity:1;transform:none}}
+.head{display:flex;justify-content:space-between;font-family:'Caveat';font-size:22px;color:var(--pencil);border-bottom:2px solid var(--ink);padding-bottom:4px;margin-bottom:18px}
+h1,h2,h3{font-family:'Caveat';font-weight:700;margin:.2em 0 .3em;line-height:1.1}
+h1{font-size:54px;color:var(--red);transform:rotate(-1.5deg)}
+h2{font-size:40px;color:var(--ink)}
+h2 u{text-decoration:underline wavy var(--red) 2px;text-underline-offset:6px}
+h3{font-size:30px;color:var(--ink2);margin-top:22px}
+p,li{font-size:19px;line-height:1.55}
+ul{padding-left:22px}
+.mark{background:linear-gradient(100deg,transparent 2%,var(--marker) 4%,var(--marker) 96%,transparent 98%);padding:0 3px}
+.red{color:var(--red)}
+.box{border:2.5px solid var(--red);border-radius:12px 18px 10px 16px;padding:10px 16px;margin:14px 0;transform:rotate(-.3deg);background:rgba(255,255,255,.35)}
+.box b.t{font-family:'Caveat';font-size:26px;color:var(--red)}
+.formula{font-size:21px;padding:6px 14px;border-left:4px solid var(--ink);margin:10px 0;background:rgba(29,58,143,.05)}
+table.bs{border-collapse:collapse;margin:8px 0 12px;font-size:18px}
+table.bs td{padding:1px 10px}
+table.bs td.n{text-align:right;font-variant-numeric:tabular-nums}
+table.bs td.an{color:var(--red);font-weight:700;padding-left:30px}
+table.calc{border-collapse:collapse;font-size:18px;margin:6px 0 12px}
+table.calc td{padding:1px 12px}
+table.calc td.n{text-align:right}
+table.calc tr.sum td{border-top:2px solid var(--ink);font-weight:700}
+.task{margin:26px 0 34px}
+.task h3{margin-bottom:4px}
+.task .txt{font-size:19px}
+.part{margin:14px 0 6px;padding-left:4px}
+.part .lbl{font-size:19px;margin-bottom:4px}
+.state{display:inline-block;margin-left:8px;font-family:'Caveat';font-size:28px;line-height:1}
+.ok{color:var(--green)} .bad{color:var(--red)}
+input.num{font-family:'Kalam';font-size:20px;color:var(--ink);background:transparent;border:none;border-bottom:2px dashed var(--ink);width:170px;padding:0 6px;outline:none}
+input.num:focus{border-bottom-style:solid;background:rgba(255,255,255,.6)}
+.unit{font-size:19px;margin-left:4px}
+.book{display:flex;flex-wrap:wrap;gap:6px 24px;align-items:flex-start;margin-top:4px}
+.book .side{min-width:300px}
+.book .side .cap{font-family:'Caveat';font-size:22px;color:var(--pencil)}
+.book .an{font-family:'Caveat';font-size:30px;color:var(--red);padding-top:22px}
+.brow{display:flex;gap:6px;align-items:center;margin:3px 0}
+select{font-family:'Kalam';font-size:16px;color:var(--ink);background:rgba(255,255,255,.55);border:1.5px solid #9fb3d9;border-radius:4px;padding:2px 4px;max-width:260px}
+.brow input.num{width:120px;font-size:18px}
+.mini{font-family:'Caveat';font-size:20px;background:none;border:none;color:var(--ink2);cursor:pointer;padding:0 4px}
+.mini:hover{color:var(--red)}
+.choice label{display:block;font-size:18px;cursor:pointer;padding:1px 0}
+.choice input{accent-color:var(--ink);transform:scale(1.2);margin-right:8px}
+.actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:16px}
+button.pen{font-family:'Caveat';font-size:26px;color:#fff;background:var(--ink);border:none;border-radius:10px 14px 9px 13px;padding:4px 20px;cursor:pointer;box-shadow:2px 3px 0 rgba(0,0,0,.25)}
+button.pen:hover{background:var(--ink2)}
+button.pen.red{background:var(--red)}
+button.pen:disabled{background:#9aa3b5;cursor:not-allowed;box-shadow:none}
+.hints{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
+.hint{width:240px;min-height:74px;position:relative;font-size:16px;line-height:1.4;padding:10px 12px;background:#fffbe0;border:1px solid #e6d77a;color:#4a4a2a;box-shadow:2px 3px 6px rgba(0,0,0,.15);transform:rotate(-1deg)}
+.hint:nth-child(2){transform:rotate(1.2deg)} .hint:nth-child(3){transform:rotate(-.4deg)}
+.hint .cover{position:absolute;inset:0;background:#ffe066;display:flex;align-items:center;justify-content:center;font-family:'Caveat';font-size:24px;color:#6b5600;cursor:pointer;transition:transform .35s ease,opacity .35s}
+.hint .cover.locked{background:#ece5bd;color:#a59a63;cursor:not-allowed}
+.hint .cover.open{transform:translateY(-110%) rotate(-8deg);opacity:0;pointer-events:none}
+.solution{margin-top:14px;padding:10px 16px;border:2px dashed var(--green);border-radius:10px;color:#1e5a22;font-size:18px;display:none}
+.solution.show{display:block}
+.fb{font-family:'Caveat';font-size:24px;margin-left:6px}
+button.pen.skip{background:#9aa3b5}
+.overlay{position:fixed;inset:0;background:rgba(30,40,60,.6);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.savecard{max-width:560px;width:100%;background:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:20px 20px;padding:24px 28px;border-radius:6px;box-shadow:0 10px 30px rgba(0,0,0,.4);transform:rotate(-.5deg)}
+.savecard .code{font-family:Consolas,'Courier New',monospace;font-size:28px;font-weight:700;letter-spacing:1px;color:var(--red);border:3px dashed var(--red);border-radius:10px;padding:8px 14px;text-align:center;margin:10px 0;word-break:break-all}
+.tree{font-size:18px;margin:8px 0 12px;padding:8px 14px;border-left:3px solid var(--ink)}
+.tree ul{list-style:none;margin:2px 0;padding-left:26px;border-left:2px dashed #9fb3d9}
+.tree li{position:relative;margin:2px 0}
+.tree li:before{content:'';position:absolute;left:-26px;top:14px;width:20px;border-top:2px dashed #9fb3d9}
+.rfb{font-family:'Caveat';font-size:20px;margin-left:4px;white-space:nowrap}
+.sumline{font-family:'Caveat';font-size:20px;color:var(--pencil);margin-top:4px}
+.rowmsg{font-family:'Caveat';font-size:21px}
+.nav{position:absolute;left:96px;right:34px;bottom:26px;display:flex;justify-content:space-between;align-items:center}
+.nav .pg{font-family:'Caveat';font-size:22px;color:var(--pencil)}
+.locked-msg{font-family:'Caveat';font-size:21px;color:var(--red)}
+.toc li{font-size:20px;list-style:none;margin:4px 0;cursor:pointer}
+.toc li.lock{color:#9aa3b5;cursor:default}
+.toc li .ic{display:inline-block;width:30px}
+.doodle{position:absolute;right:40px;top:110px;font-family:'Caveat';font-size:26px;color:var(--red);transform:rotate(8deg);text-align:center}
+.stamp{display:inline-block;border:3px solid var(--green);color:var(--green);font-family:'Caveat';font-size:34px;padding:2px 16px;border-radius:8px;transform:rotate(-6deg)}
+@media (max-width:640px){
+  .page{padding:24px 14px 100px 46px;min-height:auto}
+  .page:before{left:34px}
+  .page .holes{display:none}
+  .nav{left:46px;right:14px}
+  h1{font-size:40px} h2{font-size:32px}
+  .book .side{min-width:0;width:100%}
+  .book .an{padding-top:0}
+  .doodle{display:none}
+}
+</style>
+</head>
+<body>
+<div class="topbar"><span id="tbl">Fortschritt</span><div class="bar"><i id="bar"></i></div><span id="tbr"></span><button class="pen" id="saveBtn" style="font-size:22px;padding:2px 14px;background:#ffd54f;color:#3a3000">💾 Speichern</button></div>
+<div class="page" id="page"></div>
+
+<script>
+/* ---------- Konten (IKR) ---------- */
+const KONTEN = {
+  "0700":"Techn. Anlagen und Maschinen","0840":"Fuhrpark","0860":"Büromaschinen","0870":"Büromöbel/Geschäftsausst. (BGA)",
+  "0900":"Geleistete Anzahlungen auf Sachanlagen",
+  "2000":"Rohstoffe","2020":"Hilfsstoffe","2030":"Betriebsstoffe","2100":"Unfertige Erzeugnisse","2200":"Fertige Erzeugnisse",
+  "2400":"Forderungen a. LL","2600":"Vorsteuer","2800":"Bank","2880":"Kasse",
+  "3000":"Eigenkapital","4250":"Langfr. Bankverbindlichkeiten","4400":"Verbindlichkeiten a. LL","4800":"Umsatzsteuer",
+  "5000":"Umsatzerlöse f. eigene Erzeugnisse","5001":"Erlösberichtigungen","5200":"Bestandsveränderungen",
+  "5201":"Bestandsveränd. unfertige Erzeugnisse","5202":"Bestandsveränd. fertige Erzeugnisse","5300":"Aktivierte Eigenleistungen",
+  "6000":"Aufwendungen für Rohstoffe","6001":"Bezugskosten Rohstoffe","6002":"Nachlässe Rohstoffe",
+  "6020":"Aufwendungen für Hilfsstoffe","6030":"Aufwendungen für Betriebsstoffe",
+  "6520":"Abschreibungen auf Sachanlagen","6750":"Kosten des Geldverkehrs","7510":"Zinsaufwendungen"
+};
+const eur = n => n.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt = n => Number.isInteger(n) ? n.toLocaleString('de-DE') : eur(n);
+const K = k => `${k} ${KONTEN[k]}`;
+function bs(soll, haben){ // Buchungssatz als Tabelle
+  const rows = Math.max(soll.length, haben.length); let h='<table class="bs">';
+  for(let i=0;i<rows;i++){
+    const s=soll[i], b=haben[i];
+    h+=`<tr><td>${s?K(s[0]):''}</td><td class="n">${s?eur(s[1]):''}</td><td class="an">${i==0?'an':''}</td><td>${b?K(b[0]):''}</td><td class="n">${b?eur(b[1]):''}</td></tr>`;
+  }
+  return h+'</table>';
+}
+function table3(rows){ return '<table class="calc">'+rows.map((r,i)=>`<tr>${r.map((c,j)=>`<td class="${j?'n':''}" style="${i==0?'font-weight:700':''}">${c}</td>`).join('')}</tr>`).join('')+'</table>'; }
+function calc(rows){ // [label, wert, sum?]
+  return '<table class="calc">'+rows.map(r=>`<tr class="${r[2]?'sum':''}"><td>${r[0]}</td><td class="n">${r[1]}</td></tr>`).join('')+'</table>';
+}
+
+/* ---------- Inhalte ---------- */
+const TOPICS = [
+/* 1 */ {
+title:"Unternehmensleitbild & Unternehmensziele",
+info:`
+<h3>Unternehmensleitbild</h3>
+<p>Das <span class="mark">Leitbild</span> ist das schriftlich festgehaltene <b>Selbstverständnis</b> eines Unternehmens: Wer sind wir? Wofür stehen wir? Wie gehen wir mit Kunden, Mitarbeitern, Umwelt und Gesellschaft um?</p>
+<div class="box"><b class="t">Bestandteile</b><br>
+<b>Vision</b> – Wo wollen wir langfristig hin? (Zukunftsbild)<br>
+<b>Mission</b> – Was ist unser Auftrag / Zweck? (Wofür gibt es uns?)<br>
+<b>Werte & Grundsätze</b> – Wie verhalten wir uns? (z. B. Fairness, Qualität, Nachhaltigkeit)</div>
+<div class="box"><b class="t">Wirkung</b><br>
+<b>nach innen:</b> Orientierung, Motivation und Identifikation der Mitarbeiter · Grundlage für Entscheidungen<br>
+<b>nach außen:</b> Image bei Kunden, Lieferern, Bewerbern und Öffentlichkeit</div>
+<p>Aus dem Leitbild werden die konkreten <b>Unternehmensziele</b> abgeleitet: Leitbild → Oberziele (langfristig, strategisch) → Zwischenziele → Unterziele (kurzfristig, operativ, für einzelne Abteilungen).</p>
+<h3>Zielarten</h3>
+<div class="box"><b class="t">ökonomische Ziele</b> (wirtschaftlich)<br>Gewinn steigern · Umsatz steigern · Marktanteil ausbauen · Kosten senken · Liquidität sichern · Rentabilität erhöhen<br>
+<b class="t">ökologische Ziele</b> (Umwelt)<br>Energie & Rohstoffe sparen · CO₂-Ausstoß senken · Abfall vermeiden, recyceln · umweltfreundliche Produkte<br>
+<b class="t">soziale Ziele</b> (Menschen)<br>sichere Arbeitsplätze · faire Löhne · Arbeitsschutz · Weiterbildung · Vereinbarkeit von Familie & Beruf</div>
+<p class="red">Merke: Gewinn ist das wichtigste ökonomische Ziel – ohne Gewinn kann ein Unternehmen auf Dauer nicht überleben (und dann auch keine ökologischen oder sozialen Ziele erfüllen).</p>`,
+tasks:[
+ {title:"Aufgabe 1.1",
+  text:`Ordne jedes Ziel der Bubbel Metallbau GmbH der richtigen Zielart zu.`,
+  parts:[
+   {type:'pick',label:'a) Der Marktanteil bei Gartentoren soll auf 15 % steigen.',options:['ökonomisch','ökologisch','sozial'],ans:0},
+   {type:'pick',label:'b) Die Lackiererei soll auf lösungsmittelfreie Farben umgestellt werden.',options:['ökonomisch','ökologisch','sozial'],ans:1},
+   {type:'pick',label:'c) Jeder Mitarbeiter erhält jährlich zwei Weiterbildungstage.',options:['ökonomisch','ökologisch','sozial'],ans:2},
+   {type:'pick',label:'d) Die Zahlungsfähigkeit soll jederzeit gesichert sein.',options:['ökonomisch','ökologisch','sozial'],ans:0},
+   {type:'pick',label:'e) Metallreste werden zu 100 % dem Recycling zugeführt.',options:['ökonomisch','ökologisch','sozial'],ans:1}
+  ],
+  hints:["Frag dich: Geht es ums Geld, um die Umwelt oder um die Menschen?"],
+  solution:`a) ökonomisch · b) ökologisch · c) sozial · d) ökonomisch (Liquidität) · e) ökologisch`
+ },
+ {title:"Aufgabe 1.2",
+  text:`Auszug aus dem Leitbild der Bubbel Metallbau GmbH:<br>
+  <i>„Wir wollen bis 2035 der bekannteste Hersteller für Metall-Gartenmöbel in Süddeutschland sein. Wir fertigen langlebige Produkte aus Metall für private und gewerbliche Kunden. Wir gehen fair, ehrlich und respektvoll miteinander um."</i>`,
+  parts:[
+   {type:'pick',label:'a) „Bis 2035 der bekannteste Hersteller … sein" ist die …',options:['Vision','Mission','Wert / Grundsatz'],ans:0},
+   {type:'pick',label:'b) „Wir fertigen langlebige Produkte aus Metall …" ist die …',options:['Vision','Mission','Wert / Grundsatz'],ans:1},
+   {type:'pick',label:'c) „Wir gehen fair, ehrlich und respektvoll miteinander um" ist ein …',options:['Vision','Mission','Wert / Grundsatz'],ans:2},
+   {type:'choice',multi:true,label:'d) Welche Aufgaben erfüllt ein Leitbild? (alle richtigen ankreuzen)',options:['Orientierung für die Mitarbeiter','Positives Image nach außen','Genaue Vorgabe der Monatsumsätze je Abteilung','Identifikation der Mitarbeiter mit dem Unternehmen','Ersatz für den Arbeitsvertrag'],ans:[0,1,3]}
+  ],
+  hints:["Vision = Zukunftsbild. Mission = Zweck/Auftrag heute. Werte = wie wir uns verhalten.","Ein Leitbild ist allgemein formuliert – konkrete Zahlen stehen erst in den Zielen."],
+  solution:`a) Vision · b) Mission · c) Wert/Grundsatz<br>d) Orientierung, Image, Identifikation (konkrete Zahlen stehen in den Zielen, nicht im Leitbild)`
+ }
+]},
+/* 2 */ {
+title:"Zielbeziehungen: Zielharmonie, Zielkonflikt, Zielneutralität",
+info:`
+<p>Ein Unternehmen verfolgt immer <b>mehrere Ziele gleichzeitig</b>. Diese können sich gegenseitig beeinflussen:</p>
+<div class="box">
+<b class="t">Zielharmonie (komplementär)</b><br>Ein Ziel <b>fördert</b> das andere.<br><i>Energieverbrauch senken (ökologisch) ↔ Kosten senken (ökonomisch)</i><br><br>
+<b class="t">Zielkonflikt (konkurrierend)</b><br>Ein Ziel <b>behindert</b> das andere.<br><i>Filteranlage einbauen (ökologisch) ↔ Kosten senken (ökonomisch)</i><br>
+<i>Löhne erhöhen (sozial) ↔ Gewinn steigern (ökonomisch)</i><br><br>
+<b class="t">Zielneutralität (indifferent)</b><br>Die Ziele beeinflussen sich <b>nicht</b>.<br><i>Neues Firmenlogo ↔ Ausschussquote senken</i></div>
+<h3>Ökologie ↔ Ökonomie</h3>
+<p>Umweltschutz kostet <b>kurzfristig</b> oft Geld (Konflikt). <b>Langfristig</b> kann er sich auszahlen: geringere Energie- und Rohstoffkosten, besseres Image, neue Kunden, keine Strafen (Harmonie).</p>
+<h3>Was tun bei Zielkonflikten?</h3>
+<p>Ziele <b>gewichten</b> (Prioritäten setzen) · einen <b>Kompromiss</b> finden · ein Ziel zeitlich nachordnen · Mindestziele festlegen (z. B. „Gewinn mindestens …, dabei CO₂ −10 %").</p>
+<p class="red">Klausur-Tipp: Begründe immer, <b>warum</b> eine Harmonie oder ein Konflikt vorliegt – die gleichen Ziele können je nach Situation unterschiedlich zusammenhängen.</p>`,
+tasks:[
+ {title:"Aufgabe 2.1",
+  text:`Bestimme die Zielbeziehung.`,
+  parts:[
+   {type:'pick',label:'a) Mehr Werbung schalten ↔ Kosten senken',options:['Zielharmonie','Zielkonflikt','Zielneutralität'],ans:1},
+   {type:'pick',label:'b) Wärmerückgewinnung in der Halle ↔ Energiekosten senken',options:['Zielharmonie','Zielkonflikt','Zielneutralität'],ans:0},
+   {type:'pick',label:'c) Gehälter erhöhen ↔ Gewinn maximieren',options:['Zielharmonie','Zielkonflikt','Zielneutralität'],ans:1},
+   {type:'pick',label:'d) Neue Farbe der Firmenfahrzeuge ↔ Liquidität sichern',options:['Zielharmonie','Zielkonflikt','Zielneutralität'],ans:2},
+   {type:'pick',label:'e) Ausschuss senken ↔ Materialverbrauch senken',options:['Zielharmonie','Zielkonflikt','Zielneutralität'],ans:0}
+  ],
+  hints:["Wird Ziel 2 leichter, schwerer oder ist es egal, wenn ich Ziel 1 erreiche?"],
+  solution:`a) Konflikt (Werbung kostet) · b) Harmonie · c) Konflikt · d) Neutral · e) Harmonie`
+ },
+ {title:"Aufgabe 2.2",
+  text:`Die Bubbel Metallbau GmbH überlegt, eine Photovoltaikanlage für <b>180.000 €</b> auf das Hallendach zu bauen. Sie spart danach jedes Jahr <b>22.500 €</b> Stromkosten.`,
+  parts:[
+   {type:'choice',label:'a) Wie hängen „CO₂ senken" und „Gewinn steigern" im ersten Jahr zusammen?',options:['Zielharmonie, weil Strom gespart wird','Zielkonflikt, weil die hohe Investition zunächst Geld kostet','Zielneutralität'],ans:[1]},
+   {type:'num',label:'b) Nach wie vielen Jahren hat sich die Anlage durch die Einsparungen bezahlt gemacht?',ans:8,unit:'Jahre'},
+   {type:'choice',label:'c) Wie sieht die Zielbeziehung langfristig aus (Nutzungsdauer 25 Jahre)?',options:['Zielharmonie – nach der Amortisation spart die Anlage jedes Jahr Geld und CO₂','Weiterhin Zielkonflikt','Zielneutralität'],ans:[0]},
+   {type:'choice',multi:true,label:'d) Wie kann ein Unternehmen mit Zielkonflikten umgehen? (alle richtigen ankreuzen)',options:['Ziele gewichten / Prioritäten setzen','Einen Kompromiss finden','Alle Ziele einfach streichen','Mindestziele festlegen'],ans:[0,1,3]}
+  ],
+  hints:["Für b): Investition ÷ jährliche Einsparung.","Kurzfristig und langfristig können verschiedene Antworten richtig sein."],
+  solution:`a) <b>Zielkonflikt</b> (180.000 € Ausgaben, Gewinn sinkt zunächst)<br>b) 180.000 ÷ 22.500 = <b>8 Jahre</b><br>c) <b>Zielharmonie</b> langfristig<br>d) Gewichten, Kompromiss, Mindestziele`
+ }
+]},
+/* 3 */ {
+title:"Ziele SMART formulieren",
+info:`
+<p>Ein Ziel wie „Wir wollen besser werden" hilft niemandem – man weiß nie, ob es erreicht ist. Deshalb formuliert man Ziele <span class="mark">SMART</span>:</p>
+<div class="box">
+<b class="t">S – spezifisch</b> → eindeutig und konkret: <i>Was genau</i> soll erreicht werden?<br>
+<b class="t">M – messbar</b> → mit Zahl/Kennzahl überprüfbar: <i>Wie viel?</i><br>
+<b class="t">A – attraktiv / akzeptiert</b> → die Beteiligten tragen das Ziel mit<br>
+<b class="t">R – realistisch</b> → mit den vorhandenen Mitteln erreichbar<br>
+<b class="t">T – terminiert</b> → klarer Zeitpunkt: <i>Bis wann?</i></div>
+<h3>Beispiel</h3>
+<p>✘ „Wir wollen mehr verkaufen."<br>
+✔ „Der Umsatz mit Gartentoren soll bis zum 31.12.2027 um 10 % gegenüber 2026 steigen."</p>
+<h3>Zieldimensionen</h3>
+<p>Ein vollständiges Ziel hat <b>Zielinhalt</b> (was?), <b>Zielausmaß</b> (wie viel?) und <b>zeitlichen Bezug</b> (bis wann?).</p>
+<p class="red">Prüf-Trick: Fehlt eine Zahl → nicht messbar. Fehlt ein Datum → nicht terminiert. Ist es unmöglich (z. B. +500 % in einem Monat) → nicht realistisch.</p>`,
+tasks:[
+ {title:"Aufgabe 3.1",
+  text:`Welches SMART-Kriterium wird bei diesen Zielen vor allem verletzt?`,
+  parts:[
+   {type:'pick',label:'a) „Wir wollen den Umsatz um 8 % steigern."',options:['spezifisch','messbar','attraktiv/akzeptiert','realistisch','terminiert'],ans:4},
+   {type:'pick',label:'b) „Bis 31.12.2027 wollen wir umweltfreundlicher werden."',options:['spezifisch','messbar','attraktiv/akzeptiert','realistisch','terminiert'],ans:1},
+   {type:'pick',label:'c) „Der Gewinn soll bis Ende nächsten Monats um 400 % steigen." (bisher stagnierte er)',options:['spezifisch','messbar','attraktiv/akzeptiert','realistisch','terminiert'],ans:3},
+   {type:'pick',label:'d) Die Geschäftsführung legt ohne Absprache fest, dass alle Mitarbeiter ab sofort unbezahlt eine Stunde länger arbeiten.',options:['spezifisch','messbar','attraktiv/akzeptiert','realistisch','terminiert'],ans:2}
+  ],
+  hints:["Geh die Buchstaben S-M-A-R-T der Reihe nach durch: Was fehlt bzw. passt nicht?"],
+  solution:`a) <b>terminiert</b> fehlt (bis wann?) · b) <b>messbar</b> fehlt (um wie viel?) · c) nicht <b>realistisch</b> · d) nicht <b>akzeptiert</b>`
+ },
+ {title:"Aufgabe 3.2",
+  text:`Die Bubbel Metallbau GmbH möchte ihren Stromverbrauch senken.`,
+  parts:[
+   {type:'choice',label:'a) Welches Ziel ist SMART formuliert?',options:[
+     'Wir wollen viel weniger Strom verbrauchen.',
+     'Der Stromverbrauch soll bis 31.12.2027 um 12 % gegenüber 2026 sinken.',
+     'Der Stromverbrauch soll gesenkt werden, sobald es passt.',
+     'Der Stromverbrauch soll morgen auf null sinken.'],ans:[1]},
+   {type:'num',label:'b) 2026 wurden 250.000 kWh verbraucht. Wie viele kWh dürfen es 2027 höchstens sein, damit das Ziel aus a) erreicht ist?',ans:220000,unit:'kWh'},
+   {type:'pick',label:'c) Zu welcher Zielart gehört dieses Ziel?',options:['nur ökonomisch','nur ökologisch','ökologisch und ökonomisch (Zielharmonie)'],ans:2}
+  ],
+  hints:["Für b): 12 % von 250.000 abziehen.","Weniger Strom: gut für die Umwelt – und für …?"],
+  solution:`a) „bis 31.12.2027 um 12 % gegenüber 2026" – alles drin<br>b) 250.000 × 0,88 = <b>220.000 kWh</b><br>c) ökologisch <b>und</b> ökonomisch → Zielharmonie`
+ }
+]},
+/* 4 */ {
+title:"Shareholder & Stakeholder",
+info:`
+<div class="box"><b class="t">Shareholder</b> (= Anteilseigner)<br>
+Die <b>Eigentümer</b> des Unternehmens: Aktionäre einer AG, Gesellschafter einer GmbH.<br>
+Interesse: <b>hoher Gewinn</b>, hohe Dividende/Gewinnausschüttung, <b>steigender Unternehmenswert</b> (Aktienkurs).</div>
+<div class="box"><b class="t">Stakeholder</b> (= Anspruchsgruppen)<br>
+<b>Alle</b> Gruppen, die Ansprüche an das Unternehmen haben oder von ihm betroffen sind. Die Shareholder sind <b>ein Teil</b> der Stakeholder.</div>
+${table3([["Stakeholder","intern/extern","typisches Interesse"],["Eigentümer (Shareholder)","intern","Gewinn, Wertsteigerung"],["Mitarbeiter","intern","sicherer Arbeitsplatz, gutes Gehalt, gutes Klima"],["Management","intern","Erfolg, Macht, Vergütung"],["Kunden","extern","gute Qualität, niedrige Preise, Service"],["Lieferanten","extern","stabile Aufträge, pünktliche Zahlung"],["Banken / Fremdkapitalgeber","extern","Zinsen, Tilgung, Sicherheit"],["Staat","extern","Steuern, Arbeitsplätze, Gesetze einhalten"],["Öffentlichkeit / Anwohner","extern","Umweltschutz, wenig Lärm, Engagement vor Ort"]])}
+<h3>Zwei Denkweisen</h3>
+<p><b>Shareholder-Value-Ansatz:</b> Oberstes Ziel ist der Wert für die Eigentümer (Gewinn, Aktienkurs).<br>
+<b>Stakeholder-Ansatz:</b> Das Unternehmen berücksichtigt die Interessen <b>aller</b> Anspruchsgruppen – weil es auf Mitarbeiter, Kunden, Lieferer usw. angewiesen ist.</p>
+<p class="red">Interessen verschiedener Stakeholder widersprechen sich oft: Mitarbeiter wollen höhere Löhne, Eigentümer höhere Gewinne, Kunden niedrige Preise → Zielkonflikte!</p>`,
+tasks:[
+ {title:"Aufgabe 4.1",
+  text:`Welche Anspruchsgruppe vertritt dieses Interesse am ehesten?`,
+  parts:[
+   {type:'pick',label:'a) „Wir wollen, dass die Rechnungen pünktlich bezahlt werden und regelmäßig nachbestellt wird."',options:['Kunden','Lieferanten','Mitarbeiter','Staat','Bank'],ans:1},
+   {type:'pick',label:'b) „Die Zinsen und Tilgungsraten müssen sicher fließen."',options:['Kunden','Lieferanten','Mitarbeiter','Staat','Bank'],ans:4},
+   {type:'pick',label:'c) „Wir erwarten Steuereinnahmen und die Einhaltung der Gesetze."',options:['Kunden','Lieferanten','Mitarbeiter','Staat','Bank'],ans:3},
+   {type:'pick',label:'d) „Wir möchten gute Produkte zu einem fairen Preis und schnellen Service."',options:['Kunden','Lieferanten','Mitarbeiter','Staat','Bank'],ans:0},
+   {type:'pick',label:'e) „Uns sind ein sicherer Arbeitsplatz und Weiterbildung wichtig."',options:['Kunden','Lieferanten','Mitarbeiter','Staat','Bank'],ans:2}
+  ],
+  hints:["Überleg, welche Beziehung die Gruppe zum Unternehmen hat: Wer liefert, wer kauft, wer leiht Geld, wer arbeitet dort?"],
+  solution:`a) Lieferanten · b) Bank · c) Staat · d) Kunden · e) Mitarbeiter`
+ },
+ {title:"Aufgabe 4.2",
+  text:`Die Bubbel Metallbau GmbH hat einen Gewinn von 300.000 € erzielt. Die Gesellschafter möchten ihn komplett ausschütten. Der Betriebsrat fordert eine Prämie für alle Mitarbeiter, die Geschäftsführung will in eine neue Maschine investieren.`,
+  parts:[
+   {type:'pick',label:'a) Die Gesellschafter sind …',options:['nur Stakeholder','nur Shareholder','Shareholder und damit auch Stakeholder'],ans:2},
+   {type:'pick',label:'b) Mitarbeiter sind …',options:['interne Stakeholder','externe Stakeholder','Shareholder'],ans:0},
+   {type:'choice',label:'c) Was liegt hier vor?',options:['Zielharmonie zwischen allen Gruppen','Ein Interessenkonflikt zwischen Stakeholdern um die Verwendung des Gewinns','Zielneutralität'],ans:[1]},
+   {type:'choice',label:'d) Welcher Ansatz würde der vollständigen Ausschüttung an die Gesellschafter den Vorrang geben?',options:['Shareholder-Value-Ansatz','Stakeholder-Ansatz'],ans:[0]}
+  ],
+  hints:["Shareholder sind eine Teilgruppe der Stakeholder.","Drei Gruppen wollen dasselbe Geld für verschiedene Zwecke."],
+  solution:`a) Shareholder <b>und</b> Stakeholder · b) <b>interne</b> Stakeholder<br>c) <b>Interessenkonflikt</b> um den Gewinn<br>d) <b>Shareholder-Value-Ansatz</b> (Wert für die Eigentümer zuerst)`
+ }
+]},
+/* 5 */ {
+title:"Kennzahlen zur Überprüfung von Unternehmenszielen: Rentabilität",
+info:`
+<p>Ob ein ökonomisches Ziel erreicht wurde, prüft man mit <span class="mark">Kennzahlen</span>. Die wichtigsten sind die <b>Rentabilitäten</b>: Sie setzen den Gewinn ins Verhältnis zum eingesetzten Kapital oder zum Umsatz.</p>
+<div class="formula">Eigenkapitalrentabilität = Gewinn × 100 ÷ Eigenkapital</div>
+<p>→ Wie gut verzinst sich das Kapital der Eigentümer? (Interesse der <b>Shareholder</b>)</p>
+<div class="formula">Gesamtkapitalrentabilität = (Gewinn + Fremdkapitalzinsen) × 100 ÷ Gesamtkapital</div>
+<p>→ Verzinsung des gesamten Kapitals (EK + FK). Die Zinsen kommen dazu, weil sie der „Gewinn" der Kreditgeber sind.</p>
+<div class="formula">Umsatzrentabilität = Gewinn × 100 ÷ Umsatzerlöse</div>
+<p>→ Wie viel Gewinn bleibt von 100 € Umsatz übrig?</p>
+<div class="box"><b class="t">ROI – Return on Investment</b>
+<div class="formula" style="margin:6px 0">Kapitalumschlag = Umsatzerlöse ÷ Gesamtkapital</div>
+<div class="formula" style="margin:6px 0">ROI = Umsatzrentabilität × Kapitalumschlag (= Gewinn × 100 ÷ Gesamtkapital)</div>
+Zeigt, ob die Rentabilität über die <b>Gewinnspanne</b> oder über den <b>schnellen Kapitalumschlag</b> entsteht.</div>
+<p style="font-size:16px;color:var(--pencil)">✎ „Gewinn" = Jahresüberschuss. Manche Bücher ziehen bei Einzelunternehmen noch einen Unternehmerlohn ab oder rechnen beim ROI mit Gewinn + Zinsen – nimm, was eure Lehrkraft vorgibt.</p>
+<h3>Ziel erreicht?</h3>
+<p>Ist-Wert ausrechnen und mit dem Soll-Wert (Ziel) vergleichen. Auf <b>Prozentpunkte</b> achten: Von 4 % auf 5 % ist +1 Prozentpunkt, aber +25 %.</p>`,
+tasks:[
+ {title:"Aufgabe 5.1",
+  text:`Jahresabschluss der Bubbel Metallbau GmbH:<br>
+  ${calc([["Eigenkapital","600.000 €"],["Fremdkapital","900.000 €"],["Jahresüberschuss (Gewinn)","72.000 €"],["Zinsaufwendungen für FK","45.000 €"],["Umsatzerlöse","2.400.000 €"]])}`,
+  parts:[
+   {type:'num',label:'a) Eigenkapitalrentabilität:',ans:12,unit:'%'},
+   {type:'num',label:'b) Gesamtkapitalrentabilität:',ans:7.8,unit:'%'},
+   {type:'num',label:'c) Umsatzrentabilität:',ans:3,unit:'%'},
+   {type:'num',label:'d) Kapitalumschlag:',ans:1.6,unit:''},
+   {type:'num',label:'e) ROI:',ans:4.8,unit:'%'}
+  ],
+  hints:["Gesamtkapital = EK + FK = 1.500.000 €. Bei der GK-Rentabilität kommen die Zinsen zum Gewinn dazu.","ROI = Umsatzrentabilität × Kapitalumschlag."],
+  solution:`a) 72.000 × 100 ÷ 600.000 = <b>12 %</b><br>b) (72.000 + 45.000) × 100 ÷ 1.500.000 = <b>7,8 %</b><br>c) 72.000 × 100 ÷ 2.400.000 = <b>3 %</b><br>d) 2.400.000 ÷ 1.500.000 = <b>1,6</b><br>e) 3 % × 1,6 = <b>4,8 %</b> (= 72.000 ÷ 1.500.000)`
+ },
+ {title:"Aufgabe 5.2",
+  text:`Die Gesellschafter hatten für das Jahr folgende Ziele beschlossen: <b>Eigenkapitalrentabilität mindestens 10 %</b> und <b>Umsatzrentabilität mindestens 4 %</b>. (Werte aus 5.1)`,
+  parts:[
+   {type:'pick',label:'a) Wurde das Ziel bei der Eigenkapitalrentabilität erreicht?',options:['ja','nein'],ans:0},
+   {type:'pick',label:'b) Wurde das Ziel bei der Umsatzrentabilität erreicht?',options:['ja','nein'],ans:1},
+   {type:'num',label:'c) Wie hoch hätte der Gewinn bei gleichem Umsatz mindestens sein müssen, um 4 % Umsatzrentabilität zu erreichen?',ans:96000,unit:'€'},
+   {type:'num',label:'d) Um wie viele Prozentpunkte wurde das Umsatzrentabilitäts-Ziel verfehlt?',ans:1,unit:'Prozentpunkte'},
+   {type:'choice',label:'e) Welche Stakeholder-Gruppe interessiert sich vor allem für die Eigenkapitalrentabilität?',options:['Shareholder / Eigentümer','Kunden','Lieferanten'],ans:[0]}
+  ],
+  hints:["Für c): Gewinn = 4 % vom Umsatz.","Prozentpunkte = einfache Differenz der beiden Prozentwerte."],
+  solution:`a) 12 % ≥ 10 % → <b>ja</b><br>b) 3 % &lt; 4 % → <b>nein</b><br>c) 2.400.000 × 4 % = <b>96.000 €</b><br>d) 4 − 3 = <b>1 Prozentpunkt</b><br>e) Die <b>Eigentümer</b> – es geht um die Verzinsung ihres Kapitals.`
+ }
+]},
+/* 6 */ {
+title:"Bedürfnisse & Bedürfnispyramide",
+info:`
+<p>Ein <span class="mark">Bedürfnis</span> ist das <b>Gefühl eines Mangels</b>, verbunden mit dem Wunsch, diesen Mangel zu beseitigen (z. B. Hunger, Wunsch nach Urlaub).</p>
+<h3>Arten von Bedürfnissen</h3>
+<div class="box"><b class="t">nach der Dringlichkeit</b><br>
+<b>Existenzbedürfnisse</b> – lebensnotwendig: Essen, Trinken, Kleidung, Wohnung<br>
+<b>Kulturbedürfnisse</b> – gehören zum üblichen Lebensstandard: Bildung, Kino, Smartphone, Reisen<br>
+<b>Luxusbedürfnisse</b> – gehen weit darüber hinaus: Yacht, Sportwagen, Designeruhr<br>
+<i>Die Grenzen hängen von Zeit, Land und Einkommen ab!</i><br><br>
+<b class="t">nach dem Träger</b><br>
+<b>Individualbedürfnisse</b> – der Einzelne befriedigt sie selbst (Essen, Kleidung)<br>
+<b>Kollektivbedürfnisse</b> – nur durch die Gemeinschaft befriedigbar (Straßen, Schulen, Polizei, Krankenhäuser)<br><br>
+<b class="t">nach dem Bewusstsein</b><br>
+<b>offene (bewusste)</b> Bedürfnisse ↔ <b>latente (verborgene)</b> Bedürfnisse, die z. B. erst durch Werbung geweckt werden</div>
+<h3>Bedürfnispyramide nach Maslow</h3>
+<div class="tree" style="border-left:none;text-align:center;font-size:18px;line-height:1.9">
+<span style="display:inline-block;width:30%;border:2px solid var(--ink);border-radius:6px">5 Selbstverwirklichung</span><br>
+<span style="display:inline-block;width:45%;border:2px solid var(--ink);border-radius:6px">4 Wertschätzung / Ich-Bedürfnisse</span><br>
+<span style="display:inline-block;width:60%;border:2px solid var(--ink);border-radius:6px">3 Soziale Bedürfnisse</span><br>
+<span style="display:inline-block;width:75%;border:2px solid var(--ink);border-radius:6px">2 Sicherheitsbedürfnisse</span><br>
+<span style="display:inline-block;width:90%;border:2px solid var(--ink);border-radius:6px">1 Physiologische Grundbedürfnisse</span></div>
+${calc([["1 Grundbedürfnisse","Essen, Trinken, Schlaf, Wärme"],["2 Sicherheit","sicherer Arbeitsplatz, Wohnung, Versicherungen, Gesundheit"],["3 Soziale Bedürfnisse","Freundschaft, Familie, Zugehörigkeit, Teamgeist"],["4 Wertschätzung","Anerkennung, Lob, Status, Beförderung"],["5 Selbstverwirklichung","eigene Talente entfalten, Sinn, kreative Arbeit"]])}
+<p>Stufen 1–4 heißen <b>Defizitbedürfnisse</b> (Mangel wird beseitigt), Stufe 5 <b>Wachstumsbedürfnis</b> (wird nie ganz befriedigt). Nach Maslow strebt man erst nach der nächsten Stufe, wenn die darunterliegende weitgehend erfüllt ist.</p>
+<p class="red">Kritik: Die strenge Reihenfolge stimmt nicht immer (z. B. Künstler, die für ihre Kunst hungern), und das Modell ist stark vereinfacht. Unternehmen nutzen es trotzdem – für Werbung und für die Motivation von Mitarbeitern.</p>`,
+tasks:[
+ {title:"Aufgabe 6.1",
+  text:`Ordne die Situation der Stufe der Bedürfnispyramide nach Maslow zu.`,
+  parts:[
+   {type:'pick',label:'a) Lena freut sich über ihren unbefristeten Arbeitsvertrag.',options:['1 Grundbedürfnisse','2 Sicherheit','3 Soziale Bedürfnisse','4 Wertschätzung','5 Selbstverwirklichung'],ans:1},
+   {type:'pick',label:'b) Tom wird vor dem ganzen Team für sein Projekt gelobt und zum Teamleiter befördert.',options:['1 Grundbedürfnisse','2 Sicherheit','3 Soziale Bedürfnisse','4 Wertschätzung','5 Selbstverwirklichung'],ans:3},
+   {type:'pick',label:'c) In der Kantine gibt es ein kostenloses Mittagessen.',options:['1 Grundbedürfnisse','2 Sicherheit','3 Soziale Bedürfnisse','4 Wertschätzung','5 Selbstverwirklichung'],ans:0},
+   {type:'pick',label:'d) Die Abteilung geht gemeinsam zum Firmenlauf und danach grillen.',options:['1 Grundbedürfnisse','2 Sicherheit','3 Soziale Bedürfnisse','4 Wertschätzung','5 Selbstverwirklichung'],ans:2},
+   {type:'pick',label:'e) Ein Azubi darf eigenständig eine neue App für die Firma entwickeln und seine Ideen umsetzen.',options:['1 Grundbedürfnisse','2 Sicherheit','3 Soziale Bedürfnisse','4 Wertschätzung','5 Selbstverwirklichung'],ans:4}
+  ],
+  hints:["Unterschied 4 ↔ 5: Bei Wertschätzung kommt die Anerkennung von anderen, bei Selbstverwirklichung geht es um die eigene Entfaltung."],
+  solution:`a) 2 Sicherheit · b) 4 Wertschätzung · c) 1 Grundbedürfnisse · d) 3 Soziale Bedürfnisse · e) 5 Selbstverwirklichung`
+ },
+ {title:"Aufgabe 6.2",
+  text:`Bedürfnisarten.`,
+  parts:[
+   {type:'pick',label:'a) Wunsch nach einer gut ausgebauten Autobahn →',options:['Individualbedürfnis','Kollektivbedürfnis'],ans:1},
+   {type:'pick',label:'b) Ein Wintermantel in Deutschland →',options:['Existenzbedürfnis','Kulturbedürfnis','Luxusbedürfnis'],ans:0},
+   {type:'pick',label:'c) Ein Privatjet →',options:['Existenzbedürfnis','Kulturbedürfnis','Luxusbedürfnis'],ans:2},
+   {type:'pick',label:'d) Ein Kinobesuch →',options:['Existenzbedürfnis','Kulturbedürfnis','Luxusbedürfnis'],ans:1},
+   {type:'choice',multi:true,label:'e) Welche Aussagen zu Maslow stimmen? (alle richtigen ankreuzen)',options:['Stufen 1–4 sind Defizitbedürfnisse.','Selbstverwirklichung ist ein Wachstumsbedürfnis.','Die Pyramide gilt ausnahmslos für jeden Menschen.','Unternehmen nutzen das Modell z. B. zur Mitarbeitermotivation.'],ans:[0,1,3]}
+  ],
+  hints:["Kann ich das Bedürfnis allein (mit meinem Geld) befriedigen – oder braucht es die Gemeinschaft/den Staat?"],
+  solution:`a) Kollektiv · b) Existenz · c) Luxus · d) Kultur<br>e) Defizit 1–4, Wachstum 5, Nutzung zur Motivation – aber es gilt <b>nicht</b> ausnahmslos.`
+ }
+]},
+/* 7 */ {
+title:"Bedarf, Nachfrage & Güter",
+info:`
+<h3>Vom Bedürfnis zur Nachfrage</h3>
+<div class="formula">Bedürfnis → + Kaufkraft → Bedarf → + am Markt geäußert → Nachfrage</div>
+<p><b>Bedürfnis:</b> „Ich hätte gern ein neues Fahrrad."<br>
+<b>Bedarf:</b> Das Bedürfnis, für das man auch <b>Geld (Kaufkraft)</b> hat: „Ich habe 800 € gespart."<br>
+<b>Nachfrage:</b> Der Bedarf wird <b>am Markt</b> wirksam: „Ich gehe in den Laden und kaufe das Rad."</p>
+<h3>Güter</h3>
+<p><span class="mark">Güter</span> sind alle Mittel, die Bedürfnisse befriedigen.</p>
+<div class="box">
+<b class="t">freie Güter</b> – unbegrenzt vorhanden, kostenlos (Luft zum Atmen, Sonnenlicht)<br>
+<b class="t">wirtschaftliche Güter</b> – <b>knapp</b>, haben einen Preis → darum muss man wirtschaften<br><br>
+Wirtschaftliche Güter teilen sich auf in:<br>
+<b>materielle Güter (Sachgüter)</b><br>
+&nbsp;&nbsp;→ <b>Konsumgüter</b> (für private Haushalte) oder <b>Produktionsgüter / Investitionsgüter</b> (für Unternehmen)<br>
+&nbsp;&nbsp;→ jeweils <b>Gebrauchsgüter</b> (mehrfach nutzbar: Kühlschrank, Maschine) oder <b>Verbrauchsgüter</b> (einmal: Brot, Schmierstoff)<br>
+<b>immaterielle Güter</b><br>
+&nbsp;&nbsp;→ <b>Dienstleistungen</b> (Haarschnitt, Beratung, Transport) und <b>Rechte</b> (Patente, Lizenzen, Markenrechte)</div>
+<p><b>Komplementärgüter</b> ergänzen sich (Drucker + Tinte, Auto + Benzin). <b>Substitutionsgüter</b> ersetzen sich (Butter ↔ Margarine, Bahn ↔ Fernbus).</p>
+<p>Gleiches Gut, anderer Zweck: Ein Laptop für den Schüler ist ein <b>Konsumgut</b>, im Büro der Firma ein <b>Produktionsgut</b>.</p>
+<h3>Ökonomisches Prinzip</h3>
+<p>Weil Güter knapp sind, muss man wirtschaften:<br>
+<b>Maximalprinzip:</b> mit gegebenen Mitteln einen <b>möglichst großen</b> Erfolg erzielen.<br>
+<b>Minimalprinzip:</b> ein festes Ziel mit <b>möglichst geringen</b> Mitteln erreichen.</p>
+<p class="red">Falle: „Mit möglichst wenig Mitteln möglichst viel erreichen" geht nicht – das ist kein ökonomisches Prinzip!</p>`,
+tasks:[
+ {title:"Aufgabe 7.1",
+  text:`Bedürfnis, Bedarf oder Nachfrage?`,
+  parts:[
+   {type:'pick',label:'a) Mia wünscht sich eine Spielkonsole, hat aber kein Geld.',options:['Bedürfnis','Bedarf','Nachfrage'],ans:0},
+   {type:'pick',label:'b) Mia hat 450 € gespart und könnte sich die Konsole leisten.',options:['Bedürfnis','Bedarf','Nachfrage'],ans:1},
+   {type:'pick',label:'c) Mia bestellt die Konsole im Onlineshop.',options:['Bedürfnis','Bedarf','Nachfrage'],ans:2}
+  ],
+  hints:["Kaufkraft macht aus dem Bedürfnis einen Bedarf – und was macht daraus Nachfrage?"],
+  solution:`a) Bedürfnis · b) Bedarf (Kaufkraft vorhanden) · c) Nachfrage (am Markt geäußert)`
+ },
+ {title:"Aufgabe 7.2",
+  text:`Ordne die Güter zu.`,
+  parts:[
+   {type:'pick',label:'a) Die CNC-Fräsmaschine der Bubbel Metallbau GmbH',options:['Konsumgut – Gebrauchsgut','Konsumgut – Verbrauchsgut','Produktionsgut – Gebrauchsgut','Produktionsgut – Verbrauchsgut'],ans:2},
+   {type:'pick',label:'b) Kühlschmierstoff für diese Fräsmaschine',options:['Konsumgut – Gebrauchsgut','Konsumgut – Verbrauchsgut','Produktionsgut – Gebrauchsgut','Produktionsgut – Verbrauchsgut'],ans:3},
+   {type:'pick',label:'c) Die Pizza, die ein Kunde abends zu Hause isst',options:['Konsumgut – Gebrauchsgut','Konsumgut – Verbrauchsgut','Produktionsgut – Gebrauchsgut','Produktionsgut – Verbrauchsgut'],ans:1},
+   {type:'pick',label:'d) Ein Patent auf ein neues Scharnier',options:['Sachgut','Dienstleistung','Recht'],ans:2},
+   {type:'pick',label:'e) Smartphone und Handyhülle sind …',options:['Komplementärgüter','Substitutionsgüter','freie Güter'],ans:0},
+   {type:'pick',label:'f) Sonnenlicht ist …',options:['ein freies Gut','ein wirtschaftliches Gut'],ans:0}
+  ],
+  hints:["Erst fragen: Wer nutzt es – Haushalt (Konsum) oder Unternehmen (Produktion)? Dann: Wird es dabei verbraucht oder mehrfach genutzt?"],
+  solution:`a) Produktionsgut – Gebrauchsgut · b) Produktionsgut – Verbrauchsgut · c) Konsumgut – Verbrauchsgut · d) Recht (immaterielles Gut) · e) Komplementärgüter · f) freies Gut`
+ },
+ {title:"Aufgabe 7.3",
+  text:`Ökonomisches Prinzip.`,
+  parts:[
+   {type:'pick',label:'a) Ein Azubi will mit seinem Budget von 50 € möglichst viele Fachbücher kaufen.',options:['Maximalprinzip','Minimalprinzip','kein ökonomisches Prinzip'],ans:0},
+   {type:'pick',label:'b) Bubbel Metallbau will 1.000 Gartentore mit möglichst geringen Kosten herstellen.',options:['Maximalprinzip','Minimalprinzip','kein ökonomisches Prinzip'],ans:1},
+   {type:'pick',label:'c) „Mit minimalem Einsatz den maximalen Gewinn erzielen."',options:['Maximalprinzip','Minimalprinzip','kein ökonomisches Prinzip'],ans:2}
+  ],
+  hints:["Welche Seite ist fest vorgegeben – die Mittel oder das Ziel?"],
+  solution:`a) Mittel fest (50 €) → <b>Maximalprinzip</b> · b) Ziel fest (1.000 Tore) → <b>Minimalprinzip</b> · c) beides gleichzeitig optimieren geht nicht → <b>kein</b> ökonomisches Prinzip`
+ }
+]},
+/* 8 – gemischte Abschlussklausur */ {
+exam:true,
+title:"Abschlussklausur – alles gemischt",
+info:`
+<p>Jetzt wird's ernst: Das hier ist wie die echte Klausur. Die Aufgaben sind <span class="mark">nicht nach Themen sortiert</span> – du musst selbst erkennen, was gefragt ist.</p>
+<div class="box"><b class="t">Regeln</b>
+<ul>
+<li>Keine Hinweis-Zettel, kein Lösungsweg zwischendurch</li>
+<li>Du gibst <b>einmal am Ende</b> ab, dann wird alles korrigiert</li>
+<li>Die Punkte stehen an jeder Aufgabe – Rechnen gibt mehr als Zuordnen</li>
+<li>Nimm dir eine Uhr: <b>45 Minuten</b></li>
+</ul></div>
+<h3>Notenschlüssel (IHK)</h3>
+${calc([["100 – 92 %","1 sehr gut"],["unter 92 – 81 %","2 gut"],["unter 81 – 67 %","3 befriedigend"],["unter 67 – 50 %","4 ausreichend"],["unter 50 – 30 %","5 mangelhaft"],["unter 30 %","6 ungenügend"]])}
+<p style="font-size:16px;color:var(--pencil)">✎ Zur Orientierung – eure Lehrkraft kann anders bewerten.</p>
+<p class="red">Viel Erfolg morgen, Bubbel! 🍀</p>`,
+tasks:[
+ {title:"Aufgabe K1 – Leitbild & Ziele",
+  text:`Die GrünStahl GmbH schreibt in ihrem Leitbild: <i>„Wir wollen bis 2030 klimaneutral produzieren."</i> Die Geschäftsführung leitet daraus Ziele ab.`,
+  parts:[
+   {type:'pick',pts:1,label:'a) „Bis 2030 klimaneutral produzieren" ist im Leitbild eine …',options:['Vision','Mission','Wert'],ans:0},
+   {type:'pick',pts:1,label:'b) Zielart von „klimaneutral produzieren":',options:['ökonomisch','ökologisch','sozial'],ans:1},
+   {type:'choice',pts:2,label:'c) Welches Ziel ist SMART formuliert?',options:[
+     'Wir wollen grüner werden.',
+     'Der CO₂-Ausstoß soll bis 31.12.2028 um 40 % gegenüber 2025 sinken.',
+     'Der CO₂-Ausstoß soll irgendwann deutlich sinken.'],ans:[1]},
+   {type:'pick',pts:1,label:'d) „Wir wollen den Gewinn um 5 % steigern." – Welches SMART-Kriterium fehlt?',options:['spezifisch','messbar','realistisch','terminiert'],ans:3},
+   {type:'pick',pts:1,label:'e) „Neue, teure Filteranlage einbauen" ↔ „Gewinn kurzfristig steigern"',options:['Zielharmonie','Zielkonflikt','Zielneutralität'],ans:1}
+  ],
+  hints:[],
+  solution:`a) Vision · b) ökologisch · c) „bis 31.12.2028 um 40 % gegenüber 2025" · d) terminiert · e) Zielkonflikt`
+ },
+ {title:"Aufgabe K2 – Rentabilität",
+  text:`Zahlen der GrünStahl GmbH: Eigenkapital <b>800.000 €</b>, Fremdkapital <b>1.200.000 €</b>, Jahresüberschuss <b>96.000 €</b>, Fremdkapitalzinsen <b>64.000 €</b>, Umsatzerlöse <b>3.200.000 €</b>. Ziel der Gesellschafter: Eigenkapitalrentabilität von mindestens <b>15 %</b>.`,
+  parts:[
+   {type:'num',pts:2,label:'a) Eigenkapitalrentabilität:',ans:12,unit:'%'},
+   {type:'num',pts:3,label:'b) Gesamtkapitalrentabilität:',ans:8,unit:'%'},
+   {type:'num',pts:2,label:'c) Umsatzrentabilität:',ans:3,unit:'%'},
+   {type:'num',pts:3,label:'d) ROI (Umsatzrentabilität × Kapitalumschlag):',ans:4.8,unit:'%'},
+   {type:'pick',pts:1,label:'e) Wurde das Ziel der Gesellschafter erreicht?',options:['ja','nein'],ans:1},
+   {type:'num',pts:2,label:'f) Welcher Gewinn wäre für 15 % Eigenkapitalrentabilität nötig gewesen?',ans:120000,unit:'€'}
+  ],
+  hints:[],
+  solution:`a) 96.000 × 100 ÷ 800.000 = <b>12 %</b><br>b) (96.000 + 64.000) × 100 ÷ 2.000.000 = <b>8 %</b><br>c) 96.000 × 100 ÷ 3.200.000 = <b>3 %</b><br>d) Kapitalumschlag 3.200.000 ÷ 2.000.000 = 1,6 → 3 % × 1,6 = <b>4,8 %</b><br>e) 12 % &lt; 15 % → <b>nein</b><br>f) 800.000 × 15 % = <b>120.000 €</b>`
+ },
+ {title:"Aufgabe K3 – Stakeholder",
+  text:`Die GrünStahl GmbH will ein Werk schließen und die Produktion ins Ausland verlagern.`,
+  parts:[
+   {type:'pick',pts:1,label:'a) „Wir verlieren unsere Arbeitsplätze!" – Welche Gruppe?',options:['Mitarbeiter','Kunden','Shareholder'],ans:0},
+   {type:'pick',pts:1,label:'b) „Die Rendite unserer Anteile steigt." – Welche Gruppe?',options:['Mitarbeiter','Staat','Shareholder'],ans:2},
+   {type:'pick',pts:1,label:'c) „Uns fehlen Gewerbesteuer und Arbeitsplätze in der Region." – Welche Gruppe?',options:['Lieferanten','Staat / Gemeinde','Banken'],ans:1},
+   {type:'pick',pts:1,label:'d) Lieferanten und Kunden sind …',options:['interne Stakeholder','externe Stakeholder','Shareholder'],ans:1},
+   {type:'choice',pts:2,label:'e) Welche Aussage stimmt?',options:[
+     'Shareholder und Stakeholder sind zwei völlig getrennte Gruppen.',
+     'Die Shareholder sind eine Teilgruppe der Stakeholder; ihre Interessen können mit denen anderer Stakeholder in Konflikt stehen.',
+     'Beim Stakeholder-Ansatz zählen nur die Eigentümer.'],ans:[1]}
+  ],
+  hints:[],
+  solution:`a) Mitarbeiter · b) Shareholder · c) Staat/Gemeinde · d) externe Stakeholder · e) Shareholder ⊂ Stakeholder, Interessenkonflikte möglich`
+ },
+ {title:"Aufgabe K4 – Bedürfnisse & Güter",
+  text:`Rund um einen neuen Mitarbeiter der GrünStahl GmbH.`,
+  parts:[
+   {type:'pick',pts:1,label:'a) Er ist froh, dass sein Arbeitsvertrag unbefristet ist. (Maslow)',options:['Grundbedürfnisse','Sicherheit','Soziale Bedürfnisse','Wertschätzung','Selbstverwirklichung'],ans:1},
+   {type:'pick',pts:1,label:'b) Nach einem Jahr erhält er die Auszeichnung „Mitarbeiter des Jahres". (Maslow)',options:['Grundbedürfnisse','Sicherheit','Soziale Bedürfnisse','Wertschätzung','Selbstverwirklichung'],ans:3},
+   {type:'pick',pts:1,label:'c) Er möchte ein E-Bike, hat das Geld schon gespart, war aber noch nicht im Laden.',options:['Bedürfnis','Bedarf','Nachfrage'],ans:1},
+   {type:'pick',pts:1,label:'d) Das Schweißgerät, mit dem er arbeitet:',options:['Konsumgut – Gebrauchsgut','Produktionsgut – Gebrauchsgut','Produktionsgut – Verbrauchsgut'],ans:1},
+   {type:'pick',pts:1,label:'e) Die Schweißelektroden, die dabei verbraucht werden:',options:['Konsumgut – Verbrauchsgut','Produktionsgut – Gebrauchsgut','Produktionsgut – Verbrauchsgut'],ans:2},
+   {type:'pick',pts:1,label:'f) Die Werkskantine will mit einem Budget von 2.000 € möglichst viele Mitarbeiter verpflegen.',options:['Maximalprinzip','Minimalprinzip','kein ökonomisches Prinzip'],ans:0},
+   {type:'pick',pts:1,label:'g) Öffentliche Straßen zum Werk befriedigen …',options:['Individualbedürfnisse','Kollektivbedürfnisse'],ans:1}
+  ],
+  hints:[],
+  solution:`a) Sicherheit · b) Wertschätzung · c) Bedarf · d) Produktionsgut – Gebrauchsgut · e) Produktionsgut – Verbrauchsgut · f) Maximalprinzip · g) Kollektivbedürfnisse`
+ }
+]}
+];
+
+
+/* ---------- Zustand ---------- */
+const KEY='bubbel-probeklausur-wp-1';
+let S={page:0,unlocked:2,solved:{},tries:{},hints:{}};
+try{const s=JSON.parse(localStorage.getItem(KEY)); if(s) S=Object.assign(S,s);}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const NPAGES = 2 + TOPICS.length*2; // Deckblatt + je Thema 2 + Schluss
+const pageInfo = i => i===0?{kind:'cover'} : i===NPAGES-1?{kind:'end'} : {kind:(i%2?'info':'tasks'), t:Math.floor((i-1)/2)};
+
+/* ---------- Zahlen einlesen ---------- */
+function parseNum(s){
+  if(s==null) return NaN; s=String(s).replace(/[€%\s]/g,'').replace(/[a-zA-Z]/g,'');
+  if(!s) return NaN;
+  if(s.includes(',')){ s=s.replace(/\./g,'').replace(',','.'); }
+  else if(/^-?\d{1,3}(\.\d{3})+$/.test(s)){ s=s.replace(/\./g,''); }
+  return parseFloat(s);
+}
+const near=(a,b,t=0.011)=>Math.abs(a-b)<=t;
+
+/* ---------- Rendering ---------- */
+const $page=document.getElementById('page');
+const kontoOpts = sel => '<option value="">– Konto wählen –</option>'+Object.keys(KONTEN).map(k=>`<option value="${k}" ${k===sel?'selected':''}>${k} ${KONTEN[k]}</option>`).join('');
+function head(){return `<div class="holes"><span></span><span></span><span></span></div><div class="head"><span>Name: Bubbel ✎</span><span>Wirtschaftsprozesse – Probeklausur</span><span>Datum: ${new Date().toLocaleDateString('de-DE')}</span></div>`;}
+
+function render(){
+  const i=S.page, info=pageInfo(i); let h=head();
+  if(info.kind==='cover'){
+    h+=`<h1>Mein Bubbel schafft das!</h1>
+    <div class="doodle">du packst<br>das 💪</div>
+    <h2>Probeklausur <u>Wirtschaftsprozesse</u></h2><p style="font-family:Caveat;font-size:22px;color:var(--pencil);margin-top:-6px">Unternehmensziele · Stakeholder · Rentabilität · Bedürfnisse & Güter – Klausur am 19.11.</p>
+    <p>So funktioniert's: Zu jedem Thema kommt zuerst ein <span class="mark">Infoblatt</span> – lies es in Ruhe. Danach die Aufgaben. Wenn du nicht weiterkommst, kannst du <b>Hinweis-Zettel</b> aufdecken (immer der Reihe nach). Erst wenn alles richtig ist, geht's zum nächsten Thema.</p>
+    <p>Zahlen kannst du ganz normal eingeben, z. B. <b>96.000</b>, <b>96000</b> oder <b>7,8</b> – Einheiten wie € oder Stück musst du nicht dazuschreiben. Mit <b>💾 Speichern</b> oben rechts bekommst du einen Code, mit dem du später weitermachen kannst.</p>
+    <p>Zum Schluss wartet eine <b>⭐ Abschlussklausur</b>: alles gemischt, ohne Hinweise, mit Punkten und Note – wie in echt.</p>
+    <div class="box" style="transform:none"><b class="t">Schon angefangen?</b> Gib deinen Speicher-Code ein:<br>
+      <input class="num" id="codeIn" style="width:260px;text-transform:uppercase" placeholder="B…-…-…" autocomplete="off"> <button class="pen" id="loadCode">Weitermachen</button> <span class="fb" id="codeMsg"></span></div>
+    <h3>Inhalt <span style="font-size:20px;color:var(--pencil)">(du kannst jedes Thema direkt anklicken)</span></h3><ul class="toc">${TOPICS.map((t,k)=>{const p=1+2*k, done=isDone(k);
+      return `<li data-go="${p}"><span class="ic">${done?'✅':'✏️'}</span>${t.exam?'⭐':k+1+'.'} ${t.title}</li>`}).join('')}</ul>
+    <p style="margin-top:18px"><a href="../mein-bubbel-schafft-das/" style="font-family:Caveat;font-size:24px;color:var(--ink2)">📒 Probeklausur Rechnungswesen →</a> &nbsp; <a href="../mein-bubbel-geschaeftsprozesse/" style="font-family:Caveat;font-size:24px;color:var(--ink2)">📒 Probeklausur Geschäftsprozesse →</a></p>
+    <div class="nav"><button class="mini" id="reset">↺ alles zurücksetzen</button><button class="pen" data-nav="1">Los geht's →</button></div>`;
+  } else if(info.kind==='info'){
+    const t=TOPICS[info.t];
+    h+=`<h2><u>${t.exam?'⭐ ':'Thema '+(info.t+1)+': '}${t.title}</u></h2><p style="font-family:Caveat;font-size:24px;color:var(--pencil);margin-top:0">${t.exam?'📝 Vor dem Start bitte lesen':'📒 Infoblatt – erst lesen, dann rechnen'}</p>${t.info}
+    <div class="nav"><button class="pen" data-nav="-1">← zurück</button><span class="pg">Seite ${i+1} / ${NPAGES}</span><button class="pen" data-nav="1">${t.exam?'Klausur starten →':'Zu den Aufgaben →'}</button></div>`;
+  } else if(info.kind==='tasks'){
+    const t=TOPICS[info.t];
+    h+= t.exam ? `<h2><u>Abschlussklausur</u></h2><p style="font-family:Caveat;font-size:24px;color:var(--pencil);margin-top:0">⏱ 45 Minuten · keine Hilfsmittel außer Taschenrechner</p>` : `<h2><u>Thema ${info.t+1}: Aufgaben</u></h2>`;
+    t.tasks.forEach((task,j)=>{ h+=renderTask(info.t,j,task); });
+    if(t.exam) h+=`<div id="examFooter">${S.exam?scoreBox():'<button class="pen red" id="submitExam">📝 Klausur abgeben</button>'}</div>`;
+    const done=isDone(info.t);
+    h+=`<div class="nav"><button class="pen" data-nav="-1">← Infoblatt</button><span class="pg">Seite ${i+1} / ${NPAGES}</span>
+      <button class="pen ${done?'':'skip'}" data-nav="1">${info.t===TOPICS.length-1?(done?'Fertig! →':'Zur Übersicht →'):(done?'Nächstes Thema →':'Überspringen →')}</button></div>`;
+  } else {
+    const all=TOPICS.every((_,k)=>isDone(k));
+    h+= all ? `<h1>Geschafft, Bubbel! 🎉</h1><p><span class="stamp">Probeklausur bestanden</span></p>
+    <p>Du hast alle Themen durchgerechnet. Vor der echten Klausur am besten die Themen nochmal anschauen, bei denen du Hinweise gebraucht hast:</p>`
+    : `<h1>Zwischenstand 📋</h1><p>Noch nicht alles erledigt – klick ein Thema an, um direkt hinzuspringen:</p>`;
+    h+=`<ul class="toc">${TOPICS.filter(t=>!t.exam).map((t,k)=>{const n=t.tasks.reduce((a,_,j)=>a+(S.hints[k+'-'+j]||0),0);return `<li data-go="${1+2*k}"><span class="ic">${isDone(k)?'✅':'✏️'}</span>${t.title}: ${!isDone(k)?'<span class="red">noch offen</span>':n? `<span class="red">${n} Hinweis${n>1?'e':''}</span>`:'<span class="ok">ohne Hinweis ✔</span>'}</li>`}).join('')}</ul>
+    ${S.exam?`<h3>Abschlussklausur: ${S.exam.pts} / ${S.exam.max} Punkte → Note ${note(S.exam.pts/S.exam.max*100)}</h3>`:''}
+    <div class="nav"><button class="pen" data-nav="-1">← zurück</button><span class="pg">Seite ${i+1} / ${NPAGES}</span><button class="pen red" id="reset">Nochmal von vorn</button></div>`;
+  }
+  $page.innerHTML=h; $page.style.animation='none'; void $page.offsetWidth; $page.style.animation='';
+  bind(); progress(); window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function renderTask(ti,j,task){
+  const id=ti+'-'+j, ex=TOPICS[ti].exam, res=ex&&S.exam?S.exam.res[id]:null;
+  const solved=ex?!!S.exam:S.solved[id], tries=S.tries[id]||0, opened=S.hints[id]||0;
+  const badge = ex ? (res?`<span class="state ${res.every(x=>x)?'ok':'bad'}">${task.parts.reduce((a,p,k)=>a+(res[k]?pts(p):0),0)} / ${task.parts.reduce((a,p)=>a+pts(p),0)} P.</span>`:`<span class="state" style="color:var(--pencil);font-size:22px">(${task.parts.reduce((a,p)=>a+pts(p),0)} P.)</span>`)
+                   : (solved?'<span class="state ok">✔ richtig!</span>':'');
+  let h=`<div class="task" data-task="${id}"><h3>${task.title} ${badge}</h3><div class="txt">${task.text}</div>`;
+  task.parts.forEach((p,k)=>{
+    const mk = res ? (res[k]?'<span class="state ok" data-st>✔</span>':'<span class="state bad" data-st>✘</span>') : '<span class="state" data-st></span>';
+    h+=`<div class="part" data-part="${k}"><div class="lbl">${p.label} ${mk}</div>`;
+    if(p.type==='num') h+=`<input class="num" inputmode="decimal" autocomplete="off" ${solved?`value="${fmtAns(p)}" disabled`:''}><span class="unit">${p.unit||''}</span>`;
+    if(p.type==='choice'){ h+='<div class="choice">'+p.options.map((o,m)=>`<label><input type="${p.multi?'checkbox':'radio'}" name="c${id}-${k}" value="${m}" ${solved&&p.ans.includes(m)?'checked':''} ${solved?'disabled':''}>${o}</label>`).join('')+'</div>'; }
+    if(p.type==='pick'){ h+=`<select ${solved?'disabled':''}><option value="">– wählen –</option>${p.options.map((o,m)=>`<option value="${m}" ${solved&&p.ans===m?'selected':''}>${o}</option>`).join('')}</select>`; }
+    if(p.type==='book'){
+      const side=(name,rows)=>`<div class="side" data-side="${name}"><div class="cap">${name==='s'?'Soll':'Haben'}</div>${rows.map(r=>brow(r)).join('')}${solved?'':'<button class="mini" data-add>+ Zeile</button>'}</div>`;
+      const sr=solved?p.soll:[[ '',null]], hr=solved?p.haben:[[ '',null]];
+      h+=`<div class="book">${side('s',sr)}<div class="an">an</div>${side('h',hr)}</div><div class="sumline" data-sum></div><div class="rowmsg" data-rowmsg></div>`;
+    }
+    h+='</div>';
+  });
+  if(!solved && !ex){
+    h+=`<div class="actions"><button class="pen" data-check>✓ Prüfen</button><span class="fb" data-fb></span>
+      ${tries>=3?`<button class="mini" data-sol>👀 Lösungsweg ansehen</button>`:''}</div>`;
+  }
+  h+=`<div class="hints">${task.hints.map((x,m)=>`<div class="hint">${x}<div class="cover ${m<opened||solved?'open':''} ${m>opened?'locked':''}" data-hint="${m}">${m>opened?'🔒 ':''}Hinweis ${m+1}</div></div>`).join('')}</div>`;
+  h+=`<div class="solution ${solved?'show':''}" data-solbox><b>Lösung:</b><br>${task.solution}</div></div>`;
+  return h;
+}
+function fmtAns(p){ return p.unit==='%'||p.unit==='Monate'||p.ans<1 ? String(p.ans).replace('.',',') : eur(p.ans); }
+function brow(r){ const a=r[1]; return `<div class="brow"><select ${a!=null?'disabled':''}>${kontoOpts(r[0])}</select><input class="num" inputmode="decimal" placeholder="Betrag €" ${a!=null?`value="${eur(a)}" disabled`:''}>${a!=null?'':'<button class="mini" data-del>✕</button>'}</div>`; }
+
+function isDone(ti){ return TOPICS[ti].exam ? !!S.exam : TOPICS[ti].tasks.every((_,j)=>S.solved[ti+'-'+j]); }
+const pts = p => p.pts || (p.type==='book'?2:1);
+function note(pc){ return pc>=92?'1 (sehr gut)':pc>=81?'2 (gut)':pc>=67?'3 (befriedigend)':pc>=50?'4 (ausreichend)':pc>=30?'5 (mangelhaft)':'6 (ungenügend)'; }
+function scoreBox(){
+  const e=S.exam, pc=Math.round(e.pts/e.max*1000)/10;
+  return `<div class="box" style="text-align:center"><b class="t">Ergebnis: ${e.pts} von ${e.max} Punkten (${String(pc).replace('.',',')} %)</b><br>
+  <span class="stamp" style="margin:8px 0">Note ${note(pc)}</span><br>
+  Schau dir bei den roten ✘ die Lösung unter der Aufgabe an.<br><button class="mini" id="retryExam">↺ Klausur nochmal schreiben</button></div>`;
+}
+
+/* ---------- Prüfen ---------- */
+function readBook(el){
+  const sum={}; let bad=false;
+  el.querySelectorAll('.brow').forEach(r=>{
+    const k=r.querySelector('select').value, v=parseNum(r.querySelector('input').value);
+    if(!k && !r.querySelector('input').value.trim()) return;
+    if(!k||isNaN(v)){bad=true;return;}
+    sum[k]=(sum[k]||0)+v;
+  });
+  return bad?null:sum;
+}
+function sameMap(a,b){
+  const ka=Object.keys(a), kb=Object.keys(b); if(ka.length!==kb.length) return false;
+  return kb.every(k=>k in a && near(a[k],b[k]));
+}
+function toMap(rows){const m={}; rows.forEach(r=>m[r[0]]=(m[r[0]]||0)+r[1]); return m;}
+
+/* Teil bewerten (+ Zeilen-Feedback bei Buchungssätzen) */
+function gradePart(pe,p,detail=true){
+  let ok=false;
+  if(p.type==='num'){ ok=near(parseNum(pe.querySelector('input').value),p.ans,p.tol||0.011); }
+  if(p.type==='choice'){ const sel=[...pe.querySelectorAll('input:checked')].map(x=>+x.value).sort(); ok=sel.join()===[...p.ans].sort().join(); }
+  if(p.type==='pick'){ ok=pe.querySelector('select').value===String(p.ans); }
+  if(p.type==='book'){
+    const variants=[{soll:p.soll,haben:p.haben},...(p.alts||[])];
+    const s=readBook(pe.querySelector('[data-side="s"]')), h=readBook(pe.querySelector('[data-side="h"]'));
+    ok=!!(s&&h&&variants.some(v=>sameMap(s,toMap(v.soll))&&sameMap(h,toMap(v.haben))));
+    if(detail) markRows(pe,variants,ok);
+  }
+  const st=pe.querySelector('[data-st]'); st.textContent=ok?'✔':'✘'; st.className='state '+(ok?'ok':'bad');
+  return ok;
+}
+function sideSums(sideEl){ const m={}; sideEl.querySelectorAll('.brow').forEach(r=>{const k=r.querySelector('select').value,v=parseNum(r.querySelector('input').value); if(k&&!isNaN(v)) m[k]=(m[k]||0)+v;}); return m; }
+function markRows(pe,variants,ok){
+  const sE=pe.querySelector('[data-side="s"]'), hE=pe.querySelector('[data-side="h"]');
+  const got={s:sideSums(sE),h:sideSums(hE)};
+  let best=null;
+  variants.forEach(v=>{
+    const E={s:toMap(v.soll),h:toMap(v.haben)}, marks=[]; let good=0;
+    [['s',sE,'h'],['h',hE,'s']].forEach(([sd,el,ot])=>el.querySelectorAll('.brow').forEach(r=>{
+      const k=r.querySelector('select').value, raw=r.querySelector('input').value.trim();
+      let m='';
+      if(!k&&!raw) m='';
+      else if(!k) m='<span class="bad">Konto fehlt</span>';
+      else if(k in E[sd]) { if(near(got[sd][k],E[sd][k])){m='<span class="ok">✔</span>';good++;} else m='<span class="bad">Betrag prüfen</span>'; }
+      else if(k in E[ot]) m='<span class="bad">↔ falsche Seite</span>';
+      else m='<span class="bad">✘ Konto passt nicht</span>';
+      marks.push([r,m]);
+    }));
+    const missing=['s','h'].reduce((a,sd)=>a+Object.keys(E[sd]).filter(k=>!(k in got.s)&&!(k in got.h)).length,0);
+    if(!best||good>best.good) best={marks,good,missing};
+  });
+  best.marks.forEach(([r,m])=>{ let f=r.querySelector('.rfb'); if(!f){f=document.createElement('span');f.className='rfb';r.appendChild(f);} f.innerHTML=m; });
+  const msg=pe.querySelector('[data-rowmsg]');
+  if(msg) msg.innerHTML = !ok && best.missing>0 ? `<span class="bad">${best.missing===1?'Da fehlt noch ein Konto':'Da fehlen noch '+best.missing+' Konten'} …</span>` : '';
+}
+function updateSums(root){
+  root.querySelectorAll('.part').forEach(pe=>{
+    const line=pe.querySelector('[data-sum]'); if(!line) return;
+    const s=Object.values(sideSums(pe.querySelector('[data-side="s"]'))).reduce((a,b)=>a+b,0);
+    const h=Object.values(sideSums(pe.querySelector('[data-side="h"]'))).reduce((a,b)=>a+b,0);
+    if(!s&&!h){line.innerHTML='';return;}
+    const eq=near(s,h);
+    line.innerHTML=`Σ Soll ${eur(s)} · Σ Haben ${eur(h)} <span class="${eq?'ok':'bad'}">${eq?'✔ ausgeglichen':'≠ geht noch nicht auf'}</span>`;
+  });
+}
+function submitExam(ti){
+  const T=TOPICS[ti]; let p=0,max=0; const res={};
+  T.tasks.forEach((task,j)=>{
+    const id=ti+'-'+j, el=$page.querySelector(`[data-task="${id}"]`);
+    res[id]=task.parts.map((pt,k)=>{ const ok=gradePart(el.querySelector(`[data-part="${k}"]`),pt); max+=pts(pt); if(ok)p+=pts(pt); return ok; });
+    el.querySelectorAll('input,select').forEach(x=>x.disabled=true);
+    el.querySelectorAll('[data-add],[data-del]').forEach(x=>x.remove());
+    el.querySelector('[data-solbox]').classList.add('show');
+  });
+  S.exam={pts:p,max,res}; S.unlocked=NPAGES-1; save();
+  $page.querySelector('#examFooter').innerHTML=scoreBox();
+  const nb=$page.querySelector('.nav [data-nav="1"]'); if(nb){ nb.textContent='Fertig! →'; nb.classList.remove('skip'); }
+  bind(); progress();
+  $page.querySelector('#examFooter').scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function checkTask(ti,j,el){
+  const task=TOPICS[ti].tasks[j], id=ti+'-'+j; let all=true;
+  task.parts.forEach((p,k)=>{ if(!gradePart(el.querySelector(`[data-part="${k}"]`),p)) all=false; });
+  const fb=el.querySelector('[data-fb]');
+  if(all){ S.solved[id]=true; save(); fb.innerHTML='<span class="ok">Super, alles richtig! 🎉</span>';
+    if(isDone(ti)){ S.unlocked=Math.max(S.unlocked,Math.min(NPAGES-1,2+2*(ti+1))); save(); }
+    setTimeout(render,900);
+  } else {
+    S.tries[id]=(S.tries[id]||0)+1; save();
+    const msgs=['Nicht ganz – schau dir die roten ✘ nochmal an.','Fast! Grübel nochmal kurz…','Hmm, vielleicht hilft ein Hinweis-Zettel?'];
+    fb.innerHTML=`<span class="bad">${msgs[Math.min(S.tries[id]-1,2)]}</span>`;
+    if(S.tries[id]===3 && !el.querySelector('[data-sol]')){
+      const b=document.createElement('button'); b.className='mini'; b.dataset.sol=''; b.textContent='👀 Lösungsweg ansehen';
+      fb.after(b); b.onclick=()=>el.querySelector('[data-solbox]').classList.add('show');
+    }
+  }
+}
+
+/* ---------- Events ---------- */
+function bind(){
+  $page.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>{
+    const n=S.page+ +b.dataset.nav; if(n<0||n>=NPAGES) return;
+    S.page=n; save(); render();
+  });
+  const lc=$page.querySelector('#loadCode'); if(lc) lc.onclick=()=>{
+    const msg=$page.querySelector('#codeMsg');
+    if(applyCode($page.querySelector('#codeIn').value)){ msg.innerHTML='<span class="ok">Geladen! ✔</span>'; setTimeout(render,700); }
+    else msg.innerHTML='<span class="bad">Der Code stimmt nicht – vertippt?</span>';
+  };
+  const ci=$page.querySelector('#codeIn'); if(ci) ci.addEventListener('keydown',e=>{ if(e.key==='Enter') lc.click(); });
+  $page.querySelectorAll('[data-go]').forEach(li=>li.onclick=()=>{ if(li.dataset.go){S.page=+li.dataset.go; save(); render();} });
+  const r=$page.querySelector('#reset'); if(r) r.onclick=()=>{ if(confirm('Wirklich alles zurücksetzen?')){ S={page:0,unlocked:2,solved:{},tries:{},hints:{}}; save(); render(); } };
+  const se=$page.querySelector('#submitExam'); if(se) se.onclick=()=>{ if(confirm('Klausur wirklich abgeben? Danach kannst du nichts mehr ändern.')) submitExam(pageInfo(S.page).t); };
+  const re=$page.querySelector('#retryExam'); if(re) re.onclick=()=>{ delete S.exam; save(); render(); };
+  $page.querySelectorAll('.task').forEach(el=>{
+    const [ti,j]=el.dataset.task.split('-').map(Number), id=el.dataset.task;
+    const c=el.querySelector('[data-check]'); if(c) c.onclick=()=>checkTask(ti,j,el);
+    const so=el.querySelector('[data-sol]'); if(so) so.onclick=()=>el.querySelector('[data-solbox]').classList.add('show');
+    el.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{ b.insertAdjacentHTML('beforebegin',brow(['',null])); bindRows(el); });
+    bindRows(el);
+    el.querySelectorAll('[data-hint]').forEach(cv=>cv.onclick=()=>{
+      const m=+cv.dataset.hint, opened=S.hints[id]||0; if(m!==opened) return;
+      S.hints[id]=opened+1; save(); cv.classList.add('open');
+      const nx=el.querySelector(`[data-hint="${m+1}"]`); if(nx){ nx.classList.remove('locked'); nx.textContent='Hinweis '+(m+2); }
+    });
+    el.querySelectorAll('input.num').forEach(inp=>inp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&c) c.click(); }));
+  });
+}
+function bindRows(el){ el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ const side=b.closest('.side'); if(side.querySelectorAll('.brow').length>1) b.closest('.brow').remove(); }); }
+function progress(){
+  const total=TOPICS.filter(t=>!t.exam).reduce((a,t)=>a+t.tasks.length,0), done=Object.keys(S.solved).length;
+  document.getElementById('bar').style.width=(done/total*100)+'%';
+  document.getElementById('tbr').textContent=`${done}/${total} Aufgaben${S.exam?' · Klausur ✔':''}`;
+  updateSums($page);
+}
+/* ---------- Speicher-Code ---------- */
+const B36='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+function codeFields(){ // feste Reihenfolge aller gespeicherten Felder
+  const f=[['page',5]];
+  TOPICS.forEach((t,ti)=>{
+    if(t.exam){ f.push(['exam',1]); t.tasks.forEach((task,j)=>task.parts.forEach((_,k)=>f.push(['ex',1,ti+'-'+j,k]))); }
+    else t.tasks.forEach((_,j)=>{ f.push(['sol',1,ti+'-'+j]); f.push(['hin',2,ti+'-'+j]); });
+  });
+  return f;
+}
+function checksum(s){ let c=7; for(let i=0;i<s.length;i++) c=(c*31+B36.indexOf(s[i])*(i+3))%1296; return B36[Math.floor(c/36)]+B36[c%36]; }
+function makeCode(){
+  let n=0n, w=0n;
+  codeFields().forEach(([k,b,id,x])=>{
+    let v=0;
+    if(k==='page') v=S.page; else if(k==='exam') v=S.exam?1:0;
+    else if(k==='ex') v=S.exam&&S.exam.res[id]&&S.exam.res[id][x]?1:0;
+    else if(k==='sol') v=S.solved[id]?1:0; else if(k==='hin') v=Math.min(S.hints[id]||0,3);
+    n|=BigInt(v)<<w; w+=BigInt(b);
+  });
+  const body=n.toString(36).toUpperCase();
+  return ('B'+body+checksum(body)).match(/.{1,4}/g).join('-');
+}
+function applyCode(code){
+  const s=String(code||'').toUpperCase().replace(/[^0-9A-Z]/g,'');
+  if(s.length<4||s[0]!=='B') return false;
+  const body=s.slice(1,-2); if(!body||checksum(body)!==s.slice(-2)) return false;
+  let n=0n; for(const c of body) n=n*36n+BigInt(B36.indexOf(c));
+  const NS={page:0,unlocked:NPAGES-1,solved:{},tries:{},hints:{}}, exRes={}; let exam=false;
+  codeFields().forEach(([k,b,id,x])=>{
+    const v=Number(n&((1n<<BigInt(b))-1n)); n>>=BigInt(b);
+    if(k==='page') NS.page=Math.min(v,NPAGES-1); else if(k==='exam') exam=!!v;
+    else if(k==='ex') (exRes[id]=exRes[id]||[])[x]=!!v;
+    else if(k==='sol'&&v) NS.solved[id]=true; else if(k==='hin'&&v) NS.hints[id]=v;
+  });
+  if(exam){ let p=0,max=0; TOPICS.forEach((t,ti)=>{ if(t.exam) t.tasks.forEach((task,j)=>task.parts.forEach((pt,k)=>{max+=pts(pt); if(exRes[ti+'-'+j][k]) p+=pts(pt);})); }); NS.exam={pts:p,max,res:exRes}; }
+  S=NS; save(); return true;
+}
+function showSave(){
+  const code=makeCode(), link=location.origin+location.pathname+'#code='+code;
+  const ov=document.createElement('div'); ov.className='overlay';
+  ov.innerHTML=`<div class="savecard"><h2 style="margin-top:0">💾 Gespeichert!</h2>
+    <p>Schreib dir diesen Code auf (oder mach ein Foto). Auf dem Deckblatt eintippen → du bist wieder genau hier.</p>
+    <div class="code">${code}</div>
+    <p><button class="pen" data-copy="${code}">Code kopieren</button> <button class="pen" data-copy="${link}">Link kopieren</button> <span class="fb" id="copyMsg"></span></p>
+    <p style="font-size:16px;word-break:break-all;color:var(--pencil)">Oder diesen Link öffnen: <a href="${link}">${link}</a></p>
+    <p><button class="mini" id="closeSave">✕ schließen</button></p></div>`;
+  document.body.appendChild(ov);
+  ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  ov.querySelector('#closeSave').onclick=()=>ov.remove();
+  ov.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{
+    try{ await navigator.clipboard.writeText(b.dataset.copy); ov.querySelector('#copyMsg').innerHTML='<span class="ok">kopiert ✔</span>'; }
+    catch(e){ ov.querySelector('#copyMsg').innerHTML='<span class="bad">bitte von Hand abschreiben</span>'; }
+  });
+}
+document.getElementById('saveBtn').onclick=showSave;
+(function(){ const m=location.hash.match(/code=([0-9A-Za-z-]+)/); if(m && applyCode(m[1])) history.replaceState(null,'',location.pathname); })();
+
+$page.addEventListener('input',()=>updateSums($page));
+$page.addEventListener('change',()=>updateSums($page));
+render();
+</script>
+</body>
+</html>
