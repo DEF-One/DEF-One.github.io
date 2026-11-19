@@ -18,7 +18,11 @@ React · TypeScript · Vite · Tailwind CSS · Supabase · Lucide Icons · GitHu
 
 Der komplette Haushaltsplan mit 35 Aufgaben wird beim Anlegen der WG automatisch eingetragen.
 
-## Einrichtung (einmalig, ca. 10 Minuten)
+## Status
+
+Supabase ist eingerichtet: Projekt `wg-manager` (ID `fepecusdmryxjpxpbpzl`, Free Plan, Organisation money-village). Migration ausgeführt, Weiterleitung auf GitHub Pages gesetzt, E-Mail-Bestätigung deaktiviert. Die Verbindungsdaten stehen in `.env.production` und sind fest in die App eingebaut. Einfach die Seite öffnen, registrieren und loslegen.
+
+## Einrichtung von Grund auf (nur nötig für ein neues Projekt)
 
 ### 1. Supabase-Projekt anlegen
 1. Auf <https://supabase.com> kostenlos registrieren und **New project** anlegen (Region z. B. Frankfurt).
