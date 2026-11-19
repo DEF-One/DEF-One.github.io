@@ -226,6 +226,13 @@ begin
   return hid;
 end $$;
 
+-- Tabellenrechte für angemeldete Nutzer (Zugriff wird zusätzlich per RLS eingeschränkt)
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on
+  public.households, public.household_members, public.tasks,
+  public.task_completions, public.task_assignments, public.user_settings
+  to authenticated;
+
 grant execute on function public.create_household(text, text, text, date) to authenticated;
 grant execute on function public.join_household(text, text) to authenticated;
 grant execute on function public.is_household_member(uuid) to authenticated;
