@@ -32,8 +32,8 @@ function buildPattern(key) {
   const base = bearMap[key] || key, flip = !!bearMap[key];
   let ctxA = jitter(A.down, .02, .04);
   if (key === 'doji' || key === 'spinningtop') ctxA = R.chance(.5) ? ctxA : flipA(ctxA);
-  const ctx = pathCandles(ctxA, R.int(16, 22), { noise: .03 });
-  const u = ctx.range * R.rand(.075, .1), p = ctx[ctx.length - 1].c;
+  const ctx = pathCandles(ctxA, R.int(13, 17), { noise: .03 });
+  const u = ctx.range * R.rand(.12, .15), p = ctx[ctx.length - 1].c;
   let pat = [];
   const body = u * R.rand(.3, .45);
   if (base === 'hammer') {
@@ -70,7 +70,7 @@ function buildForm(key) {
   const [b, f] = map[key];
   let an = jitter(A[b], .012, .025);
   if (f) an = flipA(an);
-  return pathCandles(an, R.int(46, 60), { noise: .022, wick: .018 });
+  return pathCandles(an, R.int(44, 56), { noise: .016, wick: .014 });
 }
 
 /* Range + Ausbruch mit Volumen */

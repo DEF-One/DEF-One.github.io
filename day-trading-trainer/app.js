@@ -128,17 +128,15 @@ function showTask(id) {
   cur = { id, g, opts }; answered = false;
   const box = S.sk[id]?.box ?? 0;
   view.innerHTML = topbar() + `<section class="card task">
-    <div class="tag">${MODULES[sk.mod].icon} ${sk.name}<span class="lvl" title="Lernstufe">${'●'.repeat(box)}${'○'.repeat(MAXBOX - box)}</span></div>
+    <div class="tag">${MODULES[sk.mod].icon} ${MODULES[sk.mod].name}<span class="lvl" title="Lernstufe">${'●'.repeat(box)}${'○'.repeat(MAXBOX - box)}</span></div>
     <div class="q">${g.q}</div>
     ${g.visual ? `<div class="vis">${g.visual}</div>` : ''}
     ${g.type === 'num'
       ? `<div class="numrow"><input id="num" inputmode="decimal" autocomplete="off" placeholder="Deine Antwort"><span class="unit">${g.unit || ''}</span><button class="go" id="chk">Prüfen</button></div>`
       : `<div class="opts ${g.small ? 'small' : ''} ${opts.length === 2 ? 'two' : ''}">${opts.map((o, i) => `<button class="opt" data-i="${i}"><kbd>${i + 1}</kbd><span>${o.t}</span></button>`).join('')}</div>`}
     <div id="fb"></div>
-    <div class="row-end"><button class="ghost" id="lessonBtn">💡 Erklärung ansehen</button></div>
   </section>`;
   $('#back').onclick = () => setTab('home');
-  $('#lessonBtn').onclick = () => modal(sk.name, sk.lesson());
   if (g.type === 'num') {
     const inp = $('#num'); inp.focus();
     $('#chk').onclick = checkNum; inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (!answered) checkNum(); else next(); } };
@@ -162,7 +160,8 @@ function feedback(good, label, extra = '') {
   $('.sbar .sc').textContent = `${sess.ok}/${sess.n} ✓`;
   const box = S.sk[cur.id].box;
   $('#fb').innerHTML = `<div class="fb ${good ? 'ok' : 'bad'}"><div class="fh">${label || (good ? '✅ Richtig!' : '❌ Leider falsch')}</div>${extra ? `<p>${extra}</p>` : ''}<div class="ex">${cur.g.explain}</div>
-    <div class="nx">${good ? `<span>Nächste Wiederholung: ${nextTxt(box)}</span>` : '<span>🔁 Kommt gleich nochmal in neuer Variante dran.</span>'}<button class="go big" id="nextBtn">Weiter →</button></div></div>`;
+    <div class="nx"><button class="ghost" id="lessonBtn">💡 Thema: ${SKILLS[cur.id].name}</button>${good ? `<span>Nächste Wiederholung: ${nextTxt(box)}</span>` : '<span>🔁 Kommt gleich nochmal in neuer Variante dran.</span>'}<button class="go big" id="nextBtn">Weiter →</button></div></div>`;
+  $('#lessonBtn').onclick = () => modal(SKILLS[cur.id].name, SKILLS[cur.id].lesson());
   $('#nextBtn').onclick = next; $('#nextBtn').focus({ preventScroll: true });
   $('#fb').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
