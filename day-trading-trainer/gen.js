@@ -279,7 +279,8 @@ sit('pullback', 'Pullback an Unterstützung im Aufwärtstrend', 'Im Aufwärtstre
   const an = jitter([[0, .1], [.15, .45], [.27, .3], [.38, .52], [.5, .36], [.6, .52], [.75, .92], [1, .58]], .01, .02);
   const cs = pathCandles(an, R.int(40, 50), { noise: .02 }); const line = cs.base + cs.range * .54, u = cs.range * .08;
   const o = cs[cs.length - 1].c, c = o + u * .35; cs.push({ o, c, h: c + u * .05, l: line - u * .2 });
-  return { q: 'Aufwärtstrend. Der alte Widerstand (gelb) wurde durchbrochen. Jetzt kam der Kurs zurück und bildet dort einen Hammer. Was machst du?', visual: renderChart({ candles: cs, lines: [{ y: line, color: TV.lineLvl, label: 'alter Widerstand = Unterstützung?' }], highlight: [cs.length - 1, cs.length - 1] }), options: OPT3, correct: 0, ok: [2], keepOrder: true, explain: 'Trend nach oben + Retest der alten Widerstandszone (Rollentausch) + Hammer = <b>Long</b>-Setup. Stop unter das Hammer-Tief, Ziel z. B. das letzte Hoch. Auf eine grüne Bestätigungskerze zu warten ist ebenfalls okay.' };
+  const o2 = c, c2 = c + u * R.rand(.7, 1); cs.push({ o: o2, c: c2, h: c2 + u * .1, l: o2 - u * .1 });
+  return { q: 'Aufwärtstrend. Der alte Widerstand (gelb) wurde durchbrochen. Der Kurs kam zurück, bildete dort einen Hammer – und die nächste Kerze schließt grün darüber (Bestätigung). Was machst du?', visual: renderChart({ candles: cs, lines: [{ y: line, color: TV.lineLvl, label: 'alter Widerstand = Unterstützung?' }], highlight: [cs.length - 2, cs.length - 1] }), options: OPT3, correct: 0, ok: [2], keepOrder: true, explain: 'Trend nach oben + Retest der alten Widerstandszone (Rollentausch) + Hammer + Bestätigungskerze = <b>Long</b>-Setup. Stop unter das Hammer-Tief, Ziel z. B. das letzte Hoch. Wichtig: Ein Hammer allein reicht nicht – erst die Bestätigung macht das Setup. Abwarten ist ebenfalls vertretbar.' };
 });
 sit('range_mid', 'Mitten in der Range', 'In der Mitte einer Seitwärtsphase gibt es kein gutes CRV. Entweder an den Rändern handeln oder den Ausbruch abwarten.', () => {
   const cs = pathCandles(jitter([[0, .5], [.12, .8], [.25, .22], [.4, .8], [.55, .22], [.7, .78], [.85, .25], [1, .5]], .01, .015), R.int(45, 55), { noise: .018 });
@@ -307,7 +308,7 @@ sit('move_stop', 'Stop-Loss verschieben?', 'Einen Stop-Loss NIE in Verlustrichtu
 });
 sit('trail', 'Gewinn absichern', 'Läuft ein Trade deutlich ins Plus, sichert man Gewinne, indem man den Stop nachzieht (z. B. auf Einstand oder unter das letzte Tief) – nicht entfernen.', () => {
   const cs = pathCandles(jitter([[0, .2], [.3, .25], [.5, .5], [.6, .45], [.8, .8], [.88, .72], [1, .95]], .01, .02), 45, { noise: .02 }); const E = cs[13].c, S = E - (cs.base + cs.range * .95 - E) / 2.2;
-  return { q: `Long bei <b>${eur(E)}</b>, ursprünglicher Stop bei <b>${eur(S)}</b>. Der Trade ist jetzt etwa <b>+2R</b> im Plus und der Trend läuft weiter. Was ist sinnvoll?`, visual: renderChart({ candles: cs, lines: [{ y: E, color: TV.lineEntry, label: 'Einstieg' }, { y: S, color: TV.lineStop, label: 'Stop' }] }), options: ['Stop nachziehen (z. B. Einstand / unter letztes Tief)', 'Stop ganz entfernen, damit der Trade Luft hat', 'Position mit hohem Hebel verdreifachen'], correct: 0, explain: 'Stop nachziehen sichert Gewinne und lässt den Trend trotzdem laufen. Ein Gewinner darf nie wieder zum Verlierer werden.' };
+  return { q: `Long bei <b>${eur(E)}</b>, ursprünglicher Stop bei <b>${eur(S)}</b>. Der Trade ist jetzt etwa <b>+2R</b> im Plus und der Trend läuft weiter. Dein Plan sagt: „Ab +1R Stop nachziehen.“ Was machst du?`, visual: renderChart({ candles: cs, lines: [{ y: E, color: TV.lineEntry, label: 'Einstieg' }, { y: S, color: TV.lineStop, label: 'Stop' }] }), options: ['Stop nachziehen (z. B. Einstand / unter letztes Tief)', 'Stop ganz entfernen, damit der Trade Luft hat', 'Position mit hohem Hebel verdreifachen'], correct: 0, explain: 'Stop nachziehen sichert Gewinne und lässt den Trend trotzdem laufen. Ein Gewinner darf nie wieder zum Verlierer werden.' };
 });
 sit('early_profit', 'Gewinne zu früh mitnehmen', 'Halte dich an deinen Plan: Wenn das Ziel 3R ist, nicht bei der ersten kleinen Schwankung aus Angst schließen. Sonst sind Gewinne klein und Verluste voll – das CRV kippt.', () => {
   const r = R.pick([30, 50, 100]), now = R.pick([0.4, 0.5, 0.6, 0.7]);
@@ -317,9 +318,9 @@ sit('revenge', 'Nach Verlusten weitertraden?', 'Nach mehreren Verlusten am Tag: 
   const l = R.int(3, 5), v = R.pick([80, 120, 150, 240, 300]);
   return { q: `Du hattest heute <b>${l} Verlust-Trades</b> in Folge (−${v} €). Du bist wütend und willst das Geld heute noch zurück. Was machst du?`, options: ['Sofort mit doppelter Positionsgröße weitertraden', 'Pause / Tag beenden und Trades im Journal analysieren', 'Ohne Stop-Loss traden, dann wird man nicht ausgestoppt'], correct: 1, explain: 'Das ist <b>Revenge Trading</b>. Mit Emotionen und größerer Position steigt das Risiko massiv. Profis haben ein Tagesverlust-Limit und hören danach auf.' };
 });
-sit('risk20', 'Zu viel Risiko pro Trade', 'Pro Trade höchstens ca. 1 % (max. 2 %) des Kontos riskieren. Mit 20 % reichen wenige Verluste, um das Konto zu zerstören.', () => {
+sit('risk20', 'Zu viel Risiko pro Trade', 'Pro Trade als Anfänger höchstens ca. 1 % (erfahrene Trader max. 2 %) des Kontos riskieren. Mit 20 % reichen wenige Verluste, um das Konto zu zerstören.', () => {
   const K = R.pick([1000, 2000, 3000, 5000]), p = R.pick([15, 20, 25, 30]);
-  return { q: `Konto: <b>${fmt0(K)} €</b>. Du bist dir „sicher“ und willst <b>${p} %</b> (${fmt0(K * p / 100)} €) auf diesen einen Trade riskieren. Richtig?`, options: ['Ja, wenn ich mir sicher bin, ist das okay', `Nein – max. 1–2 % riskieren (${fmt0(K * 0.01)}–${fmt0(K * 0.02)} €)`, 'Ja, aber nur mit Hebel 10'], correct: 1, explain: `Bei ${p} % Risiko sind nach 4–5 Verlusten (passiert JEDEM) über die Hälfte weg. Von −50 % brauchst du +100 % zurück. „Sicher“ gibt es an der Börse nicht.` };
+  return { q: `Konto: <b>${fmt0(K)} €</b>. Du bist dir „sicher“ und willst <b>${p} %</b> (${fmt0(K * p / 100)} €) auf diesen einen Trade riskieren. Richtig?`, options: ['Ja, wenn ich mir sicher bin, ist das okay', `Nein – als Anfänger max. 1 % riskieren (${fmt0(K * 0.01)} €)`, 'Ja, aber nur mit Hebel 10'], correct: 1, explain: `Bei ${p} % Risiko sind nach 4–5 Verlusten (passiert JEDEM) über die Hälfte weg. Von −50 % brauchst du +100 % zurück. „Sicher“ gibt es an der Börse nicht.` };
 });
 sit('leverage', 'Hoher Hebel bei kleinem Konto', 'Hoher Hebel vervielfacht Verluste. Anfänger sollten ohne oder mit sehr kleinem Hebel üben – am besten im Demokonto.', () => {
   const K = R.pick([300, 500, 800, 1000]), h = R.pick([20, 30, 50, 100]);
@@ -336,6 +337,38 @@ sit('overconfidence', 'Übermut nach Gewinn', 'Auch nach Gewinnen bleibt die Pos
   return { q: `Dein letzter Trade brachte <b>+${g} €</b> – dein bester Tag! Du fühlst dich unschlagbar und willst die nächste Position <b>verdreifachen</b>. Was ist richtig?`, options: ['Verdreifachen – ich habe gerade einen Lauf', 'Positionsgröße bleibt nach Plan (1-%-Regel)', 'Den Gewinn komplett in einen Trade stecken'], correct: 1, explain: 'Nach Gewinnen wird man leichtsinnig. Ein einziger übergroßer Verlust kann eine ganze Woche Gewinne vernichten. Plan einhalten.' };
 });
 
+
+sit('rsi_trend', 'Überverkauft, aber starker Abwärtstrend', 'Überverkauft (RSI < 30) bedeutet nicht automatisch „kaufen“. Im starken Abwärtstrend kann der RSI lange unten bleiben. Erst Umkehrsignal abwarten.', () => {
+  let cs, rsi; for (let t = 0; t < 40; t++) { cs = pathCandles(jitter(flipA(A.up), .02, .03), 60, { noise: .025 }); rsi = RSI(cs.map(x => x.c)); if (rsi[rsi.length - 1] < 32) break; }
+  return { q: `Der RSI steht bei <b>${fmt(rsi[rsi.length - 1], 0)}</b> („überverkauft“). Der Chart zeigt aber tiefere Hochs und tiefere Tiefs. Was machst du?`, visual: renderChart({ candles: cs, rsi }), options: OPT3, correct: 2, keepOrder: true, explain: 'Ein niedriger RSI allein ist kein Kaufsignal. Gegen einen klaren Abwärtstrend zu kaufen ist riskant. <b>Abwarten</b>, bis z. B. ein Boden, ein höheres Tief oder ein Bruch der Abwärtstrendlinie kommt.' };
+});
+sit('missed', 'Einstieg verpasst', 'Hast du den geplanten Einstieg verpasst, springst du nicht hinterher. Der Stop wäre weit weg, das CRV schlecht. Auf das nächste Setup (z. B. Retest) warten.', () => {
+  const { cs, line } = breakoutChart(true); const u = cs.range * .08; let p = cs[cs.length - 1].c;
+  for (let i = 0; i < 4; i++) { const o = p, c = p + u * R.rand(.6, 1.1); cs.push({ o, c, h: c + u * .15, l: o - u * .1, v: cs[cs.length - 1].v * .7 }); p = c; }
+  return { q: 'Du wolltest beim Ausbruch über den Widerstand kaufen, warst aber nicht am Bildschirm. Jetzt ist der Kurs schon 4 Kerzen weiter gestiegen. Was machst du?', visual: renderChart({ candles: cs, volume: true, lines: [{ y: line, color: TV.lineLvl, label: 'Widerstand' }] }), options: OPT3, correct: 2, keepOrder: true, explain: 'Der sinnvolle Stop läge unter dem Widerstand – weit weg. Das CRV ist jetzt schlecht. <b>Abwarten</b> und auf einen Retest des Widerstands oder ein neues Setup warten.' };
+});
+sit('volatile', 'Stop müsste riesig sein', 'Ist der Markt so volatil, dass der sinnvolle Stop sehr weit weg ist, wird die Positionsgröße kleiner – das Risiko in € bleibt gleich. Oder man lässt den Trade aus.', () => {
+  const r = R.pick([50, 100]), d = R.pick([3, 4, 5]);
+  return { q: `Du riskierst normalerweise <b>${r} €</b> pro Trade mit 1 € Stop-Abstand (= ${r} Aktien). Heute ist der Markt extrem unruhig, ein sinnvoller Stop läge <b>${d} €</b> entfernt. Was machst du?`, options: [`Wie immer ${r} Aktien kaufen, Stop ${d} € weg`, `Positionsgröße verkleinern (${Math.floor(r / d)} Aktien) oder Trade auslassen`, 'Stop trotzdem bei 1 € lassen, dann passt die Größe'], correct: 1, explain: `${r} Aktien × ${d} € = ${r * d} € Risiko statt ${r} € – viel zu viel. Ein zu enger Stop (1 €) würde dagegen ständig zufällig ausgelöst. Richtig: Größe anpassen (${r} ÷ ${d} ≈ ${Math.floor(r / d)} Aktien) oder auslassen.` };
+});
+sit('spread', 'Spread plötzlich sehr hoch', 'Bei ungewöhnlich hohem Spread (z. B. vor Nachrichten, außerhalb der Handelszeit, illiquide Aktie) nicht handeln – du startest direkt mit großem Minus.', () => {
+  const b = Math.round(R.rand(10, 60) * 100) / 100, sp = R.pick([0.4, 0.5, 0.8, 1]);
+  return { q: `Normalerweise ist der Spread 0,02 €. Gerade zeigt dein Broker Bid <b>${fmt(b)} €</b> / Ask <b>${fmt(b + sp)} €</b>. Dein Stop wäre 0,80 € entfernt. Was machst du?`, options: ['Sofort per Market-Order kaufen', 'Abwarten, bis der Spread wieder normal ist', 'Mit doppelter Größe kaufen, um den Spread auszugleichen'], correct: 1, explain: `Spread ${fmt(sp)} € bei 0,80 € Stop-Abstand: Du hättest sofort ${fmt(sp / 0.8 * 100, 0)} % deines Risikos verloren. Breite Spreads sind ein Warnsignal (wenig Liquidität, Nachrichten). <b>Abwarten.</b>` };
+});
+sit('invalid', 'Setup ist widerlegt', 'Ist der Grund für deinen Trade nicht mehr gültig (z. B. Kurs fällt zurück unter die Ausbruchslinie), steigst du nach Plan aus – auch wenn der Stop noch nicht erreicht ist, sofern dein Plan das so vorsieht.', () => {
+  const an = [[0, .3], [.1, .58], [.2, .35], [.32, .58], [.44, .38], [.56, .58], [.63, .74], [.68, .58], [.8, .44], [1, .42]];
+  const cs = pathCandles(an, R.int(46, 54), { noise: .018, wick: .015 }); const line = cs.base + cs.range * .6, E = cs.base + cs.range * .7, S = cs.base + cs.range * .25;
+  return { q: 'Du bist beim Ausbruch Long gegangen. Der Kurs ist zurück tief in die alte Range gefallen (Fehlausbruch). Dein Plan sagt: „Schließt der Kurs wieder klar unter der Linie, ist das Setup ungültig.“ Was machst du?', visual: renderChart({ candles: cs, lines: [{ y: line, color: TV.lineLvl, label: 'Ausbruchslinie' }, { y: E, color: TV.lineEntry, label: 'Einstieg' }, { y: S, color: TV.lineStop, label: 'Stop' }] }), options: ['Nach Plan aussteigen – Setup ist ungültig', 'Halten und hoffen, bis der Stop kommt', 'Nachkaufen, jetzt ist es billiger'], correct: 0, explain: 'Die Idee (Ausbruch) ist widerlegt – es ist ein Fehlausbruch. Wer nach Plan früher aussteigt, verliert weniger. Hoffen und Nachkaufen sind typische Anfängerfehler.' };
+});
+sit('signals_vs_trend', 'Indikator-Signal gegen den Trend', 'Der Gesamtkontext (Trend, Unterstützung/Widerstand) ist wichtiger als ein einzelnes Indikatorsignal. Kaufsignale in einem klaren Abwärtstrend sind oft Fallen.', () => {
+  const cs = trendChart('down'); const ema = EMA(cs.map(x => x.c), 20);
+  return { q: 'Zwei Indikatoren (MACD-Kreuz und RSI-Anstieg) geben gerade ein Kaufsignal. Der Kurs liegt aber klar unter dem fallenden EMA 20 im Abwärtstrend. Was machst du?', visual: renderChart({ candles: cs, overlays: [{ values: ema, color: '#60a5fa', label: 'EMA 20' }] }), options: OPT3, correct: 2, keepOrder: true, explain: 'Der übergeordnete Trend ist abwärts. Indikator-Kaufsignale gegen den Trend scheitern oft. <b>Abwarten</b>, bis sich auch die Struktur (höhere Tiefs, Bruch des EMA) dreht. Ein Short direkt nach einem Kaufsignal ist ebenfalls kein sauberes Setup.' };
+});
+sit('tp_hit', 'Kursziel erreicht', 'Erreicht der Kurs dein geplantes Kursziel, nimmst du den Gewinn nach Plan mit (oder einen vorher festgelegten Teil). Gier („vielleicht geht noch mehr“) ist kein Plan.', () => {
+  const r = R.pick([40, 50, 80, 100]), m = R.pick([2, 2.5, 3]);
+  return { q: `Dein Plan: Take-Profit bei <b>+${fmt0(m)}R</b>. Der Kurs erreicht es gerade (+${fmt0(r * m)} €). Du denkst: „Vielleicht geht ja noch viel mehr.“ Was machst du?`, options: ['Nach Plan Gewinn mitnehmen', 'Take-Profit löschen und weiter laufen lassen ohne Regel', 'Position vergrößern, es läuft ja'], correct: 0, explain: 'Der Plan wurde VOR dem Trade mit klarem Kopf gemacht. Wer Ziele spontan löscht, sieht Gewinne oft wieder verschwinden. Nur wenn dein Plan vorher z. B. „Hälfte raus, Rest mit Trailing-Stop“ vorsieht, ist das okay.' };
+});
+
 /* ---------- Lernreihenfolge ---------- */
 const ORDER = ('t:aktie t:boerse t:broker t:kurs t:trading t:daytrading t:demokonto t:chart t:kerze t:gruen t:rot b:ohlc t:open t:close t:high t:low ' +
   't:koerper t:docht t:timeframe t:long t:short t:bid t:ask t:spread t:order t:marketorder t:limitorder t:stoploss t:entry t:exit t:takeprofit ' +
@@ -346,6 +379,6 @@ const ORDER = ('t:aktie t:boerse t:broker t:kurs t:trading t:daytrading t:demoko
   'f:hs f:ihs c:hangingman c:invhammer t:goldencross t:deathcross i:macross f:asctri f:desctri f:symtri t:hebel t:margin t:margincall r:leverage ' +
   's:leverage s:risk20 t:trefferquote r:breakeven_wr f:bullflag f:bearflag s:bearflag s:dtop_break t:overtrading s:overtrading t:trailingstop ' +
   't:breakeven s:trail s:early_profit c:soldiers c:crows c:spinningtop f:rectangle f:risingwedge f:fallingwedge t:vwap t:macd t:bollinger t:atr ' +
-  't:volatilitaet t:liquiditaet t:stoporder t:slippage t:gap t:premarket s:news s:knife t:position t:glattstellen r:pnl_short t:gebuehren r:spread ' +
+  't:volatilitaet t:liquiditaet t:stoporder t:slippage t:gap t:premarket s:news s:knife s:rsi_trend s:missed s:volatile s:spread s:invalid s:signals_vs_trend s:tp_hit t:position t:glattstellen r:pnl_short t:gebuehren r:spread ' +
   't:drawdown t:tradingplan t:journal s:indicators s:overconfidence t:trendlinie t:ticker').split(' ').filter(id => SKILLS[id]);
 Object.keys(SKILLS).forEach(id => { if (!ORDER.includes(id)) ORDER.push(id); });
