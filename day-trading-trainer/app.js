@@ -23,14 +23,24 @@ function pickNext() {
   if (due.length) return { id: due[0] };
   // 3) Neues lernen, wenn wenig gerade in der Lernphase ist
   const learning = S.intro.filter(id => inF(id) && S.sk[id].box <= 1).length;
-  const nextNew = ORDER.find(id => inF(id) && !S.intro.includes(id));
-  if (nextNew && (learning < 4 || !S.intro.some(inF))) { S.intro.push(nextNew); st(nextNew); return { id: nextNew, isNew: true }; }
+  const nextNew = pickNew();
+  if (nextNew && (learning < (filter ? 4 : 7) || !S.intro.some(inF))) { S.intro.push(nextNew); st(nextNew); return { id: nextNew, isNew: true }; }
   // 4) Freies Üben: schwächere Skills häufiger
   const pool = S.intro.filter(id => inF(id) && id !== lastId);
   if (!pool.length) return { id: S.intro.find(inF) };
-  let tot = 0; const w = pool.map(id => { const x = 1 / Math.pow(S.sk[id].box + 1, 1.6) + (S.sk[id].bad > S.sk[id].ok ? .5 : 0); tot += x; return x; });
+  let tot = 0; const w = pool.map(id => { const x = (1 / Math.pow(S.sk[id].box + 1, 1.6) + (S.sk[id].bad > S.sk[id].ok ? .5 : 0)) * (lastId && SKILLS[id].mod === SKILLS[lastId].mod ? .35 : 1); tot += x; return x; });
   let r = Math.random() * tot; for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r <= 0) return { id: pool[i] }; }
   return { id: pool[0] };
+}
+// Gemischt: neue Themen reihum aus ALLEN Bereichen (der Bereich mit dem geringsten Anteil zuerst)
+function pickNew() {
+  if (filter) return ORDER.find(id => inF(id) && !S.intro.includes(id));
+  const lastMod = lastId && SKILLS[lastId] ? SKILLS[lastId].mod : null;
+  const cand = Object.keys(MODULES).map(m => {
+    const all = ORDER.filter(id => SKILLS[id].mod === m), next = all.find(id => !S.intro.includes(id));
+    return next ? { next, share: all.filter(id => S.intro.includes(id)).length + (m === lastMod ? .5 : 0) + Math.random() * .4 } : null;
+  }).filter(Boolean).sort((x, y) => x.share - y.share);
+  return cand.length ? cand[0].next : null;
 }
 function grade(id, result) { // result: 'ok' | 'bad'
   const s = st(id), now = Date.now();

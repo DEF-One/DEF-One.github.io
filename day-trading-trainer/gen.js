@@ -61,7 +61,14 @@ function buildPattern(key) {
   }
   let all = ctx.concat(pat);
   if (flip) all = flipCandles(all, ctx.base + ctx.range / 2);
-  return { candles: all, highlight: [ctx.length, all.length - 1] };
+  const hl = [ctx.length, all.length - 1];
+  // Abwechslung: manchmal laufen nach dem Muster noch Kerzen weiter (Muster steht dann mitten im Chart)
+  if (R.chance(.45)) {
+    const sig = CANDLES[key].sig, dir = sig === 'bull' ? 1 : sig === 'bear' ? -1 : (R.chance(.5) ? 1 : -1), k = R.int(2, 6);
+    let p = all[all.length - 1].c;
+    for (let i = 0; i < k; i++) { const o = p + R.gauss() * u * .1, c = o + dir * u * R.rand(-.3, .9); all.push(mk(o, c, u * R.rand(.05, .3), u * R.rand(.05, .3))); p = c; }
+  }
+  return { candles: all, highlight: hl };
 }
 
 /* Formationen */
