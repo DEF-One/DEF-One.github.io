@@ -27,7 +27,7 @@ function trendChart(kind) {
 }
 
 /* Kerzenmuster */
-function buildPattern(key) {
+function buildPattern(key, opt = {}) {
   const bearMap = { shootingstar: 'hammer', hangingman: 'invhammer', bearengulf: 'bullengulf', eveningstar: 'morningstar', crows: 'soldiers' };
   const base = bearMap[key] || key, flip = !!bearMap[key];
   let ctxA = jitter(A.down, .02, .04);
@@ -63,12 +63,12 @@ function buildPattern(key) {
   if (flip) all = flipCandles(all, ctx.base + ctx.range / 2);
   const hl = [ctx.length, all.length - 1];
   // Abwechslung: manchmal laufen nach dem Muster noch Kerzen weiter (Muster steht dann mitten im Chart)
-  if (R.chance(.45)) {
+  if (opt.trail === 'force' || (opt.trail !== 'none' && R.chance(.45))) {
     const sig = CANDLES[key].sig, dir = sig === 'bull' ? 1 : sig === 'bear' ? -1 : (R.chance(.5) ? 1 : -1), k = R.int(2, 6);
     let p = all[all.length - 1].c;
     for (let i = 0; i < k; i++) { const o = p + R.gauss() * u * .1, c = o + dir * u * R.rand(-.3, .9); all.push(mk(o, c, u * R.rand(.05, .3), u * R.rand(.05, .3))); p = c; }
   }
-  return { candles: all, highlight: hl };
+  return { candles: all, highlight: hl, u };
 }
 
 /* Formationen */
@@ -157,29 +157,71 @@ skill('b:break', 'b', 'Ausbruch, Retest oder Fehlausbruch?',
       explain: { retest: 'Kurs ist klar darüber gelaufen, zurückgekommen und die Linie hat als Unterstützung gehalten (Rollentausch) → echter Ausbruch mit Retest.', fake: 'Kurs war kurz über der Linie, ist aber schnell zurück in die Range gefallen → Fehlausbruch. Wer blind gekauft hat, sitzt im Verlust.', none: 'Der Kurs hat den Widerstand noch nicht überwunden → noch kein Ausbruch, abwarten.' }[k] };
   });
 
+/* ---------- Hilfen für Bild-Aufgaben ---------- */
+// Lehrbuch-Fortsetzung anhängen (für die „Auflösung“ nach der Antwort)
+function extendCs(cs, dir, k, u) {
+  const out = cs.map(x => ({ ...x })); u = u || avgBody(cs) * 1.6; let p = out[out.length - 1].c;
+  for (let i = 0; i < k; i++) { const o = p + R.gauss() * u * .1, c = o + dir * u * R.rand(.1, 1.1) + R.gauss() * u * .25; out.push(mk(o, c, u * R.rand(.05, .35), u * R.rand(.05, .35))); p = c; }
+  return out;
+}
+const DIR = sig => sig === 'bull' ? 1 : sig === 'bear' ? -1 : (R.chance(.5) ? 1 : -1);
+const revealNote = '<p class="hint">So läuft es im <b>Lehrbuch-Fall</b> weiter (neue Kerzen rechts). In echten Märkten klappt das längst nicht immer – darum immer Stop-Loss!</p>';
+const C_PREF = { hammer: ['hangingman', 'invhammer', 'shootingstar'], hangingman: ['hammer', 'shootingstar', 'invhammer'], shootingstar: ['invhammer', 'hangingman', 'hammer'], invhammer: ['shootingstar', 'hammer', 'hangingman'], doji: ['spinningtop', 'hammer'], spinningtop: ['doji', 'invhammer'], bullengulf: ['bearengulf', 'morningstar'], bearengulf: ['bullengulf', 'eveningstar'], morningstar: ['eveningstar', 'bullengulf'], eveningstar: ['morningstar', 'bearengulf'], soldiers: ['crows', 'morningstar'], crows: ['soldiers', 'eveningstar'] };
+const F_PREF = { doubletop: ['hs', 'doublebottom'], doublebottom: ['ihs', 'doubletop'], hs: ['doubletop', 'ihs'], ihs: ['doublebottom', 'hs'], asctri: ['symtri', 'desctri'], desctri: ['symtri', 'asctri'], symtri: ['asctri', 'rectangle'], bullflag: ['bearflag', 'fallingwedge'], bearflag: ['bullflag', 'risingwedge'], rectangle: ['symtri', 'doubletop'], risingwedge: ['fallingwedge', 'bearflag'], fallingwedge: ['risingwedge', 'bullflag'] };
+function distractors(key, pref, pool, n = 3) {
+  const d = R.shuffle(pref[key] || []).slice(0, 2);
+  R.shuffle(Object.keys(pool)).forEach(k => { if (k !== key && d.length < n && !d.includes(k)) d.push(k); });
+  return d;
+}
+const TAPPABLE = ['hammer', 'shootingstar', 'invhammer', 'hangingman', 'bullengulf', 'bearengulf', 'morningstar', 'eveningstar', 'soldiers', 'crows'];
+
 /* ---------- Kerzenmuster ---------- */
 Object.entries(CANDLES).forEach(([key, C]) => {
-  const lesson = () => { const p = buildPattern(key); return `${renderChart({ ...p, height: 200 })}<p><b>Aussehen:</b> ${C.look}</p><p><b>Wo:</b> ${C.ctx}</p><p><b>Bedeutung:</b> ${C.mean}</p><p class="tip">Signal: ${SIG_TXT[C.sig]}. Kerzenmuster sind Hinweise, keine Garantie – am besten an Unterstützung/Widerstand und mit Bestätigung.</p>`; };
+  const lesson = () => { const p = buildPattern(key, { trail: 'none' }); return `${renderChart({ ...p, height: 220 })}<p><b>Aussehen:</b> ${C.look}</p><p><b>Wo:</b> ${C.ctx}</p><p><b>Bedeutung:</b> ${C.mean}</p><p class="tip">Signal: ${SIG_TXT[C.sig]}. Kerzenmuster sind Hinweise, keine Garantie – am besten an Unterstützung/Widerstand und mit Bestätigung.</p>`; };
   skill('c:' + key, 'c', C.name, lesson, () => {
-    const p = buildPattern(key), visual = renderChart(p);
     const ex = `<b>${C.name}</b>: ${C.look} ${C.mean}`;
-    if (R.chance(.3)) return { q: 'Ist das markierte Muster eher bullisch, bärisch oder neutral?', visual, options: ['🟢 Bullisch', '🔴 Bärisch', '⚪ Neutral'], correct: ['bull', 'bear', 'neutral'].indexOf(C.sig), keepOrder: true, explain: ex };
-    const keys = Object.keys(CANDLES).filter(k => k !== key);
-    const pref = { hammer: ['hangingman', 'invhammer', 'shootingstar'], hangingman: ['hammer', 'shootingstar', 'invhammer'], shootingstar: ['invhammer', 'hangingman', 'hammer'], invhammer: ['shootingstar', 'hammer', 'hangingman'], doji: ['spinningtop'], spinningtop: ['doji'], bullengulf: ['bearengulf', 'morningstar'], bearengulf: ['bullengulf', 'eveningstar'], morningstar: ['eveningstar', 'bullengulf'], eveningstar: ['morningstar', 'bearengulf'], soldiers: ['crows'], crows: ['soldiers'] }[key] || [];
-    const dis = R.shuffle(pref).slice(0, 2); R.shuffle(keys).forEach(k => { if (dis.length < 3 && !dis.includes(k)) dis.push(k); });
-    return { q: 'Welches Kerzenmuster ist markiert?', visual, options: [C.name, ...dis.map(k => CANDLES[k].name)], correct: 0, explain: ex + (['hammer', 'hangingman', 'shootingstar', 'invhammer'].includes(key) ? '<br><span class="tip">Tipp: Hammer & Hanging Man sehen gleich aus – entscheidend ist, ob vorher ein Abwärts- oder Aufwärtstrend war.</span>' : '') };
+    const hint = 'Achte auf Körpergröße, Docht-Länge, Farbe – und auf den Trend VOR dem Muster.';
+    const r = Math.random();
+    // 1) Antippen: Muster selbst im Chart finden
+    if (r < .27 && TAPPABLE.includes(key)) {
+      const p = buildPattern(key, { trail: 'force' });
+      const spec = { candles: p.candles, clickable: true };
+      const multi = p.highlight[1] > p.highlight[0];
+      return { type: 'tap', q: `Finde das Muster: Tippe ${multi ? 'eine Kerze' : 'die Kerze'} des <b>${C.name}</b> im Chart an.`, spec, range: p.highlight, hint: hint + ' ' + C.look, explain: ex };
+    }
+    // 2) Bild auswählen
+    if (r < .52) {
+      const keys = [key, ...distractors(key, C_PREF, CANDLES)];
+      return { q: `Auf welchem Bild ist ein <b>${C.name}</b> markiert?`, img: true, options: keys.map(k => renderChart({ ...buildPattern(k, { trail: 'none' }), mini: true })), correct: 0, cmp: { kind: 'c', keys }, hint, explain: ex };
+    }
+    // 3) Signal + Auflösung
+    if (r < .72) {
+      const p = buildPattern(key, { trail: 'none' });
+      const rev = extendCs(p.candles, DIR(C.sig), R.int(5, 8), p.u);
+      return { q: 'Ist das markierte Muster eher bullisch, bärisch oder neutral?', visual: renderChart(p), options: ['🟢 Bullisch', '🔴 Bärisch', '⚪ Neutral'], correct: ['bull', 'bear', 'neutral'].indexOf(C.sig), keepOrder: true, hint, explain: ex + revealNote + renderChart({ candles: rev, highlight: p.highlight, height: 200 }) };
+    }
+    // 4) Namen nennen
+    const p = buildPattern(key), keys = [key, ...distractors(key, C_PREF, CANDLES)];
+    return { q: 'Welches Kerzenmuster ist markiert?', visual: renderChart(p), options: keys.map(k => CANDLES[k].name), correct: 0, cmp: { kind: 'c', keys }, hint, explain: ex + (['hammer', 'hangingman', 'shootingstar', 'invhammer'].includes(key) ? '<br><span class="tip">Tipp: Hammer & Hanging Man sehen gleich aus – entscheidend ist, ob vorher ein Abwärts- oder Aufwärtstrend war.</span>' : '') };
   });
 });
 
 /* ---------- Formationen ---------- */
 Object.entries(FORMS).forEach(([key, F]) => {
-  skill('f:' + key, 'f', F.name, () => `${renderChart({ candles: buildForm(key), height: 200 })}<p><b>Aussehen:</b> ${F.look}</p><p><b>Bedeutung:</b> ${F.mean}</p><p class="tip">Erwartung: ${SIG_TXT[F.sig]}. Formationen gelten erst mit Ausbruch als bestätigt.</p>`, () => {
-    const visual = renderChart({ candles: buildForm(key) });
-    const ex = `<b>${F.name}</b>: ${F.look} ${F.mean}`;
-    if (R.chance(.3)) return { q: `Das ist ein(e) <b>${F.name}</b>. Was wird danach typischerweise erwartet?`, visual, options: ['📈 Eher steigende Kurse', '📉 Eher fallende Kurse', '↔️ Offen – Ausbruch abwarten'], correct: ['bull', 'bear', 'neutral'].indexOf(F.sig), keepOrder: true, explain: ex };
-    const pref = { doubletop: ['hs', 'doublebottom'], doublebottom: ['ihs', 'doubletop'], hs: ['doubletop', 'ihs'], ihs: ['doublebottom', 'hs'], asctri: ['symtri', 'desctri'], desctri: ['symtri', 'asctri'], symtri: ['asctri', 'rectangle'], bullflag: ['bearflag', 'fallingwedge'], bearflag: ['bullflag', 'risingwedge'], rectangle: ['symtri', 'doubletop'], risingwedge: ['fallingwedge', 'bearflag'], fallingwedge: ['risingwedge', 'bullflag'] }[key];
-    const dis = pref.slice(); R.shuffle(Object.keys(FORMS)).forEach(k => { if (k !== key && dis.length < 3 && !dis.includes(k)) dis.push(k); });
-    return { q: 'Welche Chartformation siehst du?', visual, options: [F.name, ...dis.map(k => FORMS[k].name)], correct: 0, explain: ex };
+  skill('f:' + key, 'f', F.name, () => `${renderChart({ candles: buildForm(key), height: 220 })}<p><b>Aussehen:</b> ${F.look}</p><p><b>Bedeutung:</b> ${F.mean}</p><p class="tip">Erwartung: ${SIG_TXT[F.sig]}. Formationen gelten erst mit Ausbruch als bestätigt.</p>`, () => {
+    const ex = `<b>${F.name}</b>: ${F.look} ${F.mean}`, hint = 'Zähle die Hochs und Tiefs. Sind die Linien waagerecht, steigend, fallend – oder laufen sie zusammen?';
+    const r = Math.random();
+    if (r < .33) {
+      const keys = [key, ...distractors(key, F_PREF, FORMS)];
+      return { q: `Welches Bild zeigt ein(e) <b>${F.name}</b>?`, img: true, options: keys.map(k => renderChart({ candles: buildForm(k), mini: true })), correct: 0, cmp: { kind: 'f', keys }, hint, explain: ex };
+    }
+    if (r < .6) {
+      const cs = buildForm(key), n = cs.length, dir = F.sig === 'neutral' ? Math.sign(cs[n - 1].c - cs[n - 8].c) || 1 : DIR(F.sig);
+      const rev = extendCs(cs, dir, R.int(7, 11));
+      return { q: `Das ist ein(e) <b>${F.name}</b>. Was wird danach typischerweise erwartet?`, visual: renderChart({ candles: cs }), options: ['📈 Eher steigende Kurse', '📉 Eher fallende Kurse', '↔️ Offen – Ausbruch abwarten'], correct: ['bull', 'bear', 'neutral'].indexOf(F.sig), keepOrder: true, hint, explain: ex + revealNote + renderChart({ candles: rev, highlight: [n, rev.length - 1], height: 200 }) };
+    }
+    const keys = [key, ...distractors(key, F_PREF, FORMS)];
+    return { q: 'Welche Chartformation siehst du?', visual: renderChart({ candles: buildForm(key) }), options: keys.map(k => FORMS[k].name), correct: 0, cmp: { kind: 'f', keys }, hint, explain: ex };
   });
 });
 
@@ -215,6 +257,57 @@ skill('i:volume', 'i', 'Volumen bestätigt Ausbruch?', () => `<p>Das <b>Volumen<
   const strong = R.chance(.5), { cs, line } = breakoutChart(strong);
   return { q: 'Der Kurs bricht über den Widerstand. Ist der Ausbruch durch das Volumen bestätigt?', visual: renderChart({ candles: cs, volume: true, lines: [{ y: line, color: TV.lineLvl, label: 'Widerstand' }], highlight: [cs.length - 1, cs.length - 1] }), options: ['✅ Ja – hohes Volumen', '⚠️ Nein – niedriges Volumen, Vorsicht'], correct: strong ? 0 : 1, keepOrder: true,
     explain: strong ? 'Der Volumenbalken der Ausbruchskerze ist mehrfach so hoch wie die vorherigen → viele Marktteilnehmer kaufen mit → bestätigter Ausbruch.' : 'Der Volumenbalken der Ausbruchskerze ist sogar KLEINER als üblich → wenig Interesse, hohes Risiko für einen Fehlausbruch.' };
+});
+
+
+/* ---------- Zusätzliche Bild-Varianten ---------- */
+const wrapGen = (id, fn) => { const old = SKILLS[id].gen; SKILLS[id].gen = () => fn() || old(); };
+const TREND_N = { up: 'Aufwärtstrend', down: 'Abwärtstrend', side: 'Seitwärtsphase' };
+wrapGen('b:trend', () => {
+  if (!R.chance(.45)) return null;
+  const k = R.pick(['up', 'down', 'side']), keys = [k, ...['up', 'down', 'side'].filter(x => x !== k)];
+  return { q: `Welches Bild zeigt einen <b>${TREND_N[k]}</b>?`, img: true, options: keys.map(x => renderChart({ candles: trendChart(x), mini: true })), correct: 0, hint: 'Verbinde in Gedanken die Hochs und die Tiefs: steigen beide, fallen beide – oder bleiben sie auf einer Höhe?', explain: 'Aufwärtstrend = höhere Hochs + höhere Tiefs. Abwärtstrend = tiefere Hochs + tiefere Tiefs. Seitwärts = Hochs und Tiefs ungefähr auf gleicher Höhe.' };
+});
+wrapGen('b:sr', () => {
+  if (!R.chance(.45)) return null;
+  const cs = pathCandles(jitter(A.rectangle, .01, .015), R.int(26, 34), { noise: .018, wick: .015 });
+  const sup = cs.base + cs.range * .22, res = cs.base + cs.range * .8, tol = cs.range * .08, askSup = R.chance(.5);
+  const ok = cs.map((k, i) => (askSup ? k.l <= sup + tol : k.h >= res - tol) ? i : -1).filter(i => i > 0);
+  if (ok.length < 2) return null;
+  return { type: 'tap', q: `Tippe auf eine Kerze, die an der <b>${askSup ? 'Unterstützung abprallt (Boden)' : 'am Widerstand abprallt (Decke)'}</b>.`, spec: { candles: cs, clickable: true }, okIdx: ok, solved: { lines: [{ y: sup, color: TV.lineLvl, label: 'Unterstützung' }, { y: res, color: TV.lineLvl, label: 'Widerstand' }] }, hint: askSup ? 'Suche die Stellen, an denen der Kurs mehrmals unten „aufsetzt“ und wieder steigt.' : 'Suche die Stellen, an denen der Kurs mehrmals oben „anstößt“ und wieder fällt.', explain: `Markiert sind alle Kerzen, die ${askSup ? 'die Unterstützung (Boden)' : 'den Widerstand (Decke)'} berühren. Je öfter eine Zone getestet wird, desto wichtiger ist sie.` };
+});
+function rsiChart(k) {
+  let cs, rsi, v;
+  for (let t = 0; t < 60; t++) {
+    let an = k === 'neutral' ? jitter(A.side, .02, .04) : jitter([[0, .3], [.3, .42], [.55, .3], [.72, .42], [1, 1]], .02, .03);
+    if (k === 'under') an = flipA(an);
+    cs = pathCandles(an, 60, { noise: .025 }); rsi = RSI(cs.map(x => x.c)); v = rsi[rsi.length - 1];
+    if ((k === 'over' && v > 72) || (k === 'under' && v < 28) || (k === 'neutral' && v > 38 && v < 62)) break;
+  }
+  return { cs, rsi, v };
+}
+wrapGen('i:rsi', () => {
+  if (!R.chance(.4)) return null;
+  const N = { over: 'überkauft (über 70)', under: 'überverkauft (unter 30)', neutral: 'neutral (30–70)' };
+  const k = R.pick(['over', 'under', 'neutral']), keys = [k, ...['over', 'under', 'neutral'].filter(x => x !== k)];
+  return { q: `Auf welchem Bild ist der RSI am rechten Rand <b>${N[k]}</b>?`, img: true, options: keys.map(x => { const r = rsiChart(x); return renderChart({ candles: r.cs, rsi: r.rsi, mini: true }); }), correct: 0, hint: 'Schau nur aufs untere Fenster: Wo endet die lila Linie – über der oberen, unter der unteren gestrichelten Linie oder dazwischen?', explain: 'Im unteren Fenster: obere gestrichelte Linie = 70, untere = 30. Steiler Anstieg → RSI über 70, steiler Abfall → RSI unter 30.' };
+});
+wrapGen('i:volume', () => {
+  if (!R.chance(.4)) return null;
+  const a = breakoutChart(true), b = breakoutChart(false);
+  return { q: 'Bei welchem Ausbruch <b>bestätigt das Volumen</b> die Bewegung?', img: true, options: [a, b].map(x => renderChart({ candles: x.cs, volume: true, lines: [{ y: x.line, color: TV.lineLvl }], highlight: [x.cs.length - 1, x.cs.length - 1], mini: true })), correct: 0, hint: 'Vergleiche den letzten Volumenbalken mit den Balken davor.', explain: 'Beim bestätigten Ausbruch ist der letzte Volumenbalken mehrfach so hoch wie die vorherigen. Beim anderen ist er sogar kleiner → Fehlausbruch-Gefahr.' };
+});
+wrapGen('i:macross', () => {
+  if (!R.chance(.45)) return null;
+  const golden = R.chance(.5); let cs, f, s, cross = -1;
+  for (let t = 0; t < 40 && cross < 0; t++) {
+    let an = jitter([[0, .85], [.45, .15], [.55, .2], [1, .95]], .04, .05); if (!golden) an = flipA(an);
+    cs = pathCandles(an, 70, { noise: .025 }); const c = cs.map(x => x.c); f = EMA(c, 9); s = EMA(c, 21);
+    for (let i = 30; i < 66; i++) if (Math.sign(f[i] - s[i]) !== Math.sign(f[i - 1] - s[i - 1]) && (f[i] > s[i]) === golden) cross = i;
+  }
+  if (cross < 0) return null;
+  const off = 15, ov = [{ values: f.slice(off), color: '#f5c542', label: 'EMA 9' }, { values: s.slice(off), color: '#60a5fa', label: 'EMA 21' }];
+  return { type: 'tap', q: `Tippe auf die Stelle, an der das <b>${golden ? 'Golden Cross' : 'Death Cross'}</b> entsteht.`, spec: { candles: cs.slice(off), overlays: ov, clickable: true }, range: [cross - off - 2, cross - off + 2], solved: { markers: [{ i: cross - off, y: s[cross], color: '#fff' }] }, hint: 'Folge der gelben (schnellen) Linie: Wo schneidet sie die blaue?', explain: golden ? 'Hier kreuzt der schnelle EMA (gelb) den langsamen (blau) von unten nach oben → Golden Cross.' : 'Hier kreuzt der schnelle EMA (gelb) den langsamen (blau) von oben nach unten → Death Cross.' };
 });
 
 /* ---------- Risiko-Rechnen ---------- */

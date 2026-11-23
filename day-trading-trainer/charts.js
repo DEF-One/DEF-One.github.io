@@ -65,14 +65,15 @@ function RSI(v, n = 14) {
   return out;
 }
 
+var CHART_W = 640; // wird je nach Gerät gesetzt (Handy schmaler = größere Darstellung)
 /* ===== SVG-Renderer =====
   spec: { candles, highlight:[i0,i1], lines:[{y,label,color,dash}], overlays:[{values,color,label}],
           volume:bool, rsi:array|null, markers:[{i,y,label,color}], hideLastN }
 */
 function renderChart(spec) {
-  const cs = spec.candles, n = cs.length;
-  const W = 640, PR = 62, PL = 8, plotW = W - PR - PL;
-  const mainH = spec.height || 270, volH = spec.volume ? 64 : 0, rsiH = spec.rsi ? 92 : 0, gap = 8;
+  const cs = spec.candles, n = cs.length, mini = !!spec.mini;
+  const W = mini ? 360 : CHART_W, PR = mini ? 6 : (CHART_W < 600 ? 54 : 62), PL = mini ? 4 : 8, plotW = W - PR - PL;
+  const mainH = spec.height || (mini ? 200 : CHART_W < 600 ? 330 : 270), volH = spec.volume ? (mini ? 44 : 64) : 0, rsiH = spec.rsi ? (mini ? 60 : 92) : 0, gap = 8;
   const H = mainH + (volH ? volH + gap : 0) + (rsiH ? rsiH + gap : 0) + 6;
   let lo = Infinity, hi = -Infinity;
   cs.forEach(k => { lo = Math.min(lo, k.l); hi = Math.max(hi, k.h); });
@@ -87,8 +88,9 @@ function renderChart(spec) {
   // Gitter + Preisachse
   for (let g = 0; g <= 4; g++) {
     const p = lo + (hi - lo) * g / 4, y = Y(p);
-    s += `<line x1="${PL}" x2="${W - PR}" y1="${y}" y2="${y}" class="grid"/><text x="${W - PR + 6}" y="${y + 4}" class="axis">${fmt(p)}</text>`;
+    s += `<line x1="${PL}" x2="${W - PR}" y1="${y}" y2="${y}" class="grid"/>` + (mini ? '' : `<text x="${W - PR + 5}" y="${y + 4}" class="axis">${fmt(p)}</text>`);
   }
+  (spec.hlIdx || []).forEach(i => { s += `<rect x="${X(i) - step / 2}" y="2" width="${step}" height="${mainH - 4}" class="hl" rx="4"/>`; });
   if (spec.highlight) {
     const [a, b] = spec.highlight;
     s += `<rect x="${X(a) - step / 2}" y="2" width="${step * (b - a + 1)}" height="${mainH - 4}" class="hl" rx="6"/>`;
@@ -96,7 +98,7 @@ function renderChart(spec) {
   (spec.lines || []).forEach(L => {
     const y = Y(L.y);
     s += `<line x1="${PL}" x2="${W - PR}" y1="${y}" y2="${y}" stroke="${L.color || '#f5c542'}" stroke-width="1.6" ${L.dash !== false ? 'stroke-dasharray="6 4"' : ''}/>`;
-    if (L.label) s += `<rect x="${PL + 4}" y="${y - 19}" width="${L.label.length * 7.4 + 10}" height="16" rx="4" fill="${L.color || '#f5c542'}" opacity=".9"/><text x="${PL + 9}" y="${y - 7}" class="lbl">${L.label}</text>`;
+    if (L.label && !mini) s += `<rect x="${PL + 4}" y="${y - 19}" width="${L.label.length * 7.4 + 10}" height="16" rx="4" fill="${L.color || '#f5c542'}" opacity=".9"/><text x="${PL + 9}" y="${y - 7}" class="lbl">${L.label}</text>`;
   });
   (spec.overlays || []).forEach(o => {
     let d = ''; o.values.forEach((v, i) => { if (v != null) d += (d ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1); });
@@ -112,14 +114,16 @@ function renderChart(spec) {
     s += `<circle cx="${X(m.i)}" cy="${Y(m.y)}" r="13" fill="none" stroke="${m.color || '#fff'}" stroke-width="2.4"/>`;
     if (m.label) s += `<text x="${X(m.i)}" y="${Y(m.y) - 18}" text-anchor="middle" class="mk">${m.label}</text>`;
   });
-  if (spec.overlays && spec.overlays.some(o => o.label)) {
+  if (spec.clickable) cs.forEach((k, i) => { s += `<rect class="hit" data-i="${i}" x="${X(i) - step / 2}" y="0" width="${step}" height="${mainH}" fill="transparent"/>`; });
+  if (spec.tapped != null) s += `<rect x="${X(spec.tapped) - step / 2}" y="2" width="${step}" height="${mainH - 4}" fill="none" stroke="#fff" stroke-width="2" rx="4"/>`;
+  if (spec.overlays && !mini && spec.overlays.some(o => o.label)) {
     let lx = PL + 8;
     spec.overlays.forEach(o => { if (!o.label) return; s += `<rect x="${lx}" y="${mainH - 20}" width="12" height="4" fill="${o.color}"/><text x="${lx + 16}" y="${mainH - 14}" class="axis">${o.label}</text>`; lx += o.label.length * 7 + 36; });
   }
   let y0 = mainH + gap;
   if (spec.volume) {
     const mv = Math.max(...cs.map(k => k.v || 0));
-    s += `<rect x="0" y="${y0}" width="${W}" height="${volH}" class="cbg"/><text x="${W - PR + 6}" y="${y0 + 14}" class="axis">Volumen</text>`;
+    s += `<rect x="0" y="${y0}" width="${W}" height="${volH}" class="cbg"/>` + (mini ? '' : `<text x="${PL + 6}" y="${y0 + 14}" class="axis">Volumen</text>`);
     cs.forEach((k, i) => { const h = (k.v / mv) * (volH - 8); s += `<rect x="${X(i) - cw / 2}" y="${y0 + volH - h}" width="${cw}" height="${h}" fill="${k.c >= k.o ? 'var(--up)' : 'var(--dn)'}" opacity=".55"/>`; });
     y0 += volH + gap;
   }
@@ -127,12 +131,12 @@ function renderChart(spec) {
     const YR = v => y0 + 6 + (100 - v) / 100 * (rsiH - 12);
     s += `<rect x="0" y="${y0}" width="${W}" height="${rsiH}" class="cbg"/>`;
     s += `<rect x="${PL}" y="${YR(70)}" width="${plotW}" height="${YR(30) - YR(70)}" fill="#8b7cf6" opacity=".08"/>`;
-    [70, 30].forEach(v => s += `<line x1="${PL}" x2="${W - PR}" y1="${YR(v)}" y2="${YR(v)}" stroke="#8b7cf6" stroke-dasharray="4 4"/><text x="${W - PR + 6}" y="${YR(v) + 4}" class="axis">${v}</text>`);
-    s += `<text x="${PL + 6}" y="${y0 + 16}" class="axis">RSI (14)</text>`;
+    [70, 30].forEach(v => s += `<line x1="${PL}" x2="${W - PR}" y1="${YR(v)}" y2="${YR(v)}" stroke="#8b7cf6" stroke-dasharray="4 4"/>` + (mini ? '' : `<text x="${W - PR + 5}" y="${YR(v) + 4}" class="axis">${v}</text>`));
+    if (!mini) s += `<text x="${PL + 6}" y="${y0 + 16}" class="axis">RSI (14)</text>`;
     let d = ''; spec.rsi.forEach((v, i) => { if (v != null) d += (d ? 'L' : 'M') + X(i).toFixed(1) + ' ' + YR(v).toFixed(1); });
     s += `<path d="${d}" fill="none" stroke="#a78bfa" stroke-width="2"/>`;
     const last = spec.rsi[spec.rsi.length - 1];
-    if (last != null) s += `<text x="${W - PR + 6}" y="${YR(last) + 4}" class="axis" fill="#c4b5fd">${fmt(last, 0)}</text>`;
+    if (last != null && !mini) s += `<text x="${W - PR + 6}" y="${YR(last) + 4}" class="axis" fill="#c4b5fd">${fmt(last, 0)}</text>`;
   }
   return s + '</svg>';
 }

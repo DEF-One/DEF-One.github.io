@@ -1,48 +1,70 @@
 /* ===== Speicher ===== */
-const KEY = 'dtt_v1';
+const KEY = 'dtt_v1', DEVKEY = 'dtt_device';
 const MIN = 60e3, DAY = 864e5;
 const INT = [0, 10 * MIN, 1 * DAY, 3 * DAY, 7 * DAY, 16 * DAY, 40 * DAY];
-const MAXBOX = INT.length - 1;
+const MAXBOX = INT.length - 1, ROUND = 15;
 let S = load();
-function fresh() { return { sk: {}, intro: [], queue: [], n: 0, days: {}, ok: 0, bad: 0, seenWelcome: false }; }
+function fresh() { return { sk: {}, intro: [], queue: [], n: 0, days: {}, ok: 0, bad: 0, seenWelcome: false, goal: 30 }; }
 function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.sk) return Object.assign(fresh(), s); } catch (e) { } return fresh(); }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } }
 const today = () => new Date().toISOString().slice(0, 10);
 const st = id => S.sk[id] || (S.sk[id] = { box: 0, due: 0, ok: 0, bad: 0 });
+const isVis = id => ['b', 'c', 'f', 'i'].includes(SKILLS[id].mod);
+const MOD_HINT = { t: 'Denk an das Beispiel aus der Erklärung. Schließe zuerst Antworten aus, die sicher falsch sind.', b: 'Schau dir zuerst die grobe Richtung an, dann die Details.', c: 'Achte auf Körpergröße, Docht-Länge, Farbe – und auf den Trend VOR dem Muster.', f: 'Zähle Hochs und Tiefs. Sind die Linien waagerecht, steigend, fallend – oder laufen sie zusammen?', i: 'Lies den Indikator zuerst ganz rechts ab – dort ist „jetzt“.', r: 'Schreib dir die Zahlen kurz auf und rechne Schritt für Schritt (Formel steht in der Erklärung).', s: 'Frag dich: Gibt es ein klares Setup, einen sinnvollen Stop und ein gutes CRV? Wenn nicht → eher abwarten.' };
+
+/* ===== Gerät: Handy oder PC ===== */
+let DEV = null; try { DEV = localStorage.getItem(DEVKEY); } catch (e) { }
+function applyDevice() {
+  document.body.classList.toggle('m-phone', DEV === 'phone');
+  document.body.classList.toggle('m-pc', DEV !== 'phone');
+  CHART_W = DEV === 'phone' ? 420 : 640;
+  const b = document.getElementById('devBtn'); if (b) b.textContent = DEV === 'phone' ? '📱' : '🖥️';
+}
+function setDevice(d) { DEV = d; try { localStorage.setItem(DEVKEY, d); } catch (e) { } applyDevice(); }
+function devicePicker(after) {
+  const guess = Math.min(screen.width, window.innerWidth) < 760 ? 'phone' : 'pc';
+  view.innerHTML = `<section class="card devpick"><h2>Wo lernst du gerade?</h2><p class="hint">Die Ansicht wird daran angepasst. Du kannst jederzeit oben rechts umschalten.</p>
+    <div class="devbtns"><button class="devb ${guess === 'phone' ? 'sug' : ''}" data-d="phone"><span>📱</span><b>Handy</b><small>Große Charts, große Tasten, Bedienung mit dem Daumen</small></button>
+    <button class="devb ${guess === 'pc' ? 'sug' : ''}" data-d="pc"><span>🖥️</span><b>PC / Laptop</b><small>Chart links groß, Antworten rechts, Tastatur-Kürzel</small></button></div></section>`;
+  view.querySelectorAll('.devb').forEach(b => b.onclick = () => { setDevice(b.dataset.d); after(); });
+}
 
 /* ===== Planer (Spaced Repetition) ===== */
 let filter = null, lastId = null;
-const inF = id => !filter || SKILLS[id].mod === filter;
+const inF = id => !filter || (filter === 'vis' ? isVis(id) : SKILLS[id].mod === filter);
 function pickNext() {
   const now = Date.now();
-  // 1) Fehler aus dieser Sitzung kommen nach ein paar Aufgaben wieder
   const qi = S.queue.findIndex(q => q.at <= S.n && inF(q.id) && q.id !== lastId);
   if (qi >= 0) { const id = S.queue[qi].id; S.queue.splice(qi, 1); return { id }; }
-  // 2) Fällige Wiederholungen
   const due = S.intro.filter(id => inF(id) && S.sk[id].box >= 1 && S.sk[id].due <= now && id !== lastId).sort((a, b) => S.sk[a].due - S.sk[b].due);
   if (due.length) return { id: due[0] };
-  // 3) Neues lernen, wenn wenig gerade in der Lernphase ist
   const learning = S.intro.filter(id => inF(id) && S.sk[id].box <= 1).length;
   const nextNew = pickNew();
-  if (nextNew && (learning < (filter ? 4 : 7) || !S.intro.some(inF))) { S.intro.push(nextNew); st(nextNew); return { id: nextNew, isNew: true }; }
-  // 4) Freies Üben: schwächere Skills häufiger
+  if (nextNew && (learning < (filter && filter !== 'vis' ? 4 : 7) || !S.intro.some(inF))) { S.intro.push(nextNew); st(nextNew); return { id: nextNew, isNew: true }; }
   const pool = S.intro.filter(id => inF(id) && id !== lastId);
   if (!pool.length) return { id: S.intro.find(inF) };
-  let tot = 0; const w = pool.map(id => { const x = (1 / Math.pow(S.sk[id].box + 1, 1.6) + (S.sk[id].bad > S.sk[id].ok ? .5 : 0)) * (lastId && SKILLS[id].mod === SKILLS[lastId].mod ? .35 : 1); tot += x; return x; });
+  let tot = 0; const w = pool.map(id => {
+    let x = 1 / Math.pow(S.sk[id].box + 1, 1.6) + (S.sk[id].bad > S.sk[id].ok ? .5 : 0);
+    if (lastId && SKILLS[id].mod === SKILLS[lastId].mod) x *= .35;
+    if (!filter && isVis(id)) x *= 1.7; // im Mix mehr Bild-Aufgaben
+    tot += x; return x;
+  });
   let r = Math.random() * tot; for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r <= 0) return { id: pool[i] }; }
   return { id: pool[0] };
 }
-// Gemischt: neue Themen reihum aus ALLEN Bereichen (der Bereich mit dem geringsten Anteil zuerst)
+// Neue Themen reihum aus allen (passenden) Bereichen
 function pickNew() {
-  if (filter) return ORDER.find(id => inF(id) && !S.intro.includes(id));
+  if (filter && filter !== 'vis') return ORDER.find(id => inF(id) && !S.intro.includes(id));
   const lastMod = lastId && SKILLS[lastId] ? SKILLS[lastId].mod : null;
-  const cand = Object.keys(MODULES).map(m => {
+  const cand = Object.keys(MODULES).filter(m => filter !== 'vis' || ['b', 'c', 'f', 'i'].includes(m)).map(m => {
     const all = ORDER.filter(id => SKILLS[id].mod === m), next = all.find(id => !S.intro.includes(id));
-    return next ? { next, share: all.filter(id => S.intro.includes(id)).length + (m === lastMod ? .5 : 0) + Math.random() * .4 } : null;
+    // Bild-Bereiche bekommen einen kleinen Vorsprung, damit Muster früh auftauchen
+    const bonus = ['c', 'f'].includes(m) ? -.6 : 0;
+    return next ? { next, share: all.filter(id => S.intro.includes(id)).length + bonus + (m === lastMod ? .5 : 0) + Math.random() * .4 } : null;
   }).filter(Boolean).sort((x, y) => x.share - y.share);
   return cand.length ? cand[0].next : null;
 }
-function grade(id, result) { // result: 'ok' | 'bad'
+function grade(id, result) {
   const s = st(id), now = Date.now();
   S.n++; S.days[today()] = (S.days[today()] || 0) + 1;
   if (result === 'ok') { s.ok++; S.ok++; s.box = Math.min(s.box + 1, MAXBOX); s.due = now + INT[s.box]; }
@@ -56,7 +78,7 @@ function grade(id, result) { // result: 'ok' | 'bad'
 /* ===== UI ===== */
 const $ = s => document.querySelector(s);
 const view = $('#view');
-let cur = null, answered = false, sess = { ok: 0, n: 0 };
+let cur = null, answered = false, sess = { ok: 0, n: 0, wrong: [] };
 
 function setTab(t) {
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
@@ -64,35 +86,41 @@ function setTab(t) {
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => setTab(b.dataset.t));
+$('#devBtn').onclick = () => { setDevice(DEV === 'phone' ? 'pc' : 'phone'); if (cur && cur.id && !cur.lesson) showTask(cur.id); else setTab('home'); };
 
 function counts(mod) {
-  const ids = Object.keys(SKILLS).filter(id => !mod || SKILLS[id].mod === mod);
+  const ids = Object.keys(SKILLS).filter(id => !mod || (mod === 'vis' ? isVis(id) : SKILLS[id].mod === mod));
   const now = Date.now(); let neu = 0, lern = 0, sicher = 0, due = 0;
   ids.forEach(id => { if (!S.intro.includes(id)) neu++; else { const b = S.sk[id].box; if (b >= 3) sicher++; else lern++; if (b >= 1 && S.sk[id].due <= now) due++; } });
-  return { total: ids.length, neu, lern, sicher, due: due + S.queue.filter(q => !mod || SKILLS[q.id].mod === mod).length };
+  return { total: ids.length, neu, lern, sicher, due: due + S.queue.filter(q => ids.includes(q.id)).length };
 }
 function bar(c) { const t = c.total; return `<div class="pbar"><i class="g" style="width:${c.sicher / t * 100}%"></i><i class="y" style="width:${c.lern / t * 100}%"></i></div>`; }
 
 function home() {
   filter = null; cur = null;
+  if (!DEV) return devicePicker(home);
   if (!S.seenWelcome) return welcome();
-  const c = counts(), streak = calcStreak(), td = S.days[today()] || 0;
+  const c = counts(), streak = calcStreak(), td = S.days[today()] || 0, goal = S.goal || 30, gp = Math.min(1, td / goal);
+  const cv = counts('vis');
   view.innerHTML = `
   <section class="card hero">
+    <div class="goal"><div class="ring" style="--p:${gp * 360}deg"><span>${td}<small>/${goal}</small></span></div>
+      <div><b>${gp >= 1 ? '🎉 Tagesziel geschafft!' : 'Tagesziel'}</b><p class="hint">${gp >= 1 ? 'Stark! Jede weitere Aufgabe festigt dein Wissen.' : `Noch ${goal - td} Aufgaben bis zum Ziel.`}</p></div></div>
     <div class="stats">
-      <div><b>${td}</b><span>heute geübt</span></div>
       <div><b>${c.due}</b><span>fällig</span></div>
       <div><b>${c.sicher}</b><span>sicher / ${c.total}</span></div>
+      <div><b>${c.lern}</b><span>am Lernen</span></div>
       <div><b>${streak}🔥</b><span>Tage am Stück</span></div>
     </div>
     ${bar(c)}
     <div class="legend"><span class="g">■ sicher</span><span class="y">■ am Lernen</span><span>■ neu</span></div>
-    <button class="big go" id="start">▶ Training starten</button>
-    <p class="hint">Der Trainer mischt automatisch: Neues lernen, Fehler wiederholen, Fälliges auffrischen.</p>
+    <button class="big go" id="start">▶ Training starten <small>(alles gemischt)</small></button>
+    <button class="big alt" id="vis">📸 Bilder-Training <small>– nur Charts &amp; Muster erkennen (${cv.sicher}/${cv.total})</small></button>
   </section>
-  <h3>Nur ein Bereich üben</h3>
+  <h3>Nur einen Bereich üben</h3>
   <div class="mods">${Object.entries(MODULES).map(([k, m]) => { const cc = counts(k); return `<button class="mod" data-m="${k}"><span class="ic">${m.icon}</span><span class="mn">${m.name}</span><span class="mc">${cc.sicher}/${cc.total} sicher${cc.due ? ` · <b>${cc.due} fällig</b>` : ''}</span>${bar(cc)}</button>`; }).join('')}</div>`;
   $('#start').onclick = () => startSession(null);
+  $('#vis').onclick = () => startSession('vis');
   view.querySelectorAll('.mod').forEach(b => b.onclick = () => startSession(b.dataset.m));
 }
 function welcome() {
@@ -100,9 +128,10 @@ function welcome() {
   <h2>Willkommen beim Day-Trading-Trainer 👋</h2>
   <p>Du startest bei <b>null</b>. Der Trainer bringt dir Schritt für Schritt bei: Begriffe, Kerzen lesen, Muster erkennen, Indikatoren, Risiko berechnen und richtige Entscheidungen in typischen Situationen.</p>
   <ul><li>Bei jedem neuen Thema bekommst du erst eine <b>kurze Erklärung</b>, dann Aufgaben.</li>
-  <li>Alle Charts werden <b>zufällig erzeugt</b> – du bekommst nie zweimal genau dieselbe Aufgabe.</li>
+  <li>Viele Aufgaben sind <b>Bild-Aufgaben</b>: Muster antippen, richtiges Bild wählen, Verlauf vorhersagen.</li>
+  <li>Alle Charts werden <b>zufällig erzeugt</b> – keine Aufgabe ist doppelt.</li>
   <li><b>Fehler kommen wieder:</b> erst nach ein paar Aufgaben, später nach 10 Min., 1, 3, 7, 16 Tagen …</li>
-  <li>Tastatur: <kbd>1</kbd>–<kbd>4</kbd> antworten, <kbd>Enter</kbd> weiter.</li></ul>
+  <li class="pc-only">Tastatur: <kbd>1</kbd>–<kbd>4</kbd> antworten, <kbd>H</kbd> Tipp, <kbd>Enter</kbd> weiter.</li></ul>
   <div class="warn">⚠️ <b>Ehrlich gesagt:</b> Die meisten privaten Day-Trader verlieren Geld. Dieser Trainer vermittelt Wissen, keine Anlageberatung, und Muster funktionieren nie garantiert. Übe danach mindestens einige Wochen in einem <b>Demokonto</b>, bevor du echtes Geld einsetzt – und nur Geld, dessen Verlust du verkraften kannst.</div>
   <button class="big go" id="ok">Los geht's</button></section>`;
   $('#ok').onclick = () => { S.seenWelcome = true; save(); startSession(null); };
@@ -110,20 +139,39 @@ function welcome() {
 function calcStreak() { let d = new Date(), n = 0; if (!S.days[today()]) d.setDate(d.getDate() - 1); while (S.days[d.toISOString().slice(0, 10)]) { n++; d.setDate(d.getDate() - 1); } return n; }
 
 /* ===== Sitzung ===== */
-function startSession(mod) { filter = mod; sess = { ok: 0, n: 0 }; next(); }
+const modeName = () => filter === 'vis' ? '📸 Bilder-Training' : filter ? MODULES[filter].icon + ' ' + MODULES[filter].name : '🔀 Gemischt';
+function startSession(mod) { filter = mod; sess = { ok: 0, n: 0, wrong: [] }; next(); }
 function topbar() {
-  return `<div class="sbar"><button class="ghost" id="back">← Übersicht</button><span>${filter ? MODULES[filter].icon + ' ' + MODULES[filter].name : '🔀 Gemischtes Training'}</span><span class="sc">${sess.ok}/${sess.n} ✓</span></div>`;
+  const p = (sess.n % ROUND) / ROUND * 100;
+  return `<div class="sbar"><button class="ghost" id="back">←</button><span class="mode">${modeName()}</span><span class="sc">${sess.ok}/${sess.n} ✓</span></div><div class="rbar"><i style="width:${p}%"></i></div>`;
 }
+function bindBack() { $('#back').onclick = () => setTab('home'); }
 function next() {
+  if (sess.n > 0 && sess.n % ROUND === 0 && !sess.shown) { sess.shown = true; return roundSummary(); }
+  sess.shown = false;
   const p = pickNext(); if (!p || !p.id) return home();
   lastId = p.id; save();
   if (p.isNew) return showLesson(p.id);
   showTask(p.id);
 }
+function roundSummary() {
+  cur = { summary: true };
+  const last = sess.lastRound || { ok: 0, n: 0 }, rn = sess.n - last.n, rok = sess.ok - last.ok, pct = Math.round(rok / rn * 100);
+  sess.lastRound = { ok: sess.ok, n: sess.n };
+  const wrong = [...new Set(sess.wrong.slice(-rn))];
+  sess.wrong = [];
+  view.innerHTML = topbar() + `<section class="card summary"><h2>${pct >= 80 ? '🏆' : pct >= 60 ? '👍' : '💪'} Runde geschafft!</h2>
+    <div class="big-pct">${pct} %</div><p class="hint">${rok} von ${rn} richtig</p>
+    ${wrong.length ? `<h3>Das solltest du dir nochmal ansehen</h3><div class="chips">${wrong.map(id => `<button class="chip y" data-id="${id}">${SKILLS[id].name}</button>`).join('')}</div><p class="hint">Keine Sorge: Diese Themen kommen automatisch wieder dran.</p>` : '<p>Keine Fehler in dieser Runde – sehr stark! 🎉</p>'}
+    <div class="row-end"><button class="ghost" id="stop">Pause machen</button><button class="go big" id="goon">Nächste Runde →</button></div></section>`;
+  bindBack();
+  view.querySelectorAll('.chip').forEach(b => b.onclick = () => openLex(b.dataset.id, true));
+  $('#stop').onclick = () => setTab('home'); $('#goon').onclick = next;
+}
 function showLesson(id) {
   const sk = SKILLS[id];
-  view.innerHTML = topbar() + `<section class="card lesson"><div class="tag new">✨ Neu: ${MODULES[sk.mod].icon} ${MODULES[sk.mod].name}</div><h2>${sk.name}</h2>${sk.lesson()}<button class="big go" id="go">Verstanden – Aufgabe starten</button></section>`;
-  $('#back').onclick = () => setTab('home');
+  view.innerHTML = topbar() + `<section class="card lesson"><div class="tag new">✨ Neu: ${MODULES[sk.mod].icon} ${MODULES[sk.mod].name}</div><h2>${sk.name}</h2><div class="lbody">${sk.lesson()}</div><button class="big go sticky-go" id="go">Verstanden – Aufgabe starten</button></section>`;
+  bindBack();
   $('#go').onclick = () => showTask(id);
   cur = { lesson: true, id };
 }
@@ -131,58 +179,89 @@ function showTask(id) {
   const sk = SKILLS[id]; let g;
   try { g = sk.gen(); } catch (e) { console.error(id, e); return next(); }
   let opts = null;
-  if (g.type !== 'num') {
-    opts = g.options.map((t, i) => ({ t, ok: i === g.correct, part: (g.ok || []).includes(i) }));
+  if (g.type !== 'num' && g.type !== 'tap') {
+    opts = g.options.map((t, i) => ({ t, oi: i, ok: i === g.correct, part: (g.ok || []).includes(i) }));
     if (!g.keepOrder) opts = R.shuffle(opts);
   }
   cur = { id, g, opts }; answered = false;
   const box = S.sk[id]?.box ?? 0;
-  view.innerHTML = topbar() + `<section class="card task">
+  let answerHtml;
+  if (g.type === 'num') answerHtml = `<div class="numrow"><input id="num" inputmode="decimal" autocomplete="off" placeholder="Deine Antwort"><span class="unit">${g.unit || ''}</span><button class="go" id="chk">Prüfen</button></div>`;
+  else if (g.type === 'tap') answerHtml = `<div class="tapinfo">👆 Tippe direkt in den Chart</div>`;
+  else if (g.img) answerHtml = `<div class="imgopts n${opts.length}">${opts.map((o, i) => `<button class="opt imgopt" data-i="${i}"><kbd>${i + 1}</kbd>${o.t}</button>`).join('')}</div>`;
+  else answerHtml = `<div class="opts ${g.small ? 'small' : ''} ${opts.length === 2 ? 'two' : ''}">${opts.map((o, i) => `<button class="opt" data-i="${i}"><kbd>${i + 1}</kbd><span>${o.t}</span></button>`).join('')}</div>`;
+  const visual = g.type === 'tap' ? renderChart(g.spec) : g.visual;
+  view.innerHTML = topbar() + `<section class="card task ${visual ? 'has-vis' : 'no-vis'} ${g.img ? 'is-img' : ''}">
     <div class="tag">${MODULES[sk.mod].icon} ${MODULES[sk.mod].name}<span class="lvl" title="Lernstufe">${'●'.repeat(box)}${'○'.repeat(MAXBOX - box)}</span></div>
-    <div class="q">${g.q}</div>
-    ${g.visual ? `<div class="vis">${g.visual}</div>` : ''}
-    ${g.type === 'num'
-      ? `<div class="numrow"><input id="num" inputmode="decimal" autocomplete="off" placeholder="Deine Antwort"><span class="unit">${g.unit || ''}</span><button class="go" id="chk">Prüfen</button></div>`
-      : `<div class="opts ${g.small ? 'small' : ''} ${opts.length === 2 ? 'two' : ''}">${opts.map((o, i) => `<button class="opt" data-i="${i}"><kbd>${i + 1}</kbd><span>${o.t}</span></button>`).join('')}</div>`}
-    <div id="fb"></div>
+    <div class="tmain"><div class="q">${g.q}</div>${visual ? `<div class="vis" id="vis">${visual}</div>` : ''}</div>
+    <div class="tside">${answerHtml}
+      <div class="hintrow"><button class="ghost small" id="hintBtn">💡 Tipp</button><div id="hint"></div></div>
+      <div id="fb"></div></div>
   </section>`;
-  $('#back').onclick = () => setTab('home');
+  bindBack();
+  $('#hintBtn').onclick = showHint;
   if (g.type === 'num') {
-    const inp = $('#num'); inp.focus();
+    const inp = $('#num'); if (DEV !== 'phone') inp.focus();
     $('#chk').onclick = checkNum; inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (!answered) checkNum(); else next(); } };
+  } else if (g.type === 'tap') {
+    $('#vis').onclick = e => { const h = e.target.closest('.hit'); if (h) tap(+h.dataset.i); };
   } else view.querySelectorAll('.opt').forEach(b => b.onclick = () => choose(+b.dataset.i));
+}
+function showHint() { $('#hint').innerHTML = `<div class="hintbox">${cur.g.hint || MOD_HINT[SKILLS[cur.id].mod]}</div>`; $('#hintBtn').disabled = true; }
+function tap(i) {
+  if (answered) return; answered = true;
+  const g = cur.g, good = g.okIdx ? g.okIdx.includes(i) : i >= g.range[0] && i <= g.range[1];
+  const spec = { ...g.spec, ...(g.solved || {}), clickable: false, tapped: i };
+  if (g.okIdx) spec.hlIdx = g.okIdx; else spec.highlight = g.range;
+  $('#vis').innerHTML = renderChart(spec);
+  $('.tapinfo').textContent = good ? '👆 Richtig getippt!' : '👆 Das gelb markierte war gesucht (weißer Rahmen = dein Tipp)';
+  feedback(good);
 }
 function choose(i) {
   if (answered) return; answered = true;
   const o = cur.opts[i], good = o.ok || o.part;
   view.querySelectorAll('.opt').forEach((b, j) => { b.disabled = true; const x = cur.opts[j]; if (x.ok) b.classList.add('right'); else if (x.part) b.classList.add('part'); if (j === i && !good) b.classList.add('wrong'); });
-  feedback(good, o.part && !o.ok ? '🟡 Auch vertretbar' : null);
+  let extra = '';
+  const cmp = cur.g.cmp;
+  if (!good && cmp) {
+    const k = cmp.keys[o.oi], D = cmp.kind === 'c' ? CANDLES[k] : FORMS[k];
+    const pic = cmp.kind === 'c' ? renderChart({ ...buildPattern(k, { trail: 'none' }), mini: true }) : renderChart({ candles: buildForm(k), mini: true });
+    extra = `<div class="cmp"><div class="cmpimg">${pic}</div><div><b>Dein Tipp: ${D.name}</b><br><span class="hint">So sieht das aus: ${D.look}</span></div></div>`;
+  }
+  feedback(good, o.part && !o.ok ? '🟡 Auch vertretbar' : null, extra);
 }
-function parseNum(s) { s = String(s).trim().replace(/\s|€|%|R/gi, ''); if (/,/.test(s)) s = s.replace(/\./g, '').replace(',', '.'); return parseFloat(s); }
+function parseNum(s) { s = String(s).trim().replace(/\s|€|%|R|stück/gi, ''); if (/,/.test(s)) s = s.replace(/\./g, '').replace(',', '.'); return parseFloat(s); }
 function checkNum() {
   const v = parseNum($('#num').value); if (isNaN(v)) { $('#num').classList.add('shake'); setTimeout(() => $('#num').classList.remove('shake'), 400); return; }
   answered = true; const g = cur.g, good = Math.abs(v - g.answer) <= (g.tol || 0) + 1e-9;
   $('#num').disabled = true; $('#chk').disabled = true;
-  feedback(good, null, `Richtige Antwort: <b>${fmt0(Math.round(g.answer * 100) / 100)} ${g.unit || ''}</b>`);
+  feedback(good, null, `<p>Richtige Antwort: <b>${fmt0(Math.round(g.answer * 100) / 100)} ${g.unit || ''}</b></p>`);
 }
 function feedback(good, label, extra = '') {
-  grade(cur.id, good ? 'ok' : 'bad'); sess.n++; if (good) sess.ok++;
+  grade(cur.id, good ? 'ok' : 'bad'); sess.n++; if (good) sess.ok++; else sess.wrong.push(cur.id);
   $('.sbar .sc').textContent = `${sess.ok}/${sess.n} ✓`;
+  const rb = $('.rbar i'); if (rb) rb.style.width = ((sess.n % ROUND) || ROUND) / ROUND * 100 + '%';
+  const hb = $('#hintBtn'); if (hb) hb.parentElement.remove();
   const box = S.sk[cur.id].box;
-  $('#fb').innerHTML = `<div class="fb ${good ? 'ok' : 'bad'}"><div class="fh">${label || (good ? '✅ Richtig!' : '❌ Leider falsch')}</div>${extra ? `<p>${extra}</p>` : ''}<div class="ex">${cur.g.explain}</div>
-    <div class="nx"><button class="ghost" id="lessonBtn">💡 Thema: ${SKILLS[cur.id].name}</button>${good ? `<span>Nächste Wiederholung: ${nextTxt(box)}</span>` : '<span>🔁 Kommt gleich nochmal in neuer Variante dran.</span>'}<button class="go big" id="nextBtn">Weiter →</button></div></div>`;
+  $('#fb').innerHTML = `<div class="fb ${good ? 'ok' : 'bad'}"><div class="fh">${label || (good ? '✅ Richtig!' : '❌ Leider falsch')}</div>${extra}<div class="ex">${cur.g.explain}</div>
+    <div class="nx"><button class="ghost small" id="lessonBtn">📖 ${SKILLS[cur.id].name}</button><span>${good ? `Nächste Wiederholung: ${nextTxt(box)}` : '🔁 Kommt gleich nochmal dran.'}</span></div></div>
+    <button class="go big nextbtn" id="nextBtn">Weiter →</button>`;
   $('#lessonBtn').onclick = () => modal(SKILLS[cur.id].name, SKILLS[cur.id].lesson());
   $('#nextBtn').onclick = next; $('#nextBtn').focus({ preventScroll: true });
-  $('#fb').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (DEV === 'phone') setTimeout(() => $('#fb').scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  else $('#fb').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 const nextTxt = b => ['gleich', 'in ~10 Min.', 'morgen', 'in 3 Tagen', 'in 1 Woche', 'in 16 Tagen', 'in ~6 Wochen'][b];
 
 document.addEventListener('keydown', e => {
   if ($('.modal')) { if (e.key === 'Escape') $('.modal').remove(); return; }
   if (!cur) return;
-  if (e.target.tagName === 'INPUT') return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (cur.summary && e.key === 'Enter') { e.preventDefault(); return next(); }
   if (cur.lesson && e.key === 'Enter') { e.preventDefault(); return showTask(cur.id); }
-  if (!answered && cur.opts && /^[1-9]$/.test(e.key) && +e.key <= cur.opts.length) choose(+e.key - 1);
+  if (!cur.g) return;
+  if (!answered && (e.key === 'h' || e.key === 'H') && $('#hintBtn')) showHint();
+  else if (!answered && cur.opts && /^[1-9]$/.test(e.key) && +e.key <= cur.opts.length) choose(+e.key - 1);
   else if (answered && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); next(); }
 });
 
@@ -208,11 +287,11 @@ function lex() {
   };
   $('#q').oninput = draw; draw();
 }
-function openLex(id) {
+function openLex(id, readOnly) {
   const sk = SKILLS[id];
-  modal(sk.name, `<div id="lx">${sk.lesson()}</div><div class="row-end">${['c', 'f', 'b', 'i'].includes(sk.mod) ? '<button class="ghost" id="regen">🔄 Neues Beispiel</button>' : ''}<button class="go" id="tryit">Jetzt üben</button></div>`);
+  modal(sk.name, `<div id="lx">${sk.lesson()}</div><div class="row-end">${['c', 'f', 'b', 'i'].includes(sk.mod) ? '<button class="ghost" id="regen">🔄 Neues Beispiel</button>' : ''}${readOnly ? '' : '<button class="go" id="tryit">Jetzt üben</button>'}</div>`);
   const rg = $('#regen'); if (rg) rg.onclick = () => $('#lx').innerHTML = sk.lesson();
-  $('#tryit').onclick = () => { $('.modal').remove(); setTab('home'); filter = sk.mod; sess = { ok: 0, n: 0 }; if (!S.intro.includes(id)) { S.intro.push(id); st(id); save(); } lastId = id; showTask(id); };
+  const tr = $('#tryit'); if (tr) tr.onclick = () => { $('.modal').remove(); filter = sk.mod; sess = { ok: 0, n: 0, wrong: [] }; if (!S.intro.includes(id)) { S.intro.push(id); st(id); save(); } lastId = id; document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === 'home')); showTask(id); };
 }
 
 /* ===== Fortschritt ===== */
@@ -228,14 +307,21 @@ function prog() {
     <h3>Bereiche</h3>${Object.entries(MODULES).map(([k, m]) => { const c = counts(k); return `<div class="mrow"><span>${m.icon} ${m.name}</span><span>${c.sicher}/${c.total}</span>${bar(c)}</div>`; }).join('')}
     <h3>Deine Schwachstellen</h3>${weak.length ? `<div class="chips">${weak.map(id => `<button class="chip y" data-id="${id}">${SKILLS[id].name} <small>✗${S.sk[id].bad} ✓${S.sk[id].ok}</small></button>`).join('')}</div>` : '<p class="hint">Noch keine Fehler – weiter so!</p>'}
   </section>
+  <section class="card"><h3>⚙️ Einstellungen</h3>
+    <div class="setrow"><span>Ansicht</span><div><button class="ghost ${DEV === 'phone' ? 'sel' : ''}" data-dev="phone">📱 Handy</button><button class="ghost ${DEV !== 'phone' ? 'sel' : ''}" data-dev="pc">🖥️ PC</button></div></div>
+    <div class="setrow"><span>Tagesziel</span><div>${[15, 30, 50, 100].map(v => `<button class="ghost ${S.goal === v ? 'sel' : ''}" data-goal="${v}">${v}</button>`).join('')}</div></div>
+  </section>
   <section class="card"><h3>💾 Speichern & auf anderem Gerät weitermachen</h3>
-    <p class="hint">Dein Fortschritt wird automatisch in diesem Browser gespeichert. Mit dem Code kannst du ihn auf ein anderes Gerät übertragen.</p>
+    <p class="hint">Dein Fortschritt wird automatisch in diesem Browser gespeichert. Mit dem Code kannst du ihn z. B. vom PC aufs Handy übertragen.</p>
     <div class="row-end"><button class="ghost" id="exp">Code erzeugen</button><button class="ghost" id="imp">Code laden</button><button class="ghost danger" id="rst">Alles zurücksetzen</button></div>
     <textarea id="code" rows="3" placeholder="Hier erscheint dein Code bzw. hier Code einfügen"></textarea><div id="msg" class="hint"></div></section>`;
   view.querySelectorAll('.chip').forEach(b => b.onclick = () => openLex(b.dataset.id));
+  view.querySelectorAll('[data-dev]').forEach(b => b.onclick = () => { setDevice(b.dataset.dev); prog(); });
+  view.querySelectorAll('[data-goal]').forEach(b => b.onclick = () => { S.goal = +b.dataset.goal; save(); prog(); });
   $('#exp').onclick = () => { $('#code').value = btoa(unescape(encodeURIComponent(JSON.stringify(S)))); $('#code').select(); $('#msg').textContent = 'Code kopieren und auf dem anderen Gerät unter „Code laden“ einfügen.'; };
   $('#imp').onclick = () => { try { const d = JSON.parse(decodeURIComponent(escape(atob($('#code').value.trim())))); if (!d.sk) throw 0; S = Object.assign(fresh(), d); save(); $('#msg').textContent = '✅ Fortschritt geladen!'; setTimeout(prog, 600); } catch (e) { $('#msg').textContent = '❌ Ungültiger Code.'; } };
   $('#rst').onclick = () => { const b = $('#rst'); if (b.dataset.c) { S = fresh(); save(); setTab('home'); } else { b.dataset.c = 1; b.textContent = 'Wirklich? Nochmal klicken'; } };
 }
 
+applyDevice();
 setTab('home');
