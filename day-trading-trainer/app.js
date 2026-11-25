@@ -96,7 +96,7 @@ function setTab(t) {
   if (EX) examStop();
   if (typeof stopModes === 'function') stopModes();
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
-  ({ home, lex, prog })[t]();
+  ({ home, lex, prog, live })[t]();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => setTab(b.dataset.t));

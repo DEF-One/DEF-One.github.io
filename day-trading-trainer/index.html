@@ -125,6 +125,12 @@ footer{text-align:center;color:var(--mut);font-size:12px;padding:20px}
 .simstats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
 .simstats div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center}.simstats b{display:block;font-size:20px}.simstats span{font-size:12px;color:var(--mut)}
 .siminfo{background:#1e293b;border-left:4px solid #0ea5e9;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-weight:600}
+.liverow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}.lbl2{color:var(--mut);font-size:13px;min-width:86px}
+.tvbox{height:620px;margin:10px 0;border-radius:10px;overflow:hidden;background:#0f151c}
+.tradingview-widget-copyright{font-size:12px;text-align:right;padding-top:4px}.tradingview-widget-copyright a{color:var(--mut)}
+.livetask{background:#1e293b;border-left:4px solid var(--gold);border-radius:10px;padding:10px 12px;margin:8px 0}
+.m-pc .live{max-width:1280px}
+.m-phone .tvbox{height:calc(100vh - 300px);min-height:380px;margin:8px -6px}.m-phone .lbl2{min-width:0;width:100%}.m-phone .liverow{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}.m-phone .liverow .lbl2{display:none}.m-phone .liverow button{white-space:nowrap}
 .pos{color:var(--up)}.neg{color:var(--dn)}
 .opt.sel{border-color:var(--acc);background:#1e3a8a55}
 .fb.part{border-color:var(--gold);background:#422006aa}
@@ -209,15 +215,16 @@ details.rev .vis{max-width:760px}
 </head>
 <body>
 <header><div class="hwrap"><div class="logo">📈 Day-Trading<span>-Trainer</span></div>
-<nav><button data-t="home" class="on"><span class="ni">🎯</span>Trainieren</button><button data-t="lex"><span class="ni">📖</span>Lexikon</button><button data-t="prog"><span class="ni">📊</span>Fortschritt</button></nav>
+<nav><button data-t="home" class="on"><span class="ni">🎯</span>Trainieren</button><button data-t="live"><span class="ni">📈</span>Live</button><button data-t="lex"><span class="ni">📖</span>Lexikon</button><button data-t="prog"><span class="ni">📊</span>Fortschritt</button></nav>
 <button id="devBtn" title="Ansicht wechseln (Handy/PC)">🖥️</button></div></header>
 <main id="view"></main>
 <footer>Lerntool – keine Anlageberatung. Charts sind zufällig erzeugte Übungsbeispiele. Erst im Demokonto üben.</footer>
-<script src="charts.js?v=8"></script>
-<script src="data.js?v=8"></script>
-<script src="gen.js?v=8"></script>
-<script src="app.js?v=8"></script>
-<script src="simscen.js?v=8"></script>
-<script src="sim.js?v=8"></script>
+<script src="charts.js?v=9"></script>
+<script src="data.js?v=9"></script>
+<script src="gen.js?v=9"></script>
+<script src="live.js?v=9"></script>
+<script src="app.js?v=9"></script>
+<script src="simscen.js?v=9"></script>
+<script src="sim.js?v=9"></script>
 </body>
 </html>
