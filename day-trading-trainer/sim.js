@@ -90,6 +90,7 @@ const SIM_TYPES = {
   chop: { n: 'Kein Trend, kein Setup', best: 'wait', why: 'Der Kurs pendelt ohne Struktur. Kein Setup = kein Trade.' }
 };
 function simScenario() {
+  if (Math.random() < .72) return simScenario2();
   const t = R.pick(Object.keys(SIM_TYPES)), T = SIM_TYPES[t];
   let cs, lines = [], rsi = null, name = T.n, why = T.why;
   if (t === 'bo' || t === 'bo_weak') { const b = breakoutChart(t === 'bo'); cs = b.cs; lines = [{ y: b.line, color: TV.lineLvl, label: 'Widerstand' }]; }
@@ -99,7 +100,9 @@ function simScenario() {
   else if (t === 'knife') { cs = pathCandles(jitter(flipA([[0, .1], [.4, .25], [.6, .4], [1, 1]]), .02, .03), 50, { noise: .025, range: R.rand(12, 20) }); rsi = true; }
   else cs = pathCandles(jitter([[0, .5], [.15, .62], [.3, .42], [.45, .58], [.6, .45], [.75, .55], [.9, .47], [1, .52]], .03, .05), R.int(40, 55), { noise: .04 });
   if (!cs[0].v) addVolume(cs);
-  return { t, cs, lines, rsi, best: T.best, name, why };
+  const sc = { t, cs, lines, rsi, best: T.best, ok: [], info: '', name, why };
+  if (sc.best !== 'wait' && R.chance(.12)) { const sp = R.pick(SPOILERS); sc.info = sp.info; sc.name += ' – aber: ' + sp.info.replace(/^\S+\s/, ''); sc.why = sp.why + ' (Das Setup an sich: ' + why + ')'; sc.origBest = sc.best; sc.best = 'wait'; }
+  return sc;
 }
 function simStats() { return S.sim || (S.sim = { R: 0, trades: 0, wins: 0, dec: 0, decPts: 0 }); }
 function simHeader() { return `<div class="sbar"><button class="ghost" id="back">✕</button><span class="mode">🕹️ Chart-Simulator</span></div>` + simStatsHtml(); }
@@ -114,7 +117,7 @@ function simStart() {
   let lo = Infinity, hi = -Infinity; full.forEach(k => { lo = Math.min(lo, k.l); hi = Math.max(hi, k.h); }); sc.lines.forEach(l => { lo = Math.min(lo, l.y); hi = Math.max(hi, l.y); });
   SIMS.yr = [lo, hi];
   view.innerHTML = simHeader() + `<section class="card task has-vis sim"><div class="tag">🕹️ Live-Chart · ${R.pick(['M1', 'M5', 'M15'])}</div>
-    <div class="tmain"><div class="q" id="simq">Beobachte den Chart … gleich musst du entscheiden.</div><div class="vis" id="simvis"></div></div>
+    <div class="tmain">${sc.info ? `<div class="siminfo">${sc.info}</div>` : ''}<div class="q" id="simq">Beobachte den Chart … gleich musst du entscheiden.</div><div class="vis" id="simvis"></div></div>
     <div class="tside"><div class="opts" id="simbtn">${['🟢 Long kaufen', '🔴 Short gehen', '⏸️ Abwarten / nichts tun'].map((t, i) => `<button class="opt" data-i="${i}" disabled><kbd>${i + 1}</kbd><span>${t}</span></button>`).join('')}</div>
     <p class="hint">Bei Long/Short setzt der Simulator automatisch: Stop = 1,5 × durchschnittliche Kerzengröße, Ziel = 2 × Stop-Abstand (CRV 2).</p><div id="fb"></div></div></section>`;
   $('#back').onclick = () => { stopModes(); setTab('home'); };
@@ -128,7 +131,7 @@ function simStart() {
 function simDraw(extra) {
   const sc = SIMS.sc, cs = extra ? extra.cs : sc.cs.slice(0, SIMS.shown);
   const rsi = sc.rsi ? RSI(cs.map(x => x.c)) : null;
-  $('#simvis').innerHTML = renderChart({ candles: cs, lines: (extra ? extra.lines : []).concat(sc.lines), volume: true, rsi, height: DEV === 'phone' ? 250 : undefined, yr: extra ? null : SIMS.yr, padRight: extra ? 0 : sc.cs.length - SIMS.shown, highlight: extra && extra.from != null ? [extra.from, cs.length - 1] : null });
+  $('#simvis').innerHTML = renderChart({ candles: cs, overlays: simOverlays(sc.ov, cs), lines: (extra ? extra.lines : []).concat(sc.lines), volume: true, rsi, height: DEV === 'phone' ? 250 : undefined, yr: extra ? null : SIMS.yr, padRight: extra ? 0 : sc.cs.length - SIMS.shown, highlight: extra && extra.from != null ? [extra.from, cs.length - 1] : null });
 }
 function simDecide(i) {
   if (!SIMS || SIMS.phase !== 'decide') return; SIMS.phase = 'result';
@@ -136,8 +139,9 @@ function simDecide(i) {
   view.querySelectorAll('#simbtn .opt').forEach((b, j) => { b.disabled = true; if (j === i) b.classList.add('sel'); });
   const atr = cs.slice(-14).reduce((s, k) => s + (k.h - k.l), 0) / 14, dist = 1.5 * atr, E = last.c;
   const tradeDir = choice === 'long' ? 1 : choice === 'short' ? -1 : 0, bestDir = sc.best === 'long' ? 1 : sc.best === 'short' ? -1 : 0;
-  const simDir = tradeDir || bestDir || (R.chance(.5) ? 1 : -1); // was beim Nichtstun gezeigt wird
-  let p = tradeDir ? (sc.best === 'wait' ? .42 : tradeDir === bestDir ? .65 : .3) : (bestDir ? .65 : .5);
+  const refDir = sc.origBest ? (sc.origBest === 'long' ? 1 : -1) : bestDir;
+  const simDir = tradeDir || refDir || (R.chance(.5) ? 1 : -1); // was beim Nichtstun gezeigt wird
+  let p = tradeDir ? (sc.origBest ? (tradeDir === refDir ? .5 : .3) : sc.best === 'wait' ? .42 : tradeDir === bestDir ? .65 : .3) : (refDir ? (sc.origBest ? .5 : .65) : .5);
   const success = Math.random() < p, drift = (success ? simDir : -simDir);
   const stop = E - simDir * dist, target = E + simDir * 2 * dist;
   const out = cs.map(k => ({ ...k })); let q = E, res = null;
@@ -160,18 +164,18 @@ function simDecide(i) {
 }
 function simResult(choice, tradeDir, res) {
   const sc = SIMS.sc, s = simStats();
-  const goodDec = choice === sc.best, okDec = choice === 'wait' && sc.best !== 'wait';
+  const goodDec = choice === sc.best, okDec = !goodDec && ((sc.ok || []).includes(choice) || (choice === 'wait' && sc.best !== 'wait'));
   s.dec++; s.decPts += goodDec ? 1 : okDec ? .5 : 0;
   if (tradeDir) { s.trades++; s.R = Math.round((s.R + res) * 10) / 10; if (res > 0) s.wins++; }
   save();
   const bestTxt = { long: '🟢 Long', short: '🔴 Short', wait: '⏸️ Abwarten' }[sc.best];
   const resTxt = tradeDir ? (res >= 2 ? '🎯 Ziel erreicht: <b>+2 R</b>' : res <= -1 ? '🛑 Stop ausgelöst: <b>−1 R</b>' : `⏹️ Nach 30 Kerzen geschlossen: <b>${res >= 0 ? '+' : ''}${fmt0(res)} R</b>`)
-    : `Du hast nicht gehandelt: <b>0 R</b>. ${sc.best !== 'wait' ? `Mit ${bestTxt} wärst du bei <b>${res >= 0 ? '+' : ''}${fmt0(res)} R</b> gelandet.` : `Ein Trade in Richtung der Bewegung hätte ${res >= 0 ? '+' : ''}${fmt0(res)} R gebracht – aber ohne Setup war das reines Glücksspiel.`}`;
+    : `Du hast nicht gehandelt: <b>0 R</b>. ${sc.best !== 'wait' ? `Mit ${bestTxt} wärst du bei <b>${res >= 0 ? '+' : ''}${fmt0(res)} R</b> gelandet.` : (sc.origBest ? `Das Setup (${sc.origBest === 'long' ? 'Long' : 'Short'}) hätte ${res >= 0 ? '+' : ''}${fmt0(res)} R gebracht – aber wegen des Störfaktors war das Risiko unkalkulierbar.` : `Ein Trade hier hätte ${res >= 0 ? '+' : ''}${fmt0(res)} R gebracht – aber ohne Setup wäre das reines Glücksspiel gewesen.`)}`;
   let lesson;
   if (goodDec && tradeDir && res < 0) lesson = '💡 <b>Richtige Entscheidung, trotzdem verloren.</b> Auch gute Setups scheitern oft (hier ca. jedes dritte). Genau dafür gibt es den Stop – auf lange Sicht zahlt sich der Prozess aus.';
   else if (!goodDec && !okDec && tradeDir && res > 0) lesson = '🍀 <b>Glück gehabt.</b> Das Ergebnis war gut, die Entscheidung nicht. Wer so weiter handelt, verliert langfristig – bewerte deine Entscheidung, nicht das Ergebnis.';
   else if (goodDec) lesson = '👍 <b>Lehrbuch-Entscheidung.</b>';
-  else if (okDec) lesson = '🟡 <b>Vertretbar.</b> Abwarten ist nie ein Fehler – aber hier gab es ein sauberes Setup.';
+  else if (okDec) lesson = choice === 'wait' ? '🟡 <b>Vertretbar.</b> Abwarten ist nie ein Fehler – aber hier gab es ein sauberes Setup.' : '🟡 <b>Vertretbar, aber riskant.</b> Für Anfänger ist hier die vorsichtigere Variante besser.';
   else lesson = `❌ <b>Nicht nach Lehrbuch.</b> Besser wäre: ${bestTxt}.`;
   $('#fb').innerHTML = `<div class="fb ${goodDec ? 'ok' : okDec ? 'part' : 'bad'}"><div class="fh">${resTxt}</div><p>${lesson}</p>
     <p><b>Situation: ${sc.name}</b> → Lehrbuch: ${bestTxt}<br><span class="hint">${sc.why}</span></p></div>
