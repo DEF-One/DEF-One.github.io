@@ -79,8 +79,9 @@ function renderChart(spec) {
   cs.forEach(k => { lo = Math.min(lo, k.l); hi = Math.max(hi, k.h); });
   (spec.lines || []).forEach(L => { lo = Math.min(lo, L.y); hi = Math.max(hi, L.y); });
   (spec.overlays || []).forEach(o => o.values.forEach(v => { if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }));
+  if (spec.yr) { lo = spec.yr[0]; hi = spec.yr[1]; }
   const pad = (hi - lo) * 0.08 || 1; lo -= pad; hi += pad;
-  const step = plotW / (n + 1), cw = Math.max(2, Math.min(16, step * 0.62));
+  const step = plotW / (n + 1 + (spec.padRight || 0)), cw = Math.max(2, Math.min(16, step * 0.62));
   const X = i => PL + step * (i + 1);
   const Y = p => 8 + (hi - p) / (hi - lo) * (mainH - 16);
   let s = `<svg viewBox="0 0 ${W} ${H}" class="chart" xmlns="http://www.w3.org/2000/svg">`;

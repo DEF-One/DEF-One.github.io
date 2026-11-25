@@ -66,10 +66,20 @@ function pickNew() {
   }).filter(Boolean).sort((x, y) => x.share - y.share);
   return cand.length ? cand[0].next : null;
 }
-function grade(id, result) {
+const MULTI = ['t', 'c', 'f'];
+function grade(id, result, fmt) {
   const s = st(id), now = Date.now();
   S.n++; S.days[today()] = (S.days[today()] || 0) + 1;
-  if (result === 'ok') { s.ok++; S.ok++; s.box = Math.min(s.box + 1, MAXBOX); s.due = now + INT[s.box]; }
+  if (result === 'ok') {
+    s.ok++; S.ok++; if (fmt) { s.f = s.f || {}; s.f[fmt] = 1; }
+    s.box = Math.min(s.box + 1, MAXBOX);
+    // „sicher“ erst, wenn in mindestens 2 verschiedenen Aufgabenformaten richtig
+    if (MULTI.includes(SKILLS[id].mod) && Object.keys(s.f || {}).length < 2) s.box = Math.min(s.box, 2);
+    s.due = now + INT[s.box];
+  } else if (result === 'guess') {
+    s.ok++; S.ok++; s.due = now + INT[1];
+    S.queue = S.queue.filter(q => q.id !== id); S.queue.push({ id, at: S.n + R.int(3, 5) });
+  }
   else {
     s.bad++; S.bad++; s.box = s.box >= 3 ? 1 : 0; s.due = now + INT[Math.max(1, s.box)];
     S.queue = S.queue.filter(q => q.id !== id); S.queue.push({ id, at: S.n + 2 }, { id, at: S.n + R.int(5, 8) }); // Drill: 2× in neuen Varianten
@@ -84,6 +94,7 @@ let cur = null, answered = false, sess = { ok: 0, n: 0, wrong: [] };
 
 function setTab(t) {
   if (EX) examStop();
+  if (typeof stopModes === 'function') stopModes();
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
   ({ home, lex, prog })[t]();
   window.scrollTo(0, 0);
@@ -118,16 +129,23 @@ function home() {
     ${bar(c)}
     <div class="legend"><span class="g">■ sicher</span><span class="y">■ am Lernen</span><span>■ neu</span></div>
     <button class="big go" id="start">▶ Training starten <small>(alles gemischt)</small></button>
-    <button class="big alt" id="vis">📸 Bilder-Training <small>– nur Charts &amp; Muster erkennen (${cv.sicher}/${cv.total})</small></button>
-    <div class="duo"><button class="big alt2" id="weak" ${nWeak ? '' : 'disabled'}>🎯 Schwächen <small>${nWeak ? `(${nWeak} Themen)` : '(noch keine)'}</small></button>
-    <button class="big alt3" id="exam">📝 Klausur-Modus <small>ohne Hilfe</small></button></div>
   </section>
+  <h3>Intensiv trainieren</h3>
+  <div class="modes">
+    <button class="mode-t" id="sim"><span>🕹️</span><b>Chart-Simulator</b><small>Live-Chart Kerze für Kerze – du entscheidest. Konto: ${fmt0((S.sim && S.sim.R) || 0)} R</small></button>
+    <button class="mode-t" id="blitz"><span>⚡</span><b>Blitz-Runde</b><small>60 Sek. Muster erkennen · Rekord: ${S.blitzBest || 0}</small></button>
+    <button class="mode-t" id="vis"><span>📸</span><b>Bilder-Training</b><small>nur Charts &amp; Muster (${cv.sicher}/${cv.total} sicher)</small></button>
+    <button class="mode-t" id="weak" ${nWeak ? '' : 'disabled'}><span>🎯</span><b>Schwächen</b><small>${nWeak ? `${nWeak} Themen mit Fehlern` : 'noch keine Fehler'}</small></button>
+    <button class="mode-t" id="exam"><span>📝</span><b>Klausur</b><small>alles gemischt, ohne Hilfe, mit Note</small></button>
+  </div>
   <h3>Nur einen Bereich üben</h3>
   <div class="mods">${Object.entries(MODULES).map(([k, m]) => { const cc = counts(k); return `<button class="mod" data-m="${k}"><span class="ic">${m.icon}</span><span class="mn">${m.name}</span><span class="mc">${cc.sicher}/${cc.total} sicher${cc.due ? ` · <b>${cc.due} fällig</b>` : ''}</span>${bar(cc)}</button>`; }).join('')}</div>`;
   $('#start').onclick = () => startSession(null);
   $('#vis').onclick = () => startSession('vis');
   $('#weak').onclick = () => startSession('weak');
   $('#exam').onclick = examSetup;
+  $('#blitz').onclick = () => blitzStart();
+  $('#sim').onclick = () => simStart();
   view.querySelectorAll('.mod').forEach(b => b.onclick = () => startSession(b.dataset.m));
 }
 function welcome() {
@@ -203,11 +221,12 @@ function showTask(id) {
     <div class="tag">${MODULES[sk.mod].icon} ${MODULES[sk.mod].name}<span class="lvl" title="Lernstufe">${'●'.repeat(box)}${'○'.repeat(MAXBOX - box)}</span></div>
     <div class="tmain"><div class="q">${g.q}</div>${visual ? `<div class="vis" id="vis">${visual}</div>` : ''}</div>
     <div class="tside">${answerHtml}
-      ${EX ? '' : '<div class="hintrow"><button class="ghost small" id="hintBtn">💡 Tipp</button><div id="hint"></div></div>'}
+      ${EX ? '' : '<div class="hintrow"><button class="ghost small" id="hintBtn">💡 Tipp</button><button class="ghost small" id="guessBtn" title="Wenn du nur rätst: richtig zählt dann nicht als gelernt">🤔 Ich rate nur</button><div id="hint"></div></div>'}
       <div id="fb"></div></div>
   </section>`;
   bindBack();
   if ($('#hintBtn')) $('#hintBtn').onclick = showHint;
+  if ($('#guessBtn')) $('#guessBtn').onclick = () => { cur.guess = !cur.guess; $('#guessBtn').classList.toggle('sel', cur.guess); };
   if (g.type === 'num') {
     const inp = $('#num'); if (DEV !== 'phone') inp.focus();
     $('#chk').onclick = checkNum; inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (!answered) checkNum(); else next(); } };
@@ -250,18 +269,34 @@ function checkNum() {
   feedback(good, null, `<p>Richtige Antwort: <b>${fmt0(Math.round(g.answer * 100) / 100)} ${g.unit || ''}</b></p>`);
 }
 function feedback(good, label, extra = '') {
-  grade(cur.id, good ? 'ok' : 'bad'); sess.n++; if (good) sess.ok++; else sess.wrong.push(cur.id);
+  const guessed = good && cur.guess;
+  grade(cur.id, good ? (guessed ? 'guess' : 'ok') : 'bad', cur.g.fmt);
+  if (guessed) label = '🤔 Richtig geraten – zählt noch nicht als gelernt, kommt bald wieder'; sess.n++; if (good) sess.ok++; else sess.wrong.push(cur.id);
   $('.sbar .sc').textContent = `${sess.ok}/${sess.n} ✓`;
   const rb = $('.rbar i'); if (rb) rb.style.width = ((sess.n % ROUND) || ROUND) / ROUND * 100 + '%';
   const hb = $('#hintBtn'); if (hb) hb.parentElement.remove();
   const box = S.sk[cur.id].box;
-  $('#fb').innerHTML = `<div class="fb ${good ? 'ok' : 'bad'}"><div class="fh">${label || (good ? '✅ Richtig!' : '❌ Leider falsch')}</div>${extra}<div class="ex">${cur.g.explain}</div>
+  $('#fb').innerHTML = `<div class="fb ${good ? 'ok' : 'bad'}"><div class="fh">${label || (good ? '✅ Richtig!' : '❌ Leider falsch')}</div>${extra}<div class="ex">${cur.g.explain}</div>${good && !guessed && cur.g.why && Math.random() < .65 ? whyHtml(cur.g.why) : ''}
     <div class="nx"><button class="ghost small" id="lessonBtn">📖 ${SKILLS[cur.id].name}</button><span>${good ? `Nächste Wiederholung: ${nextTxt(box)}` : '🔁 Kommt gleich nochmal dran.'}</span></div></div>
     <button class="go big nextbtn" id="nextBtn">Weiter →</button>`;
   $('#lessonBtn').onclick = () => modal(SKILLS[cur.id].name, SKILLS[cur.id].lesson());
+  view.querySelectorAll('.whyopt').forEach(b => b.onclick = () => answerWhy(+b.dataset.i));
   $('#nextBtn').onclick = next; $('#nextBtn').focus({ preventScroll: true });
   if (DEV === 'phone') setTimeout(() => $('#fb').scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
   else $('#fb').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function whyHtml(w) {
+  const o = R.shuffle(w.options.map((t, i) => ({ t, ok: i === w.correct })));
+  cur.whyOpts = o;
+  return `<div class="why"><div class="wq">${w.q}</div>${o.map((x, i) => `<button class="opt whyopt" data-i="${i}"><span>${x.t}</span></button>`).join('')}</div>`;
+}
+function answerWhy(i) {
+  if (cur.whyDone) return; cur.whyDone = true;
+  const o = cur.whyOpts[i];
+  view.querySelectorAll('.whyopt').forEach((b, j) => { b.disabled = true; if (cur.whyOpts[j].ok) b.classList.add('right'); else if (j === i) b.classList.add('wrong'); });
+  const s = S.sk[cur.id];
+  if (!o.ok) { s.box = Math.max(0, s.box - 1); s.due = Date.now() + INT[1]; S.queue.push({ id: cur.id, at: S.n + R.int(3, 5) }); save(); }
+  $('.why').insertAdjacentHTML('beforeend', `<p class="${o.ok ? 'wok' : 'wbad'}">${o.ok ? '✅ Genau – du hast es wirklich verstanden.' : '❌ Das Bild war richtig, aber das Merkmal nicht. Das Thema kommt nochmal dran.'}</p>`);
 }
 const nextTxt = b => ['gleich', 'in ~10 Min.', 'morgen', 'in 3 Tagen', 'in 1 Woche', 'in 16 Tagen', 'in ~6 Wochen'][b];
 
@@ -383,7 +418,7 @@ function examAnswer(good, your, correct, isTap) {
   const id = cur.id, g = cur.g;
   EX.res.push({ id, good, q: g.q, visual: isTap ? correct : g.visual, your, correct: isTap ? '' : correct, explain: g.explain, img: !!g.img });
   if (!S.intro.includes(id)) { S.intro.push(id); st(id); }
-  grade(id, good ? 'ok' : 'bad');
+  grade(id, good ? 'ok' : 'bad', g.fmt);
   EX.i++;
   const t = $('.task'); if (t) t.classList.add('saved');
   setTimeout(examNext, 220);

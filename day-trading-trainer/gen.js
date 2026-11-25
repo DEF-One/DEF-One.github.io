@@ -129,16 +129,16 @@ TERMS.forEach(T => {
     const dis = R.shuffle(same.length >= 3 ? same : other).slice(0, 3);
     const r = Math.random();
     // Bild-Variante: Begriff direkt im Chart anwenden
-    if (TERM_VIS[T.id] && r < .3 && SKILLS[TERM_VIS[T.id]]) { const g = SKILLS[TERM_VIS[T.id]].gen(); g.explain = g.explain + '<hr>' + termLesson(T); return g; }
-    if (r < .5) return { q: `Was bedeutet <b>„${T.w}“</b>?`, options: [T.d, ...dis.map(x => x.d)], correct: 0, explain: termLesson(T), small: true };
-    if (r < .68) return { q: `Zu welchem Begriff passt dieses <b>Beispiel</b>?<div class="quote">${T.ex}</div>`, options: [T.w, ...dis.map(x => x.w)], correct: 0, explain: termLesson(T) };
+    if (TERM_VIS[T.id] && r < .3 && SKILLS[TERM_VIS[T.id]]) { const g = SKILLS[TERM_VIS[T.id]].gen(); g.fmt = 'vis'; g.explain = g.explain + '<hr>' + termLesson(T); return g; }
+    if (r < .5) return { fmt: 'def', q: `Was bedeutet <b>„${T.w}“</b>?`, options: [T.d, ...dis.map(x => x.d)], correct: 0, explain: termLesson(T), small: true };
+    if (r < .68) return { fmt: 'ex', q: `Zu welchem Begriff passt dieses <b>Beispiel</b>?<div class="quote">${T.ex}</div>`, options: [T.w, ...dis.map(x => x.w)], correct: 0, explain: termLesson(T) };
     if (r < .84) {
       const right = R.chance(.5), d = right ? T.d : dis[0].d;
-      return { q: `Richtig oder falsch?<div class="quote"><b>${T.w}</b> = ${d}</div>`, options: ['✅ Richtig', '❌ Falsch'], correct: right ? 0 : 1, keepOrder: true, explain: (right ? 'Die Beschreibung passt.' : `Falsch – das beschreibt <b>${dis[0].w}</b>.`) + '<hr>' + termLesson(T) };
+      return { fmt: 'tf', q: `Richtig oder falsch?<div class="quote"><b>${T.w}</b> = ${d}</div>`, options: ['✅ Richtig', '❌ Falsch'], correct: right ? 0 : 1, keepOrder: true, explain: (right ? 'Die Beschreibung passt.' : `Falsch – das beschreibt <b>${dis[0].w}</b>.`) + '<hr>' + termLesson(T) };
     }
     const fw = T.w.split(' ')[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const hidden = fw.length >= 4 ? T.d.replace(new RegExp(fw, 'gi'), '…') : T.d;
-    return { q: `Welcher Begriff passt?<div class="quote">${hidden}</div>`, options: [T.w, ...dis.map(x => x.w)], correct: 0, explain: termLesson(T) };
+    return { fmt: 'term', q: `Welcher Begriff passt?<div class="quote">${hidden}</div>`, options: [T.w, ...dis.map(x => x.w)], correct: 0, explain: termLesson(T) };
   });
 });
 
@@ -235,7 +235,12 @@ Object.entries(CANDLES).forEach(([key, C]) => {
   const lesson = () => richLesson('c', key);
   skill('c:' + key, 'c', C.name, lesson, () => withMore('c', key, genC(key, C)));
 });
-function withMore(kind, key, g) { g.more = () => `<h4>✅ So sieht ${(kind === 'c' ? CANDLES : FORMS)[key].name} noch aus:</h4>${gallery(kind, key, 3)}`; return g; }
+function withMore(kind, key, g) {
+  const pool = kind === 'c' ? CANDLES : FORMS, D = pool[key], pref = (kind === 'c' ? C_PREF : F_PREF)[key] || [];
+  if (g.fmt !== 'sig' && pref.length >= 2) {
+    const dk = R.shuffle(pref).slice(0, 2);
+    g.why = { q: `🧠 Warum-Frage: Woran erkennst du ${kind === 'c' ? 'einen' : 'ein(e)'} <b>${D.name}</b>?`, options: [D.look, ...dk.map(k => pool[k].look)], correct: 0 };
+  } g.more = () => `<h4>✅ So sieht ${(kind === 'c' ? CANDLES : FORMS)[key].name} noch aus:</h4>${gallery(kind, key, 3)}`; return g; }
 function genC(key, C) { {
     const ex = `<b>${C.name}</b>: ${C.look} ${C.mean}`;
     const hint = 'Achte auf Körpergröße, Docht-Länge, Farbe – und auf den Trend VOR dem Muster.';
@@ -245,22 +250,22 @@ function genC(key, C) { {
       const p = buildPattern(key, { trail: 'force' });
       const spec = { candles: p.candles, clickable: true };
       const multi = p.highlight[1] > p.highlight[0];
-      return { type: 'tap', q: `Finde das Muster: Tippe ${multi ? 'eine Kerze' : 'die Kerze'} des <b>${C.name}</b> im Chart an.`, spec, range: p.highlight, hint: hint + ' ' + C.look, explain: ex };
+      return { fmt: 'tap', type: 'tap', q: `Finde das Muster: Tippe ${multi ? 'eine Kerze' : 'die Kerze'} des <b>${C.name}</b> im Chart an.`, spec, range: p.highlight, hint: hint + ' ' + C.look, explain: ex };
     }
     // 2) Bild auswählen
     if (r < .52) {
       const keys = [key, ...distractors(key, C_PREF, CANDLES)];
-      return { q: `Auf welchem Bild ist ein <b>${C.name}</b> markiert?`, img: true, options: keys.map(k => renderChart({ ...buildPattern(k, { trail: 'none' }), mini: true })), correct: 0, cmp: { kind: 'c', keys }, hint, explain: ex };
+      return { fmt: 'img', q: `Auf welchem Bild ist ein <b>${C.name}</b> markiert?`, img: true, options: keys.map(k => renderChart({ ...buildPattern(k, { trail: 'none' }), mini: true })), correct: 0, cmp: { kind: 'c', keys }, hint, explain: ex };
     }
     // 3) Signal + Auflösung
     if (r < .72) {
       const p = buildPattern(key, { trail: 'none' });
       const rev = extendCs(p.candles, DIR(C.sig), R.int(5, 8), p.u);
-      return { q: 'Ist das markierte Muster eher bullisch, bärisch oder neutral?', visual: renderChart(p), options: ['🟢 Bullisch', '🔴 Bärisch', '⚪ Neutral'], correct: ['bull', 'bear', 'neutral'].indexOf(C.sig), keepOrder: true, hint, explain: ex + revealNote + renderChart({ candles: rev, highlight: p.highlight, height: 200 }) };
+      return { fmt: 'sig', q: 'Ist das markierte Muster eher bullisch, bärisch oder neutral?', visual: renderChart(p), options: ['🟢 Bullisch', '🔴 Bärisch', '⚪ Neutral'], correct: ['bull', 'bear', 'neutral'].indexOf(C.sig), keepOrder: true, hint, explain: ex + revealNote + renderChart({ candles: rev, highlight: p.highlight, height: 200 }) };
     }
     // 4) Namen nennen
     const p = buildPattern(key), keys = [key, ...distractors(key, C_PREF, CANDLES)];
-    return { q: 'Welches Kerzenmuster ist markiert?', visual: renderChart(p), options: keys.map(k => CANDLES[k].name), correct: 0, cmp: { kind: 'c', keys }, hint, explain: ex + (['hammer', 'hangingman', 'shootingstar', 'invhammer'].includes(key) ? '<br><span class="tip">Tipp: Hammer & Hanging Man sehen gleich aus – entscheidend ist, ob vorher ein Abwärts- oder Aufwärtstrend war.</span>' : '') };
+    return { fmt: 'name', q: 'Welches Kerzenmuster ist markiert?', visual: renderChart(p), options: keys.map(k => CANDLES[k].name), correct: 0, cmp: { kind: 'c', keys }, hint, explain: ex + (['hammer', 'hangingman', 'shootingstar', 'invhammer'].includes(key) ? '<br><span class="tip">Tipp: Hammer & Hanging Man sehen gleich aus – entscheidend ist, ob vorher ein Abwärts- oder Aufwärtstrend war.</span>' : '') };
   }
 }
 
@@ -273,15 +278,15 @@ function genF(key, F) { {
     const r = Math.random();
     if (r < .33) {
       const keys = [key, ...distractors(key, F_PREF, FORMS)];
-      return { q: `Welches Bild zeigt ein(e) <b>${F.name}</b>?`, img: true, options: keys.map(k => renderChart({ candles: buildForm(k), mini: true })), correct: 0, cmp: { kind: 'f', keys }, hint, explain: ex };
+      return { fmt: 'img', q: `Welches Bild zeigt ein(e) <b>${F.name}</b>?`, img: true, options: keys.map(k => renderChart({ candles: buildForm(k), mini: true })), correct: 0, cmp: { kind: 'f', keys }, hint, explain: ex };
     }
     if (r < .6) {
       const cs = buildForm(key), n = cs.length, dir = F.sig === 'neutral' ? Math.sign(cs[n - 1].c - cs[n - 8].c) || 1 : DIR(F.sig);
       const rev = extendCs(cs, dir, R.int(7, 11));
-      return { q: `Das ist ein(e) <b>${F.name}</b>. Was wird danach typischerweise erwartet?`, visual: renderChart({ candles: cs }), options: ['📈 Eher steigende Kurse', '📉 Eher fallende Kurse', '↔️ Offen – Ausbruch abwarten'], correct: ['bull', 'bear', 'neutral'].indexOf(F.sig), keepOrder: true, hint, explain: ex + revealNote + renderChart({ candles: rev, highlight: [n, rev.length - 1], height: 200 }) };
+      return { fmt: 'sig', q: `Das ist ein(e) <b>${F.name}</b>. Was wird danach typischerweise erwartet?`, visual: renderChart({ candles: cs }), options: ['📈 Eher steigende Kurse', '📉 Eher fallende Kurse', '↔️ Offen – Ausbruch abwarten'], correct: ['bull', 'bear', 'neutral'].indexOf(F.sig), keepOrder: true, hint, explain: ex + revealNote + renderChart({ candles: rev, highlight: [n, rev.length - 1], height: 200 }) };
     }
     const keys = [key, ...distractors(key, F_PREF, FORMS)];
-    return { q: 'Welche Chartformation siehst du?', visual: renderChart({ candles: buildForm(key) }), options: keys.map(k => FORMS[k].name), correct: 0, cmp: { kind: 'f', keys }, hint, explain: ex };
+    return { fmt: 'name', q: 'Welche Chartformation siehst du?', visual: renderChart({ candles: buildForm(key) }), options: keys.map(k => FORMS[k].name), correct: 0, cmp: { kind: 'f', keys }, hint, explain: ex };
   }
 }
 
