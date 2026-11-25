@@ -110,6 +110,38 @@ textarea{width:100%;margin-top:10px;font:12px ui-monospace,monospace;background:
 .devb span{font-size:48px}.devb b{font-size:20px}.devb small{color:var(--mut)}.devb.sug{border-color:var(--acc)}.devb:hover{border-color:var(--acc)}
 footer{text-align:center;color:var(--mut);font-size:12px;padding:20px}
 
+h4{margin:1.1em 0 .5em;font-size:15px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.gal{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.gal.con{grid-template-columns:repeat(3,1fr)}
+.gal>div{background:var(--card2);border-radius:10px;padding:5px;display:flex;flex-direction:column;gap:3px}
+.gal b{font-size:14px;padding:0 3px}.gal small{font-size:12px;color:var(--mut);padding:0 3px 3px;line-height:1.35}
+.morebox{margin:10px 0;padding:8px 10px;background:#0b1015aa;border-radius:10px}.morebox h4{margin:.2em 0 .5em}.morebox .gal{grid-template-columns:repeat(3,1fr)}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.alt2{background:#1e293b;color:var(--txt);border:2px solid var(--gold);cursor:pointer}
+.alt3{background:#1e293b;color:var(--txt);border:2px solid var(--up);cursor:pointer}
+.big:disabled{opacity:.45;cursor:default}
+.examset{max-width:860px;margin:0 auto 14px}
+.exhist div{display:grid;grid-template-columns:1fr auto auto;gap:14px;padding:6px 0;border-bottom:1px solid var(--line)}
+.note{display:inline-flex;flex-direction:column;align-items:center;font-size:34px;font-weight:800;padding:8px 22px;border-radius:14px;margin:6px 0;border:3px solid}
+.note small{font-size:14px;font-weight:600}
+.n1,.n2{color:var(--up);border-color:var(--up)}.n3,.n4{color:var(--gold);border-color:var(--gold)}.n5,.n6{color:var(--dn);border-color:var(--dn)}
+b.n1,b.n2,b.n3,b.n4,b.n5,b.n6{border:0}
+.permod{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;text-align:left;margin:12px 0}
+.permod>div{background:var(--card2);border-radius:10px;padding:8px 10px;display:grid;grid-template-columns:1fr auto}.permod .pbar{grid-column:span 2}
+details.rev{border:2px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:8px}
+details.rev.bad{border-color:#7f1d1d}details.rev.ok{border-color:#14532d}
+details.rev summary{cursor:pointer;font-size:15px}
+details.rev .q{font-size:16px;margin:10px 0}
+details.rev .vis{max-width:760px}
+.ans{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}.ans>div{background:var(--card2);border-radius:10px;padding:8px}.ans small{display:block;color:var(--mut)}
+.ans .mini{max-width:260px}
+.task.saved{opacity:.55;transition:opacity .15s}
+.rbar.ex i{background:#22c55e}
+.m-phone .gal{grid-template-columns:1fr 1fr}.m-phone .gal.con{grid-template-columns:1fr}.m-phone .gal.con>div{display:grid;grid-template-columns:130px 1fr;align-items:center}
+.m-phone .gal.con>div small{grid-column:2}.m-phone .gal.con>div .chart{grid-row:span 2}
+.m-phone .morebox .gal{grid-template-columns:1fr 1fr 1fr}
+.m-phone .ans{grid-template-columns:1fr}
+
 /* ============ PC-Ansicht ============ */
 .m-pc .hwrap,.m-pc main{max-width:1280px}
 .m-pc .task.has-vis{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(320px,1fr);gap:0 24px;align-items:start}
@@ -159,9 +191,9 @@ footer{text-align:center;color:var(--mut);font-size:12px;padding:20px}
 <button id="devBtn" title="Ansicht wechseln (Handy/PC)">🖥️</button></div></header>
 <main id="view"></main>
 <footer>Lerntool – keine Anlageberatung. Charts sind zufällig erzeugte Übungsbeispiele. Erst im Demokonto üben.</footer>
-<script src="charts.js?v=5"></script>
-<script src="data.js?v=5"></script>
-<script src="gen.js?v=5"></script>
-<script src="app.js?v=5"></script>
+<script src="charts.js?v=6"></script>
+<script src="data.js?v=6"></script>
+<script src="gen.js?v=6"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

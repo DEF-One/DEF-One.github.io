@@ -19,6 +19,9 @@ const A = {
   symtri: [[0, .5], [.1, .95], [.24, .08], [.38, .82], [.52, .24], [.65, .68], [.77, .38], [.86, .56], [1, .9]],
   bullflag: [[0, .05], [.35, .82], [.45, .7], [.52, .78], [.62, .64], [.7, .72], [.79, .6], [.87, .68], [1, .98]],
   rectangle: [[0, .5], [.1, .8], [.22, .22], [.35, .8], [.48, .22], [.62, .8], [.76, .22], [.9, .78], [1, .55]],
+  triplebottom: [[0, .9], [.15, .12], [.28, .52], [.42, .13], [.56, .52], [.7, .12], [.84, .5], [.92, .55], [1, .82]],
+  cuphandle: [[0, .85], [.08, .62], [.2, .28], [.33, .14], [.46, .2], [.6, .5], [.68, .8], [.75, .68], [.81, .72], [.87, .66], [1, .98]],
+  channelup: [[0, .08], [.1, .34], [.18, .2], [.3, .5], [.4, .36], [.53, .66], [.63, .52], [.76, .82], [.86, .68], [1, .96]],
   fallingwedge: [[0, .98], [.12, .5], [.25, .82], [.38, .36], [.5, .62], [.62, .27], [.73, .46], [.83, .24], [1, .62]]
 };
 function trendChart(kind) {
@@ -26,58 +29,82 @@ function trendChart(kind) {
   return pathCandles(jitter(an, .02, .04), R.int(40, 55), { noise: .03 });
 }
 
-/* Kerzenmuster */
+/* Kerzenmuster – mit viel Abwechslung (Trendform, Länge, Größe, Farbe, Dochte) */
+const DOWN_SHAPES = [
+  [[0, .9], [.25, .65], [.38, .72], [.6, .42], [.7, .5], [1, .12]],
+  [[0, .95], [.5, .7], [.75, .5], [1, .1]],
+  [[0, .7], [.2, .85], [.45, .6], [.6, .66], [.8, .3], [1, .15]],
+  [[0, .9], [.3, .8], [.4, .85], [.65, .55], [.75, .6], [.9, .3], [1, .2]],
+  [[0, .8], [.15, .82], [.35, .55], [.5, .62], [.7, .35], [.82, .4], [1, .1]]
+];
 function buildPattern(key, opt = {}) {
-  const bearMap = { shootingstar: 'hammer', hangingman: 'invhammer', bearengulf: 'bullengulf', eveningstar: 'morningstar', crows: 'soldiers' };
+  const bearMap = { shootingstar: 'hammer', hangingman: 'invhammer', bearengulf: 'bullengulf', eveningstar: 'morningstar', crows: 'soldiers', marubozubear: 'marubozubull', haramibear: 'haramibull', darkcloud: 'piercing', tweezertop: 'tweezerbottom' };
   const base = bearMap[key] || key, flip = !!bearMap[key];
-  let ctxA = jitter(A.down, .02, .04);
+  let ctxA = jitter(R.pick(DOWN_SHAPES), .02, .05);
   if (key === 'doji' || key === 'spinningtop') ctxA = R.chance(.5) ? ctxA : flipA(ctxA);
-  const ctx = pathCandles(ctxA, R.int(13, 17), { noise: .03 });
-  const u = ctx.range * R.rand(.12, .15), p = ctx[ctx.length - 1].c;
+  if ((base === 'soldiers' || base === 'marubozubull') && R.chance(.4)) ctxA = jitter(A.side, .02, .04);
+  const ctx = pathCandles(ctxA, R.int(9, 20), { noise: R.rand(.022, .04), wick: R.rand(.015, .035) });
+  const u = ctx.range * R.rand(.1, .17), p = ctx[ctx.length - 1].c;
   let pat = [];
-  const body = u * R.rand(.3, .45);
+  const body = u * R.rand(.25, .5), sgn = () => (R.chance(.5) ? 1 : -1);
   if (base === 'hammer') {
-    const o = p - u * .15, c = R.chance(.6) ? o + body : o - body;
-    pat = [{ o, c, h: Math.max(o, c) + body * R.rand(0, .15), l: Math.min(o, c) - body * R.rand(2.6, 3.6) }];
+    const o = p - u * R.rand(0, .3), c = R.chance(.6) ? o + body : o - body;
+    pat = [{ o, c, h: Math.max(o, c) + body * R.rand(0, .2), l: Math.min(o, c) - body * R.rand(2.2, 4) }];
   } else if (base === 'invhammer') {
-    const o = p - u * .25, c = R.chance(.5) ? o + body : o - body;
-    pat = [{ o, c, h: Math.max(o, c) + body * R.rand(2.6, 3.6), l: Math.min(o, c) - body * R.rand(0, .15) }];
+    const o = p - u * R.rand(.1, .35), c = R.chance(.5) ? o + body : o - body;
+    pat = [{ o, c, h: Math.max(o, c) + body * R.rand(2.2, 4), l: Math.min(o, c) - body * R.rand(0, .2) }];
   } else if (base === 'bullengulf') {
-    const o1 = p + u * .05, c1 = o1 - u * R.rand(.45, .7), o2 = c1 - u * .1, c2 = o1 + u * R.rand(.35, .7);
-    pat = [mk(o1, c1, u * .08, u * .1), mk(o2, c2, u * .1, u * .08)];
+    const o1 = p + u * .05, c1 = o1 - u * R.rand(.35, .8), o2 = c1 - u * R.rand(.03, .2), c2 = o1 + u * R.rand(.25, .9);
+    pat = [mk(o1, c1, u * R.rand(.03, .15), u * R.rand(.03, .15)), mk(o2, c2, u * R.rand(.03, .15), u * R.rand(.03, .15))];
   } else if (base === 'morningstar') {
-    const o1 = p, c1 = p - u * R.rand(1.4, 1.9), o2 = c1 - u * .3, c2 = o2 + (R.chance(.5) ? 1 : -1) * u * .12;
-    const o3 = Math.max(o2, c2) + u * .08, c3 = c1 + (o1 - c1) * R.rand(.6, .9);
-    pat = [mk(o1, c1, u * .1, u * .1), mk(o2, c2, u * .2, u * .2), mk(o3, c3, u * .1, u * .08)];
+    const o1 = p, c1 = p - u * R.rand(1.2, 2), o2 = c1 - u * R.rand(.15, .4), c2 = o2 + sgn() * u * R.rand(0, .18);
+    const o3 = Math.max(o2, c2) + u * R.rand(.02, .15), c3 = c1 + (o1 - c1) * R.rand(.55, .95);
+    pat = [mk(o1, c1, u * .1, u * .1), mk(o2, c2, u * R.rand(.1, .3), u * R.rand(.1, .3)), mk(o3, c3, u * .1, u * .08)];
   } else if (base === 'soldiers') {
     let o = p;
-    for (let i = 0; i < 3; i++) { const c = o + u * R.rand(1, 1.35); pat.push(mk(o, c, u * .07, u * .07)); o = c - (c - o) * R.rand(.15, .35); }
+    for (let i = 0; i < 3; i++) { const c = o + u * R.rand(.85, 1.4); pat.push(mk(o, c, u * R.rand(.02, .12), u * R.rand(.02, .12))); o = c - (c - o) * R.rand(.1, .4); }
+  } else if (base === 'marubozubull') {
+    const o = p - u * R.rand(0, .1), c = o + u * R.rand(1.6, 2.4);
+    pat = [mk(o, c, u * R.rand(0, .03), u * R.rand(0, .03))];
+  } else if (base === 'haramibull') {
+    const o1 = p + u * .05, c1 = o1 - u * R.rand(1.3, 1.9), mid = (o1 + c1) / 2, b2 = u * R.rand(.2, .4);
+    const o2 = mid - b2 / 2 + R.rand(-.15, .15) * u, c2 = o2 + b2;
+    pat = [mk(o1, c1, u * .1, u * .1), mk(o2, c2, u * R.rand(.05, .2), u * R.rand(.05, .2))];
+  } else if (base === 'piercing') {
+    const o1 = p, c1 = p - u * R.rand(1.3, 1.8), o2 = c1 - u * R.rand(.2, .4), c2 = c1 + (o1 - c1) * R.rand(.55, .85);
+    pat = [mk(o1, c1, u * .08, u * .08), mk(o2, c2, u * .08, u * .1)];
+  } else if (base === 'tweezerbottom') {
+    const low = p - u * R.rand(.8, 1.2), o1 = p, c1 = p - u * R.rand(.35, .6), o2 = c1 + u * R.rand(-.05, .05), c2 = o2 + u * R.rand(.35, .7);
+    pat = [{ o: o1, c: c1, h: o1 + u * .05, l: low }, { o: o2, c: c2, h: c2 + u * .06, l: low + u * R.rand(-.02, .02) }];
   } else if (key === 'doji') {
-    const o = p + R.rand(-.1, .1) * u, c = o + R.rand(-.025, .025) * u;
-    pat = [mk(o, c, u * R.rand(.7, 1.3), u * R.rand(.7, 1.3))];
+    const o = p + R.rand(-.1, .1) * u, c = o + R.rand(-.025, .025) * u, w = R.rand(.6, 1.4);
+    pat = [mk(o, c, u * w * R.rand(.5, 1.5), u * w * R.rand(.5, 1.5))];
   } else if (key === 'spinningtop') {
-    const o = p, c = o + (R.chance(.5) ? 1 : -1) * u * R.rand(.22, .32);
-    pat = [mk(o, c, u * R.rand(.6, .9), u * R.rand(.6, .9))];
+    const o = p, c = o + sgn() * u * R.rand(.2, .35);
+    pat = [mk(o, c, u * R.rand(.5, 1), u * R.rand(.5, 1))];
   }
   let all = ctx.concat(pat);
   if (flip) all = flipCandles(all, ctx.base + ctx.range / 2);
   const hl = [ctx.length, all.length - 1];
-  // Abwechslung: manchmal laufen nach dem Muster noch Kerzen weiter (Muster steht dann mitten im Chart)
   if (opt.trail === 'force' || (opt.trail !== 'none' && R.chance(.45))) {
-    const sig = CANDLES[key].sig, dir = sig === 'bull' ? 1 : sig === 'bear' ? -1 : (R.chance(.5) ? 1 : -1), k = R.int(2, 6);
-    let p = all[all.length - 1].c;
-    for (let i = 0; i < k; i++) { const o = p + R.gauss() * u * .1, c = o + dir * u * R.rand(-.3, .9); all.push(mk(o, c, u * R.rand(.05, .3), u * R.rand(.05, .3))); p = c; }
+    const sig = CANDLES[key].sig, dir = sig === 'bull' ? 1 : sig === 'bear' ? -1 : sgn(), k = R.int(2, 7);
+    let q = all[all.length - 1].c;
+    for (let i = 0; i < k; i++) { const o = q + R.gauss() * u * .1, c = o + dir * u * R.rand(-.3, .9); all.push(mk(o, c, u * R.rand(.05, .3), u * R.rand(.05, .3))); q = c; }
   }
   return { candles: all, highlight: hl, u };
 }
 
 /* Formationen */
 function buildForm(key) {
-  const map = { doubletop: ['doublebottom', 1], doublebottom: ['doublebottom', 0], hs: ['ihs', 1], ihs: ['ihs', 0], asctri: ['asctri', 0], desctri: ['asctri', 1], symtri: ['symtri', R.chance(.5)], bullflag: ['bullflag', 0], bearflag: ['bullflag', 1], rectangle: ['rectangle', R.chance(.5)], fallingwedge: ['fallingwedge', 0], risingwedge: ['fallingwedge', 1] };
+  const map = { doubletop: ['doublebottom', 1], doublebottom: ['doublebottom', 0], hs: ['ihs', 1], ihs: ['ihs', 0], asctri: ['asctri', 0], desctri: ['asctri', 1], symtri: ['symtri', R.chance(.5)], bullflag: ['bullflag', 0], bearflag: ['bullflag', 1], rectangle: ['rectangle', R.chance(.5)], fallingwedge: ['fallingwedge', 0], risingwedge: ['fallingwedge', 1], triplebottom: ['triplebottom', 0], tripletop: ['triplebottom', 1], cuphandle: ['cuphandle', 0], channelup: ['channelup', 0], channeldown: ['channelup', 1] };
   const [b, f] = map[key];
   let an = jitter(A[b], .012, .025);
   if (f) an = flipA(an);
-  return pathCandles(an, R.int(44, 56), { noise: .016, wick: .014 });
+  if (R.chance(.45)) { // Vorlauf-Trend davor → Formation steht nicht immer am Anfang
+    const lead = R.rand(.1, .25), y0 = an[0][1] + (an[0][1] > .5 ? 1 : -1) * R.rand(.15, .3);
+    an = [[0, y0]].concat(an.map(([x, y]) => [lead + x * (1 - lead), y]));
+  }
+  return pathCandles(an, R.int(36, 64), { noise: R.rand(.012, .022), wick: R.rand(.01, .02) });
 }
 
 /* Range + Ausbruch mit Volumen */
@@ -95,12 +122,19 @@ function breakoutChart(strongVol) {
 
 /* ---------- Begriffe ---------- */
 function termLesson(T) { return `<div class="lesson-term"><div class="big">${T.w}</div><p>${T.d}</p><div class="ex"><b>Beispiel:</b> ${T.ex}</div></div>`; }
+const TERM_VIS = { support: 'b:sr', resistance: 'b:sr', trend: 'b:trend', hhhl: 'b:trend', lllh: 'b:trend', range: 'b:trend', open: 'b:ohlc', close: 'b:ohlc', high: 'b:ohlc', low: 'b:ohlc', gruen: 'b:ohlc', rot: 'b:ohlc', breakout: 'b:break', fakeout: 'b:break', pullback: 'b:break', rollentausch: 'b:break', rsi: 'i:rsi', ueberkauft: 'i:rsi', ueberverkauft: 'i:rsi', goldencross: 'i:macross', deathcross: 'i:macross', volumen: 'i:volume', sma: 'i:matrend', ema: 'i:matrend' };
 TERMS.forEach(T => {
   skill('t:' + T.id, 't', T.w, () => termLesson(T), () => {
     const same = TERMS.filter(x => x.cat === T.cat && x.id !== T.id), other = TERMS.filter(x => x.id !== T.id);
     const dis = R.shuffle(same.length >= 3 ? same : other).slice(0, 3);
-    if (R.chance(.5)) {
-      return { q: `Was bedeutet <b>„${T.w}“</b>?`, options: [T.d, ...dis.map(x => x.d)], correct: 0, explain: termLesson(T), small: true };
+    const r = Math.random();
+    // Bild-Variante: Begriff direkt im Chart anwenden
+    if (TERM_VIS[T.id] && r < .3 && SKILLS[TERM_VIS[T.id]]) { const g = SKILLS[TERM_VIS[T.id]].gen(); g.explain = g.explain + '<hr>' + termLesson(T); return g; }
+    if (r < .5) return { q: `Was bedeutet <b>„${T.w}“</b>?`, options: [T.d, ...dis.map(x => x.d)], correct: 0, explain: termLesson(T), small: true };
+    if (r < .68) return { q: `Zu welchem Begriff passt dieses <b>Beispiel</b>?<div class="quote">${T.ex}</div>`, options: [T.w, ...dis.map(x => x.w)], correct: 0, explain: termLesson(T) };
+    if (r < .84) {
+      const right = R.chance(.5), d = right ? T.d : dis[0].d;
+      return { q: `Richtig oder falsch?<div class="quote"><b>${T.w}</b> = ${d}</div>`, options: ['✅ Richtig', '❌ Falsch'], correct: right ? 0 : 1, keepOrder: true, explain: (right ? 'Die Beschreibung passt.' : `Falsch – das beschreibt <b>${dis[0].w}</b>.`) + '<hr>' + termLesson(T) };
     }
     const fw = T.w.split(' ')[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const hidden = fw.length >= 4 ? T.d.replace(new RegExp(fw, 'gi'), '…') : T.d;
@@ -141,7 +175,7 @@ skill('b:sr', 'b', 'Unterstützung & Widerstand finden',
     const L = R.shuffle(['A', 'B', 'C']);
     const lines = [{ y: res, label: L[0] }, { y: sup, label: L[1] }, { y: mid, label: L[2] }].map(l => ({ ...l, color: TV.lineLvl }));
     const askSup = R.chance(.5), ans = askSup ? L[1] : L[0];
-    return { q: `Welche Linie ist die <b>${askSup ? 'Unterstützung (Support)' : 'Widerstand (Resistance)'}</b>?`, visual: renderChart({ candles: cs, lines }), options: ['A', 'B', 'C'], correct: ['A', 'B', 'C'].indexOf(ans), keepOrder: true,
+    return { q: `Welche Linie ist ${askSup ? 'die <b>Unterstützung (Support)</b>' : 'der <b>Widerstand (Resistance)</b>'}?`, visual: renderChart({ candles: cs, lines }), options: ['A', 'B', 'C'], correct: ['A', 'B', 'C'].indexOf(ans), keepOrder: true,
       explain: `Linie <b>${L[1]}</b> ist die Unterstützung (Kurs prallte dort mehrmals nach oben ab), Linie <b>${L[0]}</b> der Widerstand (Kurs scheiterte dort mehrmals). Linie ${L[2]} wurde nicht mehrfach getestet.` };
   });
 
@@ -166,19 +200,43 @@ function extendCs(cs, dir, k, u) {
 }
 const DIR = sig => sig === 'bull' ? 1 : sig === 'bear' ? -1 : (R.chance(.5) ? 1 : -1);
 const revealNote = '<p class="hint">So läuft es im <b>Lehrbuch-Fall</b> weiter (neue Kerzen rechts). In echten Märkten klappt das längst nicht immer – darum immer Stop-Loss!</p>';
-const C_PREF = { hammer: ['hangingman', 'invhammer', 'shootingstar'], hangingman: ['hammer', 'shootingstar', 'invhammer'], shootingstar: ['invhammer', 'hangingman', 'hammer'], invhammer: ['shootingstar', 'hammer', 'hangingman'], doji: ['spinningtop', 'hammer'], spinningtop: ['doji', 'invhammer'], bullengulf: ['bearengulf', 'morningstar'], bearengulf: ['bullengulf', 'eveningstar'], morningstar: ['eveningstar', 'bullengulf'], eveningstar: ['morningstar', 'bearengulf'], soldiers: ['crows', 'morningstar'], crows: ['soldiers', 'eveningstar'] };
-const F_PREF = { doubletop: ['hs', 'doublebottom'], doublebottom: ['ihs', 'doubletop'], hs: ['doubletop', 'ihs'], ihs: ['doublebottom', 'hs'], asctri: ['symtri', 'desctri'], desctri: ['symtri', 'asctri'], symtri: ['asctri', 'rectangle'], bullflag: ['bearflag', 'fallingwedge'], bearflag: ['bullflag', 'risingwedge'], rectangle: ['symtri', 'doubletop'], risingwedge: ['fallingwedge', 'bearflag'], fallingwedge: ['risingwedge', 'bullflag'] };
+const C_PREF = { hammer: ['hangingman', 'invhammer', 'tweezerbottom'], hangingman: ['hammer', 'shootingstar', 'invhammer'], shootingstar: ['invhammer', 'hangingman', 'tweezertop'], invhammer: ['shootingstar', 'hammer', 'hangingman'], doji: ['spinningtop', 'hammer'], spinningtop: ['doji', 'invhammer'], bullengulf: ['bearengulf', 'piercing', 'haramibull'], bearengulf: ['bullengulf', 'darkcloud', 'haramibear'], morningstar: ['eveningstar', 'bullengulf', 'piercing'], eveningstar: ['morningstar', 'bearengulf', 'darkcloud'], soldiers: ['crows', 'marubozubull'], crows: ['soldiers', 'marubozubear'], marubozubull: ['marubozubear', 'soldiers', 'bullengulf'], marubozubear: ['marubozubull', 'crows', 'bearengulf'], haramibull: ['bullengulf', 'haramibear', 'piercing'], haramibear: ['bearengulf', 'haramibull', 'darkcloud'], piercing: ['bullengulf', 'darkcloud', 'haramibull'], darkcloud: ['bearengulf', 'piercing', 'haramibear'], tweezerbottom: ['tweezertop', 'hammer', 'bullengulf'], tweezertop: ['tweezerbottom', 'shootingstar', 'bearengulf'] };
+const F_PREF = { doubletop: ['hs', 'tripletop', 'doublebottom'], doublebottom: ['ihs', 'triplebottom', 'doubletop'], hs: ['doubletop', 'ihs', 'tripletop'], ihs: ['doublebottom', 'hs', 'cuphandle'], asctri: ['symtri', 'desctri', 'risingwedge'], desctri: ['symtri', 'asctri', 'fallingwedge'], symtri: ['asctri', 'rectangle', 'desctri'], bullflag: ['bearflag', 'fallingwedge', 'channeldown'], bearflag: ['bullflag', 'risingwedge', 'channelup'], rectangle: ['symtri', 'tripletop', 'triplebottom'], risingwedge: ['fallingwedge', 'bearflag', 'channelup'], fallingwedge: ['risingwedge', 'bullflag', 'channeldown'], triplebottom: ['doublebottom', 'ihs', 'tripletop'], tripletop: ['doubletop', 'hs', 'triplebottom'], cuphandle: ['doublebottom', 'ihs', 'bullflag'], channelup: ['risingwedge', 'channeldown', 'bullflag'], channeldown: ['fallingwedge', 'channelup', 'bearflag'] };
 function distractors(key, pref, pool, n = 3) {
   const d = R.shuffle(pref[key] || []).slice(0, 2);
   R.shuffle(Object.keys(pool)).forEach(k => { if (k !== key && d.length < n && !d.includes(k)) d.push(k); });
   return d;
 }
-const TAPPABLE = ['hammer', 'shootingstar', 'invhammer', 'hangingman', 'bullengulf', 'bearengulf', 'morningstar', 'eveningstar', 'soldiers', 'crows'];
+const TAPPABLE = ['hammer', 'shootingstar', 'invhammer', 'hangingman', 'bullengulf', 'bearengulf', 'morningstar', 'eveningstar', 'soldiers', 'crows', 'marubozubull', 'marubozubear', 'haramibull', 'haramibear', 'piercing', 'darkcloud', 'tweezerbottom', 'tweezertop'];
+
+/* Beispiel-Galerien: viele Varianten + Verwechslungsgefahr */
+const miniC = k => renderChart({ ...buildPattern(k, { trail: 'none' }), mini: true });
+const miniF = k => renderChart({ candles: buildForm(k), mini: true });
+function gallery(kind, key, n = 4) {
+  const f = kind === 'c' ? miniC : miniF;
+  return `<div class="gal">${[...Array(n)].map(() => `<div>${f(key)}</div>`).join('')}</div>`;
+}
+function contrast(kind, key) {
+  const pool = kind === 'c' ? CANDLES : FORMS, pref = (kind === 'c' ? C_PREF : F_PREF)[key] || [], f = kind === 'c' ? miniC : miniF;
+  return `<div class="gal con">${pref.slice(0, 3).map(k => `<div>${f(k)}<b>${pool[k].name}</b><small>${pool[k].look}</small></div>`).join('')}</div>`;
+}
+function richLesson(kind, key) {
+  const D = kind === 'c' ? CANDLES[key] : FORMS[key];
+  const main = kind === 'c' ? renderChart({ ...buildPattern(key, { trail: 'none' }), height: 220 }) : renderChart({ candles: buildForm(key), height: 220 });
+  return `${main}<p><b>Aussehen:</b> ${D.look}</p>${D.ctx ? `<p><b>Wo:</b> ${D.ctx}</p>` : ''}<p><b>Bedeutung:</b> ${D.mean}</p>
+  <p class="tip">Signal: ${SIG_TXT[D.sig]}. ${kind === 'c' ? 'Kerzenmuster sind Hinweise, keine Garantie – am besten an Unterstützung/Widerstand und mit Bestätigung.' : 'Formationen gelten erst mit Ausbruch als bestätigt.'}</p>
+  <h4>🖼️ So kann es noch aussehen <button class="ghost small regal" data-kind="${kind}" data-key="${key}">🔄 neue Beispiele</button></h4><div class="galwrap">${gallery(kind, key)}</div>
+  <h4>⚠️ Nicht verwechseln mit</h4>${contrast(kind, key)}`;
+}
+
 
 /* ---------- Kerzenmuster ---------- */
 Object.entries(CANDLES).forEach(([key, C]) => {
-  const lesson = () => { const p = buildPattern(key, { trail: 'none' }); return `${renderChart({ ...p, height: 220 })}<p><b>Aussehen:</b> ${C.look}</p><p><b>Wo:</b> ${C.ctx}</p><p><b>Bedeutung:</b> ${C.mean}</p><p class="tip">Signal: ${SIG_TXT[C.sig]}. Kerzenmuster sind Hinweise, keine Garantie – am besten an Unterstützung/Widerstand und mit Bestätigung.</p>`; };
-  skill('c:' + key, 'c', C.name, lesson, () => {
+  const lesson = () => richLesson('c', key);
+  skill('c:' + key, 'c', C.name, lesson, () => withMore('c', key, genC(key, C)));
+});
+function withMore(kind, key, g) { g.more = () => `<h4>✅ So sieht ${(kind === 'c' ? CANDLES : FORMS)[key].name} noch aus:</h4>${gallery(kind, key, 3)}`; return g; }
+function genC(key, C) { {
     const ex = `<b>${C.name}</b>: ${C.look} ${C.mean}`;
     const hint = 'Achte auf Körpergröße, Docht-Länge, Farbe – und auf den Trend VOR dem Muster.';
     const r = Math.random();
@@ -203,12 +261,14 @@ Object.entries(CANDLES).forEach(([key, C]) => {
     // 4) Namen nennen
     const p = buildPattern(key), keys = [key, ...distractors(key, C_PREF, CANDLES)];
     return { q: 'Welches Kerzenmuster ist markiert?', visual: renderChart(p), options: keys.map(k => CANDLES[k].name), correct: 0, cmp: { kind: 'c', keys }, hint, explain: ex + (['hammer', 'hangingman', 'shootingstar', 'invhammer'].includes(key) ? '<br><span class="tip">Tipp: Hammer & Hanging Man sehen gleich aus – entscheidend ist, ob vorher ein Abwärts- oder Aufwärtstrend war.</span>' : '') };
-  });
-});
+  }
+}
 
 /* ---------- Formationen ---------- */
 Object.entries(FORMS).forEach(([key, F]) => {
-  skill('f:' + key, 'f', F.name, () => `${renderChart({ candles: buildForm(key), height: 220 })}<p><b>Aussehen:</b> ${F.look}</p><p><b>Bedeutung:</b> ${F.mean}</p><p class="tip">Erwartung: ${SIG_TXT[F.sig]}. Formationen gelten erst mit Ausbruch als bestätigt.</p>`, () => {
+  skill('f:' + key, 'f', F.name, () => richLesson('f', key), () => withMore('f', key, genF(key, F)));
+});
+function genF(key, F) { {
     const ex = `<b>${F.name}</b>: ${F.look} ${F.mean}`, hint = 'Zähle die Hochs und Tiefs. Sind die Linien waagerecht, steigend, fallend – oder laufen sie zusammen?';
     const r = Math.random();
     if (r < .33) {
@@ -222,8 +282,8 @@ Object.entries(FORMS).forEach(([key, F]) => {
     }
     const keys = [key, ...distractors(key, F_PREF, FORMS)];
     return { q: 'Welche Chartformation siehst du?', visual: renderChart({ candles: buildForm(key) }), options: keys.map(k => FORMS[k].name), correct: 0, cmp: { kind: 'f', keys }, hint, explain: ex };
-  });
-});
+  }
+}
 
 /* ---------- Indikatoren ---------- */
 skill('i:rsi', 'i', 'RSI lesen', () => `<p>Der <b>RSI</b> läuft von 0 bis 100 (unteres Fenster).</p><ul><li>über 70 = <b>überkauft</b> (sehr schnell gestiegen)</li><li>unter 30 = <b>überverkauft</b> (sehr schnell gefallen)</li><li>dazwischen = neutral</li></ul><p class="tip">Überkauft heißt NICHT automatisch „verkaufen“! In starken Trends bleibt der RSI lange extrem. Er warnt nur: nicht hinterherspringen.</p>`, () => {

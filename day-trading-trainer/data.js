@@ -96,6 +96,18 @@ const TERMS = [
   ['journal', 'Trading-Journal', 'Risiko', 'Tagebuch, in dem du jeden Trade mit Grund, Ergebnis und Fehlern notierst – der schnellste Weg, besser zu werden.', 'Screenshot + „Warum rein? Warum raus? Was lief falsch?“'],
   ['fomo', 'FOMO', 'Risiko', '„Fear of missing out“ – Angst, etwas zu verpassen. Führt zu spontanen Käufen nach großen Anstiegen, oft am Hoch.', 'Aktie schon +30 %, man springt trotzdem hinterher.'],
   ['revenge', 'Revenge Trading', 'Risiko', 'Nach einem Verlust sofort (oft größer) weitertraden, um das Geld „zurückzuholen“. Einer der größten Konto-Killer.', 'Nach −100 € sofort doppelte Größe ohne Setup.'],
+  ['scalping', 'Scalping', 'Grundlagen', 'Sehr kurzfristiges Trading: viele Trades, die nur Sekunden bis wenige Minuten dauern, mit kleinen Zielen.', '20 Trades am Tag mit je 5–10 Cent Gewinnziel.'],
+  ['swingtrading', 'Swing-Trading', 'Grundlagen', 'Positionen werden mehrere Tage bis Wochen gehalten, um größere Schwünge mitzunehmen.', 'Kauf am Montag, Verkauf am Freitag der Folgewoche.'],
+  ['orderbuch', 'Orderbuch', 'Grundlagen', 'Liste aller offenen Kauf- und Verkaufsaufträge zu den verschiedenen Preisen.', 'Bei 50,00 € warten Käufer auf 3.000 Aktien, bei 50,05 € bieten Verkäufer 1.200 an.'],
+  ['shortsqueeze', 'Short Squeeze', 'Grundlagen', 'Kurs steigt stark, viele Short-Seller müssen zurückkaufen – das treibt den Kurs noch weiter hoch.', 'Aktie mit vielen Shorts steigt +40 % an einem Tag.'],
+  ['momentum', 'Momentum', 'Chart', 'Die Wucht/Geschwindigkeit einer Kursbewegung. Hohes Momentum = schnelle, kräftige Bewegung.', '5 große grüne Kerzen in Folge = starkes Aufwärts-Momentum.'],
+  ['konsolidierung', 'Konsolidierung', 'Chart', 'Ruhephase nach einer Bewegung, in der der Kurs seitwärts läuft und „Kraft sammelt“.', 'Nach +5 % pendelt der Kurs eine Stunde in einer engen Spanne.'],
+  ['nackenlinie', 'Nackenlinie', 'Chart', 'Die Linie durch die Tiefs (bei Top-Formationen) bzw. Hochs (bei Boden-Formationen). Ihr Bruch bestätigt die Formation.', 'Beim Doppeltop: Linie durch das Tal zwischen den beiden Hochs.'],
+  ['divergenz', 'Divergenz', 'Indikatoren', 'Kurs und Indikator laufen auseinander, z. B. Kurs macht höheres Hoch, RSI nur tieferes Hoch → Trend verliert Kraft.', 'Neues Kurshoch, aber RSI-Hoch niedriger als beim letzten Mal.'],
+  ['fibonacci', 'Fibonacci-Retracement', 'Indikatoren', 'Hilfslinien (38,2 %, 50 %, 61,8 %), an denen Rücksetzer nach einer Bewegung häufig enden.', 'Anstieg von 40 auf 50 €, Rücksetzer bis 46,18 € (61,8 %-Niveau = 50 − 0,382×10).'],
+  ['pivot', 'Pivot-Punkte', 'Indikatoren', 'Aus Hoch, Tief und Schluss des Vortags berechnete Marken, die als Unterstützung/Widerstand dienen.', 'Pivot = (Hoch + Tief + Schluss) ÷ 3.'],
+  ['tageslimit', 'Tagesverlust-Limit', 'Risiko', 'Fester Betrag, bei dessen Erreichen du für den Tag aufhörst zu traden. Schützt vor Revenge Trading.', 'Limit 2 % des Kontos: bei −100 € ist bei 5.000 € Konto Schluss für heute.'],
+  ['teilverkauf', 'Teilverkauf (Scale-out)', 'Risiko', 'Einen Teil der Position am ersten Ziel verkaufen und den Rest mit nachgezogenem Stop laufen lassen.', 'Hälfte bei +2R raus, Stop für den Rest auf Einstand.'],
   ['overtrading', 'Overtrading', 'Risiko', 'Zu viele Trades ohne gute Gelegenheit – aus Langeweile oder Ungeduld. Kostet Gebühren und Nerven.', '20 Trades am Tag statt 2–3 guter.']
 ].map(([id, w, cat, d, ex]) => ({ id, w, cat, d, ex }));
 
@@ -112,6 +124,14 @@ const CANDLES = {
   morningstar: { name: 'Morning Star', sig: 'bull', ctx: 'nach Abwärtstrend', look: '3 Kerzen: große rote, dann kleine Kerze tiefer (Stern), dann große grüne, die weit in die erste hinein schließt.', mean: 'Abwärtsbewegung stoppt, dann übernehmen Käufer. Bullische Umkehr.' },
   eveningstar: { name: 'Evening Star', sig: 'bear', ctx: 'nach Aufwärtstrend', look: '3 Kerzen: große grüne, dann kleine Kerze höher (Stern), dann große rote, die weit in die erste hinein schließt.', mean: 'Aufwärtsbewegung stoppt, dann übernehmen Verkäufer. Bärische Umkehr.' },
   soldiers: { name: 'Three White Soldiers', sig: 'bull', ctx: 'nach Abwärts- oder Seitwärtsphase', look: '3 große grüne Kerzen hintereinander, jede schließt höher, kaum Dochte.', mean: 'Starke, anhaltende Kaufkraft. Bullisch.' },
+  marubozubull: { name: 'Bullischer Marubozu', sig: 'bull', ctx: 'überall, oft am Start einer Bewegung', look: 'Eine große grüne Kerze ganz ohne (oder fast ohne) Dochte – Eröffnung = Tief, Schluss = Hoch.', mean: 'Käufer hatten den ganzen Zeitraum die volle Kontrolle. Starkes Kraftsignal nach oben.' },
+  marubozubear: { name: 'Bärischer Marubozu', sig: 'bear', ctx: 'überall, oft am Start einer Bewegung', look: 'Eine große rote Kerze ganz ohne (oder fast ohne) Dochte – Eröffnung = Hoch, Schluss = Tief.', mean: 'Verkäufer hatten den ganzen Zeitraum die volle Kontrolle. Starkes Kraftsignal nach unten.' },
+  haramibull: { name: 'Bullish Harami', sig: 'bull', ctx: 'nach Abwärtstrend', look: 'Große rote Kerze, danach eine KLEINE grüne Kerze, die komplett im Körper der roten liegt (wie „schwanger“).', mean: 'Der Verkaufsdruck stockt. Schwächeres Umkehrsignal als Engulfing – Bestätigung abwarten.' },
+  haramibear: { name: 'Bearish Harami', sig: 'bear', ctx: 'nach Aufwärtstrend', look: 'Große grüne Kerze, danach eine KLEINE rote Kerze, die komplett im Körper der grünen liegt.', mean: 'Der Kaufdruck stockt. Mögliche Wende nach unten – Bestätigung abwarten.' },
+  piercing: { name: 'Piercing Line', sig: 'bull', ctx: 'nach Abwärtstrend', look: 'Große rote Kerze, dann eröffnet eine grüne Kerze TIEFER und schließt über der Mitte des roten Körpers (aber nicht ganz darüber).', mean: 'Käufer schlagen kräftig zurück. Bullisches Umkehrsignal.' },
+  darkcloud: { name: 'Dark Cloud Cover', sig: 'bear', ctx: 'nach Aufwärtstrend', look: 'Große grüne Kerze, dann eröffnet eine rote Kerze HÖHER und schließt unter der Mitte des grünen Körpers.', mean: 'Verkäufer drücken kräftig. Bärisches Umkehrsignal („dunkle Wolke“).' },
+  tweezerbottom: { name: 'Tweezer Bottom', sig: 'bull', ctx: 'nach Abwärtstrend', look: 'Zwei Kerzen hintereinander mit (fast) GENAU gleichem Tief – erst rot, dann grün.', mean: 'Der Kurs wird zweimal am selben Preis gestoppt → Boden/Unterstützung. Bullisch.' },
+  tweezertop: { name: 'Tweezer Top', sig: 'bear', ctx: 'nach Aufwärtstrend', look: 'Zwei Kerzen hintereinander mit (fast) GENAU gleichem Hoch – erst grün, dann rot.', mean: 'Der Kurs wird zweimal am selben Preis gestoppt → Decke/Widerstand. Bärisch.' },
   crows: { name: 'Three Black Crows', sig: 'bear', ctx: 'nach Aufwärts- oder Seitwärtsphase', look: '3 große rote Kerzen hintereinander, jede schließt tiefer, kaum Dochte.', mean: 'Starker, anhaltender Verkaufsdruck. Bärisch.' }
 };
 
@@ -128,6 +148,11 @@ const FORMS = {
   bearflag: { name: 'Bärische Flagge', sig: 'bear', look: 'Steiler Abfall (Fahnenstange), danach kleiner, leicht steigender Kanal.', mean: 'Kurze Erholung im Abwärtstrend. Meist Fortsetzung nach unten.' },
   rectangle: { name: 'Rechteck / Range', sig: 'neutral', look: 'Kurs pendelt mehrmals zwischen waagerechter Ober- und Untergrenze.', mean: 'Kein Trend. Erst handeln, wenn der Kurs klar ausbricht (oder an den Rändern mit engem Stop).' },
   risingwedge: { name: 'Steigender Keil', sig: 'bear', look: 'Hochs und Tiefs steigen, aber die Linien laufen zusammen – die Bewegung verliert Kraft.', mean: 'Meist Ausbruch nach UNTEN, obwohl der Kurs steigt.' },
+  triplebottom: { name: 'Dreifachboden', sig: 'bull', look: 'Drei etwa gleich tiefe Tiefs nebeneinander, dazwischen Hochs auf ähnlicher Höhe (Nackenlinie).', mean: 'Verkäufer scheitern dreimal am selben Boden. Bruch der Nackenlinie nach oben → steigende Kurse erwartet.' },
+  tripletop: { name: 'Dreifachtop', sig: 'bear', look: 'Drei etwa gleich hohe Hochs nebeneinander, dazwischen Tiefs auf ähnlicher Höhe.', mean: 'Käufer scheitern dreimal an derselben Decke. Bruch nach unten → fallende Kurse erwartet.' },
+  cuphandle: { name: 'Tasse mit Henkel', sig: 'bull', look: 'Runder, U-förmiger Boden (Tasse), danach ein kleiner Rücksetzer (Henkel) knapp unter dem alten Hoch, dann Ausbruch.', mean: 'Langsame, gesunde Bodenbildung. Ausbruch über den Tassenrand → steigende Kurse.' },
+  channelup: { name: 'Aufwärtstrendkanal', sig: 'bull', look: 'Hochs und Tiefs steigen parallel – zwei gleich steile Linien wie Schienen nach oben.', mean: 'Geordneter Aufwärtstrend. Kaufgelegenheiten oft an der unteren Kanallinie, solange der Kanal hält.' },
+  channeldown: { name: 'Abwärtstrendkanal', sig: 'bear', look: 'Hochs und Tiefs fallen parallel – zwei gleich steile Linien wie Schienen nach unten.', mean: 'Geordneter Abwärtstrend. Keine Longs gegen den Kanal; Short-Chancen oft an der oberen Kanallinie.' },
   fallingwedge: { name: 'Fallender Keil', sig: 'bull', look: 'Hochs und Tiefs fallen, die Linien laufen zusammen – Verkaufsdruck lässt nach.', mean: 'Meist Ausbruch nach OBEN, obwohl der Kurs fällt.' }
 };
 

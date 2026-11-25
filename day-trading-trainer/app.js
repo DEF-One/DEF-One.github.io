@@ -4,7 +4,7 @@ const MIN = 60e3, DAY = 864e5;
 const INT = [0, 10 * MIN, 1 * DAY, 3 * DAY, 7 * DAY, 16 * DAY, 40 * DAY];
 const MAXBOX = INT.length - 1, ROUND = 15;
 let S = load();
-function fresh() { return { sk: {}, intro: [], queue: [], n: 0, days: {}, ok: 0, bad: 0, seenWelcome: false, goal: 30 }; }
+function fresh() { return { sk: {}, intro: [], queue: [], n: 0, days: {}, ok: 0, bad: 0, seenWelcome: false, goal: 30, exams: [] }; }
 function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.sk) return Object.assign(fresh(), s); } catch (e) { } return fresh(); }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } }
 const today = () => new Date().toISOString().slice(0, 10);
@@ -31,7 +31,8 @@ function devicePicker(after) {
 
 /* ===== Planer (Spaced Repetition) ===== */
 let filter = null, lastId = null;
-const inF = id => !filter || (filter === 'vis' ? isVis(id) : SKILLS[id].mod === filter);
+const isWeak = id => S.intro.includes(id) && S.sk[id] && S.sk[id].bad > 0 && (S.sk[id].box < 3 || S.sk[id].bad > S.sk[id].ok);
+const inF = id => !filter || (filter === 'vis' ? isVis(id) : filter === 'weak' ? isWeak(id) : SKILLS[id].mod === filter);
 function pickNext() {
   const now = Date.now();
   const qi = S.queue.findIndex(q => q.at <= S.n && inF(q.id) && q.id !== lastId);
@@ -42,7 +43,7 @@ function pickNext() {
   const nextNew = pickNew();
   if (nextNew && (learning < (filter && filter !== 'vis' ? 4 : 7) || !S.intro.some(inF))) { S.intro.push(nextNew); st(nextNew); return { id: nextNew, isNew: true }; }
   const pool = S.intro.filter(id => inF(id) && id !== lastId);
-  if (!pool.length) return { id: S.intro.find(inF) };
+  if (!pool.length) return S.intro.find(inF) ? { id: S.intro.find(inF) } : null;
   let tot = 0; const w = pool.map(id => {
     let x = 1 / Math.pow(S.sk[id].box + 1, 1.6) + (S.sk[id].bad > S.sk[id].ok ? .5 : 0);
     if (lastId && SKILLS[id].mod === SKILLS[lastId].mod) x *= .35;
@@ -54,6 +55,7 @@ function pickNext() {
 }
 // Neue Themen reihum aus allen (passenden) Bereichen
 function pickNew() {
+  if (filter === 'weak') return null;
   if (filter && filter !== 'vis') return ORDER.find(id => inF(id) && !S.intro.includes(id));
   const lastMod = lastId && SKILLS[lastId] ? SKILLS[lastId].mod : null;
   const cand = Object.keys(MODULES).filter(m => filter !== 'vis' || ['b', 'c', 'f', 'i'].includes(m)).map(m => {
@@ -70,7 +72,7 @@ function grade(id, result) {
   if (result === 'ok') { s.ok++; S.ok++; s.box = Math.min(s.box + 1, MAXBOX); s.due = now + INT[s.box]; }
   else {
     s.bad++; S.bad++; s.box = s.box >= 3 ? 1 : 0; s.due = now + INT[Math.max(1, s.box)];
-    S.queue = S.queue.filter(q => q.id !== id); S.queue.push({ id, at: S.n + R.int(3, 5) });
+    S.queue = S.queue.filter(q => q.id !== id); S.queue.push({ id, at: S.n + 2 }, { id, at: S.n + R.int(5, 8) }); // Drill: 2× in neuen Varianten
   }
   s.last = now; save();
 }
@@ -81,6 +83,7 @@ const view = $('#view');
 let cur = null, answered = false, sess = { ok: 0, n: 0, wrong: [] };
 
 function setTab(t) {
+  if (EX) examStop();
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
   ({ home, lex, prog })[t]();
   window.scrollTo(0, 0);
@@ -101,7 +104,7 @@ function home() {
   if (!DEV) return devicePicker(home);
   if (!S.seenWelcome) return welcome();
   const c = counts(), streak = calcStreak(), td = S.days[today()] || 0, goal = S.goal || 30, gp = Math.min(1, td / goal);
-  const cv = counts('vis');
+  const cv = counts('vis'), nWeak = Object.keys(SKILLS).filter(isWeak).length;
   view.innerHTML = `
   <section class="card hero">
     <div class="goal"><div class="ring" style="--p:${gp * 360}deg"><span>${td}<small>/${goal}</small></span></div>
@@ -116,11 +119,15 @@ function home() {
     <div class="legend"><span class="g">■ sicher</span><span class="y">■ am Lernen</span><span>■ neu</span></div>
     <button class="big go" id="start">▶ Training starten <small>(alles gemischt)</small></button>
     <button class="big alt" id="vis">📸 Bilder-Training <small>– nur Charts &amp; Muster erkennen (${cv.sicher}/${cv.total})</small></button>
+    <div class="duo"><button class="big alt2" id="weak" ${nWeak ? '' : 'disabled'}>🎯 Schwächen <small>${nWeak ? `(${nWeak} Themen)` : '(noch keine)'}</small></button>
+    <button class="big alt3" id="exam">📝 Klausur-Modus <small>ohne Hilfe</small></button></div>
   </section>
   <h3>Nur einen Bereich üben</h3>
   <div class="mods">${Object.entries(MODULES).map(([k, m]) => { const cc = counts(k); return `<button class="mod" data-m="${k}"><span class="ic">${m.icon}</span><span class="mn">${m.name}</span><span class="mc">${cc.sicher}/${cc.total} sicher${cc.due ? ` · <b>${cc.due} fällig</b>` : ''}</span>${bar(cc)}</button>`; }).join('')}</div>`;
   $('#start').onclick = () => startSession(null);
   $('#vis').onclick = () => startSession('vis');
+  $('#weak').onclick = () => startSession('weak');
+  $('#exam').onclick = examSetup;
   view.querySelectorAll('.mod').forEach(b => b.onclick = () => startSession(b.dataset.m));
 }
 function welcome() {
@@ -139,17 +146,18 @@ function welcome() {
 function calcStreak() { let d = new Date(), n = 0; if (!S.days[today()]) d.setDate(d.getDate() - 1); while (S.days[d.toISOString().slice(0, 10)]) { n++; d.setDate(d.getDate() - 1); } return n; }
 
 /* ===== Sitzung ===== */
-const modeName = () => filter === 'vis' ? '📸 Bilder-Training' : filter ? MODULES[filter].icon + ' ' + MODULES[filter].name : '🔀 Gemischt';
+const modeName = () => filter === 'weak' ? '🎯 Schwächen-Training' : filter === 'vis' ? '📸 Bilder-Training' : filter ? MODULES[filter].icon + ' ' + MODULES[filter].name : '🔀 Gemischt';
 function startSession(mod) { filter = mod; sess = { ok: 0, n: 0, wrong: [] }; next(); }
 function topbar() {
+  if (EX) return `<div class="sbar"><button class="ghost" id="back">✕</button><span class="mode">📝 Klausur · Frage ${EX.i + 1}/${EX.list.length}</span><span class="sc" id="extime">${EX.limit ? fmtT(EX.limit - (Date.now() - EX.start)) : ''}</span></div><div class="rbar ex"><i style="width:${EX.i / EX.list.length * 100}%"></i></div>`;
   const p = (sess.n % ROUND) / ROUND * 100;
   return `<div class="sbar"><button class="ghost" id="back">←</button><span class="mode">${modeName()}</span><span class="sc">${sess.ok}/${sess.n} ✓</span></div><div class="rbar"><i style="width:${p}%"></i></div>`;
 }
-function bindBack() { $('#back').onclick = () => setTab('home'); }
+function bindBack() { $('#back').onclick = () => { if (EX) { const b = $('#back'); if (!b.dataset.c) { b.dataset.c = 1; b.textContent = 'Abbrechen?'; return; } examStop(); } setTab('home'); }; }
 function next() {
   if (sess.n > 0 && sess.n % ROUND === 0 && !sess.shown) { sess.shown = true; return roundSummary(); }
   sess.shown = false;
-  const p = pickNext(); if (!p || !p.id) return home();
+  const p = pickNext(); if (!p || !p.id) { if (filter === 'weak') { setTab('home'); return modal('🎯 Alles aufgeholt!', '<p>Du hast gerade keine offenen Schwachstellen. Trainiere normal weiter – neue Fehler landen automatisch hier.</p>'); } return home(); }
   lastId = p.id; save();
   if (p.isNew) return showLesson(p.id);
   showTask(p.id);
@@ -195,11 +203,11 @@ function showTask(id) {
     <div class="tag">${MODULES[sk.mod].icon} ${MODULES[sk.mod].name}<span class="lvl" title="Lernstufe">${'●'.repeat(box)}${'○'.repeat(MAXBOX - box)}</span></div>
     <div class="tmain"><div class="q">${g.q}</div>${visual ? `<div class="vis" id="vis">${visual}</div>` : ''}</div>
     <div class="tside">${answerHtml}
-      <div class="hintrow"><button class="ghost small" id="hintBtn">💡 Tipp</button><div id="hint"></div></div>
+      ${EX ? '' : '<div class="hintrow"><button class="ghost small" id="hintBtn">💡 Tipp</button><div id="hint"></div></div>'}
       <div id="fb"></div></div>
   </section>`;
   bindBack();
-  $('#hintBtn').onclick = showHint;
+  if ($('#hintBtn')) $('#hintBtn').onclick = showHint;
   if (g.type === 'num') {
     const inp = $('#num'); if (DEV !== 'phone') inp.focus();
     $('#chk').onclick = checkNum; inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (!answered) checkNum(); else next(); } };
@@ -213,13 +221,16 @@ function tap(i) {
   const g = cur.g, good = g.okIdx ? g.okIdx.includes(i) : i >= g.range[0] && i <= g.range[1];
   const spec = { ...g.spec, ...(g.solved || {}), clickable: false, tapped: i };
   if (g.okIdx) spec.hlIdx = g.okIdx; else spec.highlight = g.range;
+  if (EX) return examAnswer(good, '', renderChart(spec), true);
   $('#vis').innerHTML = renderChart(spec);
   $('.tapinfo').textContent = good ? '👆 Richtig getippt!' : '👆 Das gelb markierte war gesucht (weißer Rahmen = dein Tipp)';
-  feedback(good);
+  feedback(good, null, good ? '' : more());
 }
+const more = () => cur.g.more ? `<div class="morebox">${cur.g.more()}</div>` : '';
 function choose(i) {
   if (answered) return; answered = true;
   const o = cur.opts[i], good = o.ok || o.part;
+  if (EX) return examAnswer(good, o.t, cur.opts.find(x => x.ok).t);
   view.querySelectorAll('.opt').forEach((b, j) => { b.disabled = true; const x = cur.opts[j]; if (x.ok) b.classList.add('right'); else if (x.part) b.classList.add('part'); if (j === i && !good) b.classList.add('wrong'); });
   let extra = '';
   const cmp = cur.g.cmp;
@@ -228,12 +239,13 @@ function choose(i) {
     const pic = cmp.kind === 'c' ? renderChart({ ...buildPattern(k, { trail: 'none' }), mini: true }) : renderChart({ candles: buildForm(k), mini: true });
     extra = `<div class="cmp"><div class="cmpimg">${pic}</div><div><b>Dein Tipp: ${D.name}</b><br><span class="hint">So sieht das aus: ${D.look}</span></div></div>`;
   }
-  feedback(good, o.part && !o.ok ? '🟡 Auch vertretbar' : null, extra);
+  feedback(good, o.part && !o.ok ? '🟡 Auch vertretbar' : null, extra + (good ? '' : more()));
 }
 function parseNum(s) { s = String(s).trim().replace(/\s|€|%|R|stück/gi, ''); if (/,/.test(s)) s = s.replace(/\./g, '').replace(',', '.'); return parseFloat(s); }
 function checkNum() {
   const v = parseNum($('#num').value); if (isNaN(v)) { $('#num').classList.add('shake'); setTimeout(() => $('#num').classList.remove('shake'), 400); return; }
   answered = true; const g = cur.g, good = Math.abs(v - g.answer) <= (g.tol || 0) + 1e-9;
+  if (EX) return examAnswer(good, fmt0(v) + ' ' + (g.unit || ''), fmt0(Math.round(g.answer * 100) / 100) + ' ' + (g.unit || ''));
   $('#num').disabled = true; $('#chk').disabled = true;
   feedback(good, null, `<p>Richtige Antwort: <b>${fmt0(Math.round(g.answer * 100) / 100)} ${g.unit || ''}</b></p>`);
 }
@@ -255,7 +267,7 @@ const nextTxt = b => ['gleich', 'in ~10 Min.', 'morgen', 'in 3 Tagen', 'in 1 Woc
 
 document.addEventListener('keydown', e => {
   if ($('.modal')) { if (e.key === 'Escape') $('.modal').remove(); return; }
-  if (!cur) return;
+  if (!cur || (EX && answered)) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (cur.summary && e.key === 'Enter') { e.preventDefault(); return next(); }
   if (cur.lesson && e.key === 'Enter') { e.preventDefault(); return showTask(cur.id); }
@@ -321,6 +333,82 @@ function prog() {
   $('#exp').onclick = () => { $('#code').value = btoa(unescape(encodeURIComponent(JSON.stringify(S)))); $('#code').select(); $('#msg').textContent = 'Code kopieren und auf dem anderen Gerät unter „Code laden“ einfügen.'; };
   $('#imp').onclick = () => { try { const d = JSON.parse(decodeURIComponent(escape(atob($('#code').value.trim())))); if (!d.sk) throw 0; S = Object.assign(fresh(), d); save(); $('#msg').textContent = '✅ Fortschritt geladen!'; setTimeout(prog, 600); } catch (e) { $('#msg').textContent = '❌ Ungültiger Code.'; } };
   $('#rst').onclick = () => { const b = $('#rst'); if (b.dataset.c) { S = fresh(); save(); setTab('home'); } else { b.dataset.c = 1; b.textContent = 'Wirklich? Nochmal klicken'; } };
+}
+
+/* ===== Galerie: neue Beispiele ===== */
+document.addEventListener('click', e => {
+  const b = e.target.closest('.regal'); if (!b) return;
+  const w = b.closest('h4').nextElementSibling; if (w) w.innerHTML = gallery(b.dataset.kind, b.dataset.key);
+});
+
+/* ===== Klausur-Modus ===== */
+let EX = null;
+const fmtT = ms => { ms = Math.max(0, ms); const s = Math.ceil(ms / 1000); return `⏱ ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const NOTE = p => p >= 92 ? [1, 'sehr gut'] : p >= 81 ? [2, 'gut'] : p >= 67 ? [3, 'befriedigend'] : p >= 50 ? [4, 'ausreichend'] : p >= 30 ? [5, 'mangelhaft'] : [6, 'ungenügend'];
+let exOpt = { n: 30, scope: 'all', timed: false };
+function examSetup() {
+  cur = null; filter = null;
+  const hist = (S.exams || []).slice(-8).reverse();
+  const learned = S.intro.length;
+  const grp = (k, vals) => vals.map(([v, l]) => `<button class="ghost ${exOpt[k] === v ? 'sel' : ''}" data-k="${k}" data-v="${v}">${l}</button>`).join('');
+  view.innerHTML = `<section class="card examset"><h2>📝 Klausur-Modus</h2>
+    <p>Kunterbunt aus allen Bereichen: Begriffe, Bilder, Muster, Indikatoren, Rechnen, Situationen. <b>Keine Erklärungen, keine Tipps, kein Richtig/Falsch</b> während der Klausur – die Auswertung mit Note kommt am Ende.</p>
+    <div class="setrow"><span>Anzahl Fragen</span><div>${grp('n', [[20, '20'], [30, '30'], [50, '50'], [80, '80']])}</div></div>
+    <div class="setrow"><span>Themen</span><div>${grp('scope', [['all', 'Alles (auch Neues)'], ['learned', `Nur Gelerntes (${learned})`]])}</div></div>
+    <div class="setrow"><span>Zeitlimit</span><div>${grp('timed', [[false, 'Ohne'], [true, 'Mit (45 Sek./Frage)']])}</div></div>
+    <button class="big go" id="exgo">Klausur starten</button>
+    <p class="hint">Fehler aus der Klausur landen automatisch in deinem Training und in „Schwächen“.</p>
+    ${hist.length ? `<h3>Letzte Klausuren</h3><div class="exhist">${hist.map(x => `<div><span>${x.d.split('-').reverse().join('.')}</span><span>${x.ok}/${x.n}</span><b class="n${x.note}">Note ${x.note}</b></div>`).join('')}</div>` : ''}
+  </section>`;
+  view.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { const k = b.dataset.k; exOpt[k] = k === 'n' ? +b.dataset.v : k === 'timed' ? b.dataset.v === 'true' : b.dataset.v; examSetup(); });
+  $('#exgo').onclick = () => examStart();
+}
+function examStart() {
+  let pool = Object.keys(SKILLS);
+  if (exOpt.scope === 'learned' && S.intro.length >= 8) pool = S.intro.slice();
+  const byMod = {}; pool.forEach(id => (byMod[SKILLS[id].mod] = byMod[SKILLS[id].mod] || []).push(id));
+  Object.keys(byMod).forEach(m => byMod[m] = R.shuffle(byMod[m]));
+  const mods = Object.keys(byMod), list = []; let last = null;
+  while (list.length < exOpt.n) {
+    const m = R.pick(mods.filter(x => x !== last).length ? mods.filter(x => x !== last) : mods);
+    if (!byMod[m].length) byMod[m] = R.shuffle(pool.filter(id => SKILLS[id].mod === m));
+    list.push(byMod[m].pop()); last = m;
+  }
+  EX = { list, i: 0, res: [], start: Date.now(), limit: exOpt.timed ? exOpt.n * 45e3 : 0 };
+  if (EX.limit) EX.timer = setInterval(() => { const left = EX.limit - (Date.now() - EX.start); const t = $('#extime'); if (t) t.textContent = fmtT(left); if (left <= 0) examEnd(true); }, 500);
+  examNext();
+}
+function examNext() { if (EX.i >= EX.list.length) return examEnd(); lastId = EX.list[EX.i]; showTask(EX.list[EX.i]); }
+function examAnswer(good, your, correct, isTap) {
+  const id = cur.id, g = cur.g;
+  EX.res.push({ id, good, q: g.q, visual: isTap ? correct : g.visual, your, correct: isTap ? '' : correct, explain: g.explain, img: !!g.img });
+  if (!S.intro.includes(id)) { S.intro.push(id); st(id); }
+  grade(id, good ? 'ok' : 'bad');
+  EX.i++;
+  const t = $('.task'); if (t) t.classList.add('saved');
+  setTimeout(examNext, 220);
+}
+function examStop() { if (EX && EX.timer) clearInterval(EX.timer); EX = null; }
+function examEnd(timeUp) {
+  const E = EX; examStop(); cur = null;
+  const n = E.list.length, ok = E.res.filter(r => r.good).length, pct = Math.round(ok / n * 100), [note, nt] = NOTE(pct);
+  S.exams = S.exams || []; S.exams.push({ d: today(), n, ok, pct, note }); save();
+  const per = {}; E.res.forEach(r => { const m = SKILLS[r.id].mod; per[m] = per[m] || [0, 0]; per[m][1]++; if (r.good) per[m][0]++; });
+  const unanswered = n - E.res.length;
+  const item = (r, i) => `<details class="rev ${r.good ? 'ok' : 'bad'}" ${r.good ? '' : 'open'}><summary>${r.good ? '✅' : '❌'} <b>${i + 1}.</b> ${MODULES[SKILLS[r.id].mod].icon} ${SKILLS[r.id].name}</summary>
+    <div class="q">${r.q}</div>${r.visual ? `<div class="vis">${r.visual}</div>` : ''}
+    ${r.correct ? `<div class="ans"><div><small>Deine Antwort</small>${r.img ? `<div class="mini">${r.your}</div>` : `<b>${r.your}</b>`}</div><div><small>Richtig</small>${r.img ? `<div class="mini">${r.correct}</div>` : `<b>${r.correct}</b>`}</div></div>` : '<p class="hint">Gelb markiert = richtig, weißer Rahmen = dein Tipp.</p>'}
+    <div class="ex">${r.explain}</div></details>`;
+  view.innerHTML = `<section class="card summary"><h2>📝 Klausur-Ergebnis${timeUp ? ' <small>(Zeit abgelaufen)</small>' : ''}</h2>
+    <div class="note n${note}">Note ${note}<small>${nt}</small></div>
+    <div class="big-pct">${pct} %</div><p class="hint">${ok} von ${n} richtig${unanswered ? ` · ${unanswered} nicht beantwortet` : ''}</p>
+    <div class="permod">${Object.entries(per).map(([m, [a, b]]) => `<div><span>${MODULES[m].icon} ${MODULES[m].name}</span><b>${a}/${b}</b><div class="pbar"><i class="${a / b >= .67 ? 'g' : 'y'}" style="width:${a / b * 100}%"></i></div></div>`).join('')}</div>
+    <div class="row-end"><button class="ghost" id="exhome">Zur Übersicht</button><button class="ghost" id="exweak">🎯 Fehler trainieren</button><button class="go" id="exagain">Neue Klausur</button></div></section>
+    <section class="card"><h3>Auswertung</h3><div class="row-end" style="justify-content:flex-start;margin:0 0 10px"><button class="ghost small sel" data-f="bad">Nur Fehler</button><button class="ghost small" data-f="all">Alle Fragen</button></div><div id="revlist"></div></section>`;
+  const draw = f => { $('#revlist').innerHTML = E.res.map((r, i) => (f === 'all' || !r.good) ? item(r, i) : '').join('') || '<p>Keine Fehler – perfekt! 🏆</p>'; view.querySelectorAll('[data-f]').forEach(b => b.classList.toggle('sel', b.dataset.f === f)); };
+  view.querySelectorAll('[data-f]').forEach(b => b.onclick = () => draw(b.dataset.f)); draw('bad');
+  $('#exhome').onclick = () => setTab('home'); $('#exagain').onclick = examSetup; $('#exweak').onclick = () => startSession('weak');
+  window.scrollTo(0, 0);
 }
 
 applyDevice();
